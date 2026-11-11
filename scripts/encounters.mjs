@@ -20,21 +20,25 @@ const shots = [
 for (const s of shots) {
   await page.goto(`${base}/?realm=${s.realm}&seed=${process.env.SEED ?? 7}`);
   await page.waitForTimeout(300);
+  await page.click('#btn-battle');
+  await page.waitForTimeout(200);
   await page.evaluate(async ({ arch, wave }) => {
     const { composePlan } = await import('/src/waves/waveDirector.js');
     const { getArchetype } = await import('/src/waves/archetypes.js');
     const { createRng } = await import('/src/core/rng.js');
-    const { game, actions } = window.endlessTower;
-    actions.begin();
+    const { game } = window.endlessTower;
     game.gold = 1e6;
     game.wave = wave - 1;
-    game.summon(120);
     const spots = [];
     for (let y = 0; y < game.map.rows; y++) for (let x = 0; x < game.map.cols; x++) {
       const i = y * game.map.cols + x;
       if (game.map.grid[i] === 0 && game.map.pathDist[i] <= 2) spots.push([x, y]);
     }
-    for (const u of [...game.bench].slice(0, 60)) { const p = spots.splice(Math.floor(Math.random() * spots.length), 1)[0]; if (p) game.placeFromBench(u.def.id, p[0], p[1]); }
+    for (let k = 0; k < 80 && spots.length; k++) {
+      const p = spots.splice(Math.floor(Math.random() * spots.length), 1)[0];
+      const u = game.deploy('dude', p[0], p[1]);
+      for (let l = 0; l < k % 6; l++) game.upgrade(u);
+    }
     game.nextPlan = composePlan(getArchetype(arch), wave, createRng(5), game.map.routes.length);
     game.startNextWave();
   }, s);

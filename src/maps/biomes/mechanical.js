@@ -1,19 +1,20 @@
 import { TILE, WORLD_W, WORLD_H, COLS, ROWS } from '../../config.js';
 import { TileType, sampleRoute } from '../mapGenerator.js';
-import { scatter, softBlob, dropShadow } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
 
 const palette = {
-  ground: '#3a3f47',
+  ground: '#3b3f45',
+  groundRamp: ['#2f3338', '#3b3f45', '#45484b', '#4f4c47'],
   groundVariants: ['#454b55', '#2e3239', '#4d4a44', '#282c32', '#3f444c'],
   path: '#5c6068',
   pathEdge: '#1b1e23',
   pathCenter: '#7a7e86',
-  feature: '#2c7d34',
+  feature: '#3b6638',
   featureEdge: '#16181c',
-  featureDeep: '#46b83c',
+  featureDeep: '#4b7d3e',
   featureShine: '#e0ffb0',
   bridge: '#6b7078',
   pad: '#4a4f58',
@@ -40,20 +41,23 @@ export default {
   name: 'Mechanical Wasteland',
   tagline: 'The machines never stopped. Their makers did.',
   palette,
+  // cold overhead light with warm sodium-lamp tint
+  lighting: { pos: { x: 640, y: -200 }, strength: 0.1, vignette: 0.5, grade: '#eceef2' },
   enemyPalette: { body: '#d4683a', dark: '#5a2414', eye: '#7ff7ff', glow: '#ff9a5a' },
   portalColor: '#ffb12b',
   bossTitle: 'Warden of the Iron Heart',
   bridgeStyle: 'stone',
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.05, rivers: [0, 1], noiseScale: 0.22 },
   decor: [
-    { kind: 'bigGear', count: [4, 7], fp: 2, minPathDist: 2, size: 1.05 },
-    { kind: 'bigGear', count: [4, 7], fp: 1, minPathDist: 1, size: 0.6 },
-    { kind: 'steamVent', count: [5, 8], fp: 1, minPathDist: 1, size: 0.5 },
-    { kind: 'machine', count: [3, 5], fp: 2, minPathDist: 2, size: 1.0 },
-    { kind: 'smokestack', count: [2, 4], fp: 1, minPathDist: 1, size: 0.6 },
+    { kind: 'reactor', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.45 },
+    { kind: 'bigGear', count: [3, 5], fp: 2, minPathDist: 2, size: 1.05, clump: 0.7 },
+    { kind: 'bigGear', count: [3, 6], fp: 1, minPathDist: 1, size: 0.6, clump: 0.7 },
+    { kind: 'steamVent', count: [4, 6], fp: 1, minPathDist: 1, size: 0.5, clump: 0.4 },
+    { kind: 'machine', count: [2, 4], fp: 2, minPathDist: 2, size: 1.0, clump: 0.5 },
+    { kind: 'smokestack', count: [1, 3], fp: 1, minPathDist: 1, size: 0.6 },
   ],
 
-  paintGroundDetail(ctx, map, rng) {
+  paintGroundDetail(ctx, map, rng, density) {
     // Riveted steel plates
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1.5;
@@ -86,7 +90,7 @@ export default {
       }
     }
     scatter(map, rng, 40, [TileType.GROUND], (x, y) => softBlob(ctx, x, y, rng.float(10, 26), '#0b0c0f', 0.45));
-    scatter(map, rng, 60, [TileType.GROUND], (x, y) => softBlob(ctx, x, y, rng.float(8, 18), '#8a4a20', 0.25));
+    scatterWeighted(map, rng, 140, [TileType.GROUND], density, (x, y) => softBlob(ctx, x, y, rng.float(8, 18), '#7a4a2a', 0.2));
     // hazard stripes around objective
     const { px, py } = map.goal;
     ctx.save();
@@ -145,6 +149,48 @@ export default {
         ctx.fillStyle = '#1d2026';
         circle(ctx, d.x, d.y, r * 1.02);
         ctx.fill();
+        break;
+      }
+      case 'reactor': {
+        // Landmark: a derelict cooling reactor – ribbed drum, hazard ring, fan housing.
+        dropShadow(ctx, d.x + r * 0.25, d.y + r * 0.3, r * 1.15, r * 0.85, 0.45);
+        ctx.fillStyle = '#2a2d33';
+        circle(ctx, d.x, d.y, r * 1.02);
+        ctx.fill();
+        // hazard ring
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, r, 0, TAU);
+        ctx.arc(d.x, d.y, r * 0.86, 0, TAU, true);
+        ctx.clip();
+        for (let i = 0; i < 24; i++) {
+          ctx.fillStyle = i % 2 ? '#c99a2e' : '#1d1d1f';
+          ctx.beginPath();
+          ctx.moveTo(d.x, d.y);
+          ctx.arc(d.x, d.y, r, (i / 24) * TAU, ((i + 1) / 24) * TAU);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        const g = ctx.createLinearGradient(d.x - r, d.y - r, d.x + r, d.y + r);
+        g.addColorStop(0, '#8a8f97');
+        g.addColorStop(1, '#41454c');
+        ctx.fillStyle = g;
+        circle(ctx, d.x, d.y, r * 0.84);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(20,22,26,0.55)';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * TAU;
+          ctx.beginPath();
+          ctx.moveTo(d.x + Math.cos(a) * r * 0.5, d.y + Math.sin(a) * r * 0.5);
+          ctx.lineTo(d.x + Math.cos(a) * r * 0.84, d.y + Math.sin(a) * r * 0.84);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#1b1d21';
+        circle(ctx, d.x, d.y, r * 0.48);
+        ctx.fill();
+        softBlob(ctx, d.x + r * 0.5, d.y + r * 0.45, r * 0.3, '#8a4a20', 0.45);
         break;
       }
       case 'steamVent': {
@@ -207,6 +253,7 @@ export default {
     const gears = map.decor.filter((d) => d.kind === 'bigGear').map((d) => ({ d, dir: d.seed > 0.5 ? 1 : -1, sp: rng.float(0.3, 0.8), teeth: d.fp === 2 ? 14 : 9 }));
     const vents = map.decor.filter((d) => d.kind === 'steamVent' || d.kind === 'smokestack').map((d) => ({ d, timer: rng.float(0, 3), smoke: d.kind === 'smokestack' }));
     const machines = map.decor.filter((d) => d.kind === 'machine');
+    const reactor = map.decor.find((d) => d.kind === 'reactor');
     const puffs = [];
     const bubbles = Array.from({ length: map.featureTiles.length ? 24 : 0 }, () => ({ t: rng.pick(map.featureTiles), ph: rng.float(0, 2) }));
     const sparks = [];
@@ -240,7 +287,7 @@ export default {
             const a = rng.float(0, TAU);
             sparks.push({ x: m.x + m.r * 0.8, y: m.y - m.r * 0.5, vx: Math.cos(a) * rng.float(30, 80), vy: Math.sin(a) * rng.float(30, 80) - 30, life: rng.float(0.3, 0.7) });
           }
-          sparkTimer = rng.float(1.5, 4);
+          sparkTimer = rng.float(4, 9);
         }
         for (let i = sparks.length - 1; i >= 0; i--) {
           const s = sparks[i];
@@ -263,7 +310,6 @@ export default {
             ctx.stroke();
           }
           ctx.restore();
-          for (const b of bubbles) drawGlow(ctx, '#6dff4a', b.t.x * TILE + 16, b.t.y * TILE + 16, 22, 0.08);
         }
         for (const g of gears) {
           const { d } = g;
@@ -290,15 +336,46 @@ export default {
           circle(ctx, d.x, d.y, d.r * 0.14);
           ctx.fill();
         }
+        if (reactor) {
+          // slow-turning cooling fan inside the reactor drum
+          const { x, y, r } = reactor;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(t * 0.9);
+          ctx.fillStyle = '#5c6169';
+          ctx.strokeStyle = '#25282d';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 5; i++) {
+            ctx.rotate(TAU / 5);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(r * 0.3, -r * 0.08, r * 0.44, r * 0.05);
+            ctx.lineTo(r * 0.3, r * 0.14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+          ctx.restore();
+          ctx.fillStyle = '#9aa0a8';
+          circle(ctx, x, y, r * 0.08);
+          ctx.fill();
+          const on = Math.sin(t * 2.2) > 0.6;
+          ctx.fillStyle = on ? '#e2533f' : '#5a2a24';
+          circle(ctx, x + r * 0.7, y - r * 0.7, 2.6);
+          ctx.fill();
+          if (on) drawGlow(ctx, '#e2533f', x + r * 0.7, y - r * 0.7, 9, 0.4);
+        }
         for (const m of machines) {
           const on = Math.sin(t * 3 + m.seed * 20) > 0;
-          drawGlow(ctx, on ? '#ff4a3a' : '#5aff7a', m.x + m.r * 0.6, m.y - m.r * 0.5, 9, 0.9);
-          drawGlow(ctx, '#ffb12b', m.x - m.r * 0.6, m.y - m.r * 0.5, 7, 0.5 + 0.5 * Math.sin(t * 5 + m.seed));
+          ctx.fillStyle = on ? '#d9533f' : '#5fae6a';
+          circle(ctx, m.x + m.r * 0.6, m.y - m.r * 0.5, 2.2);
+          ctx.fill();
+          drawGlow(ctx, on ? '#d9533f' : '#5fae6a', m.x + m.r * 0.6, m.y - m.r * 0.5, 6, 0.3);
           ctx.fillStyle = rgba('#7ff7ff', 0.5 + 0.3 * Math.sin(t * 2 + m.seed * 3));
           ctx.fillRect(m.x - m.r * 0.7, m.y - m.r * 0.05, m.r * 0.8, m.r * 0.12);
         }
         // Direction chevrons along every route: an at-a-glance read of enemy flow.
-        ctx.fillStyle = rgba('#ffb12b', 0.28);
+        ctx.fillStyle = rgba('#d9a441', 0.2);
         for (const route of map.routes) {
           const spacing = 48;
           const offset = (t * 22) % spacing;

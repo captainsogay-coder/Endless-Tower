@@ -1,25 +1,28 @@
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType } from '../mapGenerator.js';
-import { scatter, softBlob, dropShadow, isInterior } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow, isInterior, blobPoints } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
 
+// Volcanic Wasteland — basalt greys warmed by lava light. The lava is the
+// only saturated colour on the map; everything else stays muted.
 const palette = {
-  ground: '#2a2022',
-  groundVariants: ['#3b2a2a', '#1b1516', '#4a2c24', '#2f2627', '#3a2420'],
-  path: '#5f514b',
-  pathEdge: '#1a1314',
-  pathCenter: '#806760',
-  feature: '#ff6a1a',
-  featureEdge: '#2a0d06',
-  featureDeep: '#ffb02e',
-  featureShine: '#fff1a0',
-  bridge: '#4d4242',
-  pad: '#3d3232',
-  accent: '#ff9a4a',
-  light: '#ff7b2e',
-  shadow: '#120505',
+  ground: '#2e2728',
+  groundRamp: ['#1e1a1b', '#2b2425', '#3a2e2c', '#4a3732'],
+  groundVariants: ['#3a2e2c', '#1e1a1b'],
+  path: '#5c534e',
+  pathEdge: '#1b1617',
+  pathCenter: '#776a62',
+  feature: '#d4521f',
+  featureEdge: '#1a0b07',
+  featureDeep: '#e57a30',
+  featureShine: '#ffe2a0',
+  bridge: '#4a4242',
+  pad: '#3d3434',
+  accent: '#e0874a',
+  light: '#ff9a5a',
+  shadow: '#0e0505',
 };
 
 function jagged(ctx, x, y, r, seed, points = 7) {
@@ -38,21 +41,22 @@ export default {
   name: 'Volcanic Wasteland',
   tagline: 'The earth splits and bleeds fire',
   palette,
+  lighting: { pos: { x: 640, y: 352 }, strength: 0.06, vignette: 0.55, grade: '#f6e7dd' },
   enemyPalette: { body: '#cfc6ba', dark: '#4a3c36', eye: '#ff4d1a', glow: '#ffb27a' },
   portalColor: '#ff5a1f',
   bossTitle: 'Warden of the Molten Deep',
   bridgeStyle: 'stone',
   layout: { styles: { meander: 3, serpentine: 2, converge: 2 }, featureDensity: 0.055, rivers: [1, 2], noiseScale: 0.2 },
   decor: [
-    { kind: 'volcano', count: [1, 1], fp: 3, minPathDist: 3, size: 2.2 },
-    { kind: 'rockSpire', count: [8, 13], fp: 1, minPathDist: 1, size: 0.62 },
+    { kind: 'volcano', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 2.4 },
+    { kind: 'rockSpire', count: [7, 11], fp: 1, minPathDist: 1, size: 0.62, clump: 0.6 },
     { kind: 'rockSpire', count: [3, 5], fp: 2, minPathDist: 2, size: 1.05 },
-    { kind: 'obsidian', count: [5, 9], fp: 1, minPathDist: 1, size: 0.5 },
+    { kind: 'obsidian', count: [4, 7], fp: 1, minPathDist: 1, size: 0.5, clump: 0.5 },
   ],
 
-  paintGroundDetail(ctx, map, rng) {
-    scatter(map, rng, 70, [TileType.GROUND], (x, y) => softBlob(ctx, x, y, rng.float(12, 30), '#000000', 0.25));
-    scatter(map, rng, 900, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], (x, y) => {
+  paintGroundDetail(ctx, map, rng, density) {
+    scatter(map, rng, 50, [TileType.GROUND], (x, y) => softBlob(ctx, x, y, rng.float(12, 30), '#000000', 0.22));
+    scatterWeighted(map, rng, 1600, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], density, (x, y) => {
       ctx.fillStyle = rgba(rng.pick(['#4a3a38', '#141010', '#5a3a30']), rng.float(0.5, 0.9));
       circle(ctx, x, y, rng.float(0.8, 2.4));
       ctx.fill();
@@ -61,10 +65,11 @@ export default {
 
   paintFeatures(ctx, map, pal) {
     const tiles = map.featureTiles;
+    const blobs = blobPoints(map);
     const pass = (r, color, filter) => {
       ctx.fillStyle = color;
       ctx.beginPath();
-      for (const t of tiles) {
+      for (const t of blobs) {
         if (filter && !filter(t)) continue;
         const x = t.x * TILE + TILE / 2;
         const y = t.y * TILE + TILE / 2;
@@ -74,11 +79,22 @@ export default {
       ctx.fill();
     };
     // heat halo on surrounding rock
-    for (const t of tiles) softBlob(ctx, t.x * TILE + TILE / 2, t.y * TILE + TILE / 2, TILE * 1.3, '#ff4a10', 0.08);
+    for (const t of tiles) softBlob(ctx, t.x * TILE + TILE / 2, t.y * TILE + TILE / 2, TILE * 1.2, '#c4401a', 0.07);
     pass(TILE * 0.86, '#140604');
     pass(TILE * 0.74, '#7a1e08');
     pass(TILE * 0.64, pal.feature);
-    pass(TILE * 0.66, pal.featureDeep, (t) => isInterior(map, t));
+    pass(TILE * 0.6, pal.featureDeep, (t) => isInterior(map, t));
+    // cooled crust floating on the surface
+    for (const t of tiles) {
+      const n = (t.x * 928371 + t.y * 12345) % 7;
+      if (n > 2) continue;
+      const x = t.x * TILE + 8 + (n * 5) % 16;
+      const y = t.y * TILE + 10 + (n * 7) % 12;
+      ctx.fillStyle = 'rgba(40,14,8,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(x, y, 5 + n, 3 + n * 0.6, n, 0, TAU);
+      ctx.fill();
+    }
   },
 
   paintDecor(ctx, d) {
@@ -163,8 +179,7 @@ export default {
     }
     const flows = Array.from({ length: map.featureTiles.length ? 40 : 0 }, () => ({ t: rng.pick(map.featureTiles), ph: rng.float(0, TAU), s: rng.float(5, 12) }));
     const embers = [];
-    const ash = Array.from({ length: Math.round(70 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), vx: rng.float(8, 18), vy: rng.float(6, 14), s: rng.float(0.8, 2) }));
-    const rising = Array.from({ length: Math.round(26 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), vy: rng.float(12, 30), ph: rng.float(0, TAU) }));
+    const ash = Array.from({ length: Math.round(36 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), vx: rng.float(8, 18), vy: rng.float(6, 14), s: rng.float(0.8, 2) }));
     let eruptTimer = rng.float(6, 10);
     let flash = 0;
     let quake = 0;
@@ -180,9 +195,8 @@ export default {
         const sp = rng.float(20, volcano ? 120 : 50);
         embers.push({ x: sx, y: sy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - rng.float(10, 40), life: rng.float(0.8, 2.2), max: 2.2, s: rng.float(1.5, 3.5) });
       }
-      flash = volcano ? 0.5 : 0.2;
+      flash = volcano ? 0.4 : 0;
       quake = volcano ? 0.6 : 0;
-      scene.shake?.(volcano ? 3 : 1);
     };
 
     return {
@@ -209,11 +223,6 @@ export default {
           if (a.x > WORLD_W + 5) a.x = -5;
           if (a.y > WORLD_H + 5) a.y = -5;
         }
-        for (const r of rising) {
-          r.y -= r.vy * dt;
-          r.x += Math.sin(t * 2 + r.ph) * 6 * dt;
-          if (r.y < -5) { r.y = WORLD_H + 5; r.x = Math.random() * WORLD_W; }
-        }
       },
       drawUnder(ctx, t) {
         if (map.featureTiles.length) {
@@ -223,7 +232,7 @@ export default {
           for (const f of flows) {
             const x = f.t.x * TILE + 16 + Math.sin(t * 0.6 + f.ph) * 10;
             const y = f.t.y * TILE + 16 + Math.cos(t * 0.5 + f.ph) * 10;
-            drawGlow(ctx, '#ffd36a', x, y, f.s * 2, 0.35 + 0.25 * Math.sin(t * 1.5 + f.ph));
+            drawGlow(ctx, '#ffc26a', x, y, f.s * 2, 0.22 + 0.12 * Math.sin(t * 1.2 + f.ph));
           }
           ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = 'rgba(60,15,5,0.45)';
@@ -238,7 +247,7 @@ export default {
         }
         ctx.lineCap = 'round';
         for (const c of cracks) {
-          const glow = 0.35 + 0.35 * Math.sin(t * 1.3 + c.ph);
+          const glow = 0.3 + 0.15 * Math.sin(t * 0.9 + c.ph);
           ctx.strokeStyle = rgba('#ff7a2a', glow);
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -251,9 +260,12 @@ export default {
         }
         if (volcano) {
           const pulse = 0.55 + 0.25 * Math.sin(t * 2) + quake;
-          drawGlow(ctx, '#ff7a1a', volcano.x, volcano.y, volcano.r * 0.9, pulse);
-          ctx.fillStyle = rgba('#ffcc55', 0.8);
-          circle(ctx, volcano.x, volcano.y, volcano.r * 0.22);
+          drawGlow(ctx, '#e0642a', volcano.x, volcano.y, volcano.r * 0.6, pulse * 0.5);
+          ctx.fillStyle = '#c4501f';
+          circle(ctx, volcano.x, volcano.y, volcano.r * 0.24);
+          ctx.fill();
+          ctx.fillStyle = rgba('#f0a040', 0.55 + 0.2 * Math.sin(t * 1.5));
+          circle(ctx, volcano.x - volcano.r * 0.03, volcano.y - volcano.r * 0.03, volcano.r * 0.14);
           ctx.fill();
         }
       },
@@ -261,12 +273,11 @@ export default {
         const fx = scene.effects;
         ctx.globalCompositeOperation = 'lighter';
         for (const e of embers) drawGlow(ctx, '#ff9a3a', e.x, e.y, e.s * 2.5, Math.min(1, e.life) * fx);
-        for (const r of rising) drawGlow(ctx, '#ff7a2a', r.x, r.y, 3, (0.4 + 0.3 * Math.sin(t * 4 + r.ph)) * fx);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = rgba('#b9aea8', 0.35 * fx);
+        ctx.fillStyle = rgba('#a89f99', 0.25 * fx);
         for (const a of ash) ctx.fillRect(a.x, a.y, a.s, a.s);
         if (flash > 0) {
-          ctx.fillStyle = rgba('#ff6a1a', flash * 0.12 * fx);
+          ctx.fillStyle = rgba('#ff6a1a', flash * 0.06 * fx);
           ctx.fillRect(0, 0, WORLD_W, WORLD_H);
         }
       },

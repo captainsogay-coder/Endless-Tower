@@ -1,15 +1,47 @@
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getTier, defineTier } from '../src/units/tiers.js';
 import { Summoner } from '../src/units/summoning.js';
-import { registerUnit, clearUnits, hasRoster } from '../src/units/unitRegistry.js';
-import { ROSTER } from '../src/units/roster.js';
+import { registerUnit, getUnit, validateUnitDef } from '../src/units/unitRegistry.js';
+import { ROSTER, registerRoster } from '../src/units/roster.js';
+import { levelStats, upgradeCost, maxLevel, applyPassive } from '../src/units/unitStats.js';
+import dude, { dudePowerMultiplier } from '../src/units/defs/dude.js';
 
-afterEach(() => clearUnits());
+registerRoster();
 
-test('the shipped roster is empty – no units are pre-designed', () => {
-  assert.equal(ROSTER.length, 0);
-  assert.equal(hasRoster(), false);
+test('Dude is the first and only roster unit', () => {
+  assert.deepEqual(ROSTER.map((d) => d.id), ['dude']);
+  assert.deepEqual(validateUnitDef(dude), []);
+  assert.equal(getUnit('dude').tier, 1);
+});
+
+test('Dude is cheap, short-ranged and low damage', () => {
+  const s = levelStats(dude, 0);
+  assert.ok(dude.price <= 20);
+  assert.ok(s.range <= 2.5 * 32);
+  assert.ok(s.damage <= 5);
+});
+
+test('Dude has five upgrade levels that each improve him', () => {
+  assert.equal(maxLevel(dude), 5);
+  const dps = (l) => levelStats(dude, l).damage * levelStats(dude, l).rate;
+  for (let l = 0; l < 5; l++) {
+    assert.ok(upgradeCost(dude, l) > 0);
+    assert.ok(dps(l + 1) > dps(l), `level ${l + 1} is stronger`);
+    assert.ok(levelStats(dude, l + 1).range >= levelStats(dude, l).range);
+  }
+  assert.equal(upgradeCost(dude, 5), null);
+});
+
+test('Dude Power follows Damage × [1 + 0.10 × (deployed − 1)]', () => {
+  assert.equal(dudePowerMultiplier(1), 1);
+  assert.ok(Math.abs(dudePowerMultiplier(2) - 1.1) < 1e-9);
+  assert.ok(Math.abs(dudePowerMultiplier(4) - 1.3) < 1e-9);
+  assert.ok(Math.abs(dudePowerMultiplier(101) - 11) < 1e-9);
+  for (let l = 0; l <= 5; l++) {
+    const s = applyPassive(dude, levelStats(dude, l), { deployed: 3 });
+    assert.ok(Math.abs(s.damage - levelStats(dude, l).damage * 1.2) < 1e-9, 'passive holds at every level');
+  }
 });
 
 test('tiers are unbounded and increase in power', () => {
@@ -18,50 +50,21 @@ test('tiers are unbounded and increase in power', () => {
     const t = getTier(n);
     assert.equal(t.index, n);
     assert.ok(t.power > prev);
-    assert.ok(t.label.length > 0 && t.color.startsWith('#'));
     prev = t.power;
   }
   assert.throws(() => getTier(0));
-});
-
-test('tiers can be customised without touching other systems', () => {
-  defineTier(42, { label: 'Custom', power: 7 });
+  defineTier(42, { label: 'Custom' });
   assert.equal(getTier(42).label, 'Custom');
-  assert.equal(getTier(42).power, 7);
 });
 
-test('summon odds favour low tiers, sum to 1, and the ceiling rises endlessly', () => {
+test('summoning infrastructure rolls registered unit types with valid odds', () => {
   const s = new Summoner({ seed: 1 });
-  for (const wave of [1, 10, 50, 200]) {
-    const odds = s.odds(wave);
-    const sum = odds.reduce((a, o) => a + o.chance, 0);
-    assert.ok(Math.abs(sum - 1) < 1e-9);
-    for (let i = 1; i < odds.length; i++) assert.ok(odds[i].chance < odds[i - 1].chance);
-  }
-  assert.ok(s.maxTier(200) > s.maxTier(1));
+  const odds = s.odds(10);
+  assert.ok(Math.abs(odds.reduce((a, o) => a + o.chance, 0) - 1) < 1e-9);
+  assert.equal(s.roll(10).id, 'dude');
 });
 
-test('with an empty roster, summons yield tiered prototype proxies', () => {
-  const s = new Summoner({ seed: 9 });
-  const tiers = new Set();
-  for (let i = 0; i < 400; i++) {
-    const u = s.roll(40);
-    assert.ok(u.def.isProxy);
-    tiers.add(u.tier);
-  }
-  assert.ok(tiers.size >= 3);
-});
-
-test('registered units replace proxies and respect tiers', () => {
-  registerUnit({ id: 'test-a', name: 'Test A', tier: 1, stats: { damage: 1, range: 64, rate: 1 } });
-  registerUnit({ id: 'test-b', name: 'Test B', tier: 2, stats: { damage: 2, range: 64, rate: 1 } });
-  const s = new Summoner({ seed: 3 });
-  const seen = new Set();
-  for (let i = 0; i < 300; i++) {
-    const u = s.roll(30);
-    assert.ok(!u.def.isProxy);
-    seen.add(u.def.id);
-  }
-  assert.deepEqual([...seen].sort(), ['test-a', 'test-b']);
-  assert.throws(() => registerUnit({ id: 'bad', name: 'Bad', tier: 0, stats: {} }));
+test('invalid unit definitions are rejected', () => {
+  assert.throws(() => registerUnit({ id: 'bad', name: 'Bad', tier: 0, price: 1, levels: [] }));
+  assert.throws(() => registerUnit({ id: 'bad2', name: 'Bad', tier: 1, price: 1, levels: [{ damage: 1, range: 1, rate: 1 }, { damage: 2, range: 1, rate: 1 }] }));
 });

@@ -10,11 +10,6 @@ import { TAU } from '../core/math.js';
 const RES = 3;
 
 function eyes(ctx, pal, x, y, spread, r) {
-  ctx.fillStyle = rgba(pal.eye, 0.35);
-  circle(ctx, x - spread, y, r * 2);
-  ctx.fill();
-  circle(ctx, x + spread, y, r * 2);
-  ctx.fill();
   ctx.fillStyle = pal.eye;
   circle(ctx, x - spread, y, r);
   ctx.fill();
@@ -107,11 +102,11 @@ const SHAPES = {
     }
     // glowing core
     const g = ctx.createRadialGradient(0, r * 0.05, 0, 0, r * 0.05, r * 0.45);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.35, pal.glow);
-    g.addColorStop(1, rgba(pal.glow, 0));
+    g.addColorStop(0, shade(pal.eye, 0.4));
+    g.addColorStop(0.5, pal.eye);
+    g.addColorStop(1, rgba(pal.eye, 0));
     ctx.fillStyle = g;
-    circle(ctx, 0, r * 0.05, r * 0.45);
+    circle(ctx, 0, r * 0.05, r * 0.3);
     ctx.fill();
     eyes(ctx, pal, 0, -r * 0.4, r * 0.22, r * 0.1);
   },

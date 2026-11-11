@@ -1,12 +1,12 @@
-// Summoning: spend currency to obtain a random unit. A summon rolls a tier
-// from a decaying odds table (higher tiers rarer), then a unit of that tier.
-// Odds and the reachable tier ceiling improve as the run progresses, without
-// any upper bound on tiers.
+// Summoning infrastructure: rolls a unit *type* from the registered roster.
+// A summon rolls a tier from a decaying odds table (higher tiers rarer), then a
+// unit of that tier. Odds and the tier ceiling improve with progress and have
+// no upper bound. Intended for unlocking new unit types once the roster grows;
+// with a single unit there is nothing to roll yet, so it is not surfaced in UI.
 
 import { createRng } from '../core/rng.js';
 import { getTier } from './tiers.js';
 import { hasRoster, listUnits, unitsOfTier, registeredTiers } from './unitRegistry.js';
-import { getProxyDef } from './prototypeProxy.js';
 
 export const SUMMON_SETTINGS = {
   baseMaxTier: 3,
@@ -15,28 +15,6 @@ export const SUMMON_SETTINGS = {
   ratioPerWave: 0.002,
   maxRatio: 0.5,
 };
-
-let nextUid = 1;
-
-export function createUnitInstance(def) {
-  return {
-    uid: nextUid++,
-    def,
-    tier: def.tier,
-    stats: { ...def.stats },
-    placed: false,
-    col: -1,
-    row: -1,
-    x: 0,
-    y: 0,
-    cooldown: 0,
-    angle: -Math.PI / 2,
-    recoil: 0,
-    kills: 0,
-    damageDealt: 0,
-    placedAt: 0,
-  };
-}
 
 export class Summoner {
   constructor({ seed, settings = SUMMON_SETTINGS } = {}) {
@@ -48,7 +26,7 @@ export class Summoner {
   maxTier(wave) {
     const s = this.settings;
     const ceiling = s.baseMaxTier + Math.floor(Math.max(0, wave - 1) / s.tierUnlockEvery);
-    if (!hasRoster()) return ceiling;
+    if (!hasRoster()) return 0;
     const tiers = registeredTiers();
     return Math.min(ceiling, tiers[tiers.length - 1]);
   }
@@ -58,12 +36,13 @@ export class Summoner {
     const ratio = Math.min(s.maxRatio, s.baseRatio + s.ratioPerWave * wave);
     const max = this.maxTier(wave);
     const tiers = [];
-    const available = hasRoster() ? new Set(registeredTiers()) : null;
+    if (!hasRoster()) return [];
+    const available = new Set(registeredTiers());
     for (let t = 1; t <= max; t++) {
-      if (available && !available.has(t)) continue;
+      if (!available.has(t)) continue;
       tiers.push({ tier: t, weight: Math.pow(ratio, t - 1) * (getTier(t).summonWeight ?? 1) });
     }
-    if (!tiers.length && available) {
+    if (!tiers.length) {
       const lowest = registeredTiers()[0];
       tiers.push({ tier: lowest, weight: 1 });
     }
@@ -71,16 +50,12 @@ export class Summoner {
     return tiers.map((t) => ({ tier: t.tier, chance: t.weight / total }));
   }
 
+  /** Returns a unit definition, or null when the roster is empty. */
   roll(wave) {
     const odds = this.odds(wave);
+    if (!odds.length) return null;
     const tier = this.rng.weighted(odds, (o) => o.chance).tier;
-    let def;
-    if (hasRoster()) {
-      const pool = unitsOfTier(tier);
-      def = this.rng.weighted(pool.length ? pool : listUnits(), (u) => u.summonWeight);
-    } else {
-      def = getProxyDef(tier);
-    }
-    return createUnitInstance(def);
+    const pool = unitsOfTier(tier);
+    return this.rng.weighted(pool.length ? pool : listUnits(), (u) => u.summonWeight ?? 1);
   }
 }

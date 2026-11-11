@@ -11,7 +11,8 @@ import { WaveDirector } from '../waves/waveDirector.js';
 import { buildSpawnSchedule } from '../waves/spawnSchedule.js';
 import { getTrait } from '../waves/traits.js';
 import { getEnemyCategory } from '../enemies/enemyCategories.js';
-import { Summoner } from '../units/summoning.js';
+import { getUnit } from '../units/unitRegistry.js';
+import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
 
 const TARGETING = {
   first: (e) => e.d - e.route.length, // furthest along its route
@@ -37,14 +38,19 @@ export class Game {
 
   // ------------------------------------------------------------------ runs
 
-  newRun({ seed = randomSeed(), biomeId = null } = {}) {
+  /**
+   * Starts a new battle. `loadout` is the battle plan: a list of unit ids
+   * (up to 12 types). It persists across newRun() calls unless replaced.
+   */
+  newRun({ seed = randomSeed(), biomeId = null, loadout } = {}) {
+    if (loadout) this.setLoadout(loadout);
+    else if (!this.loadout) this.loadout = [];
     this.seed = seed >>> 0;
     const rng = createRng(this.seed);
     this.biome = biomeId ? getBiome(biomeId) : pickBiome(rng, this.biome?.id);
     // Mix the biome into the map seed so the same run seed gives each realm its own layout.
     this.map = generateMap(this.biome, (rng.int(0, 2 ** 31 - 1) ^ hashString(this.biome.id)) >>> 0);
     this.director = new WaveDirector(rng.int(0, 2 ** 31 - 1), { entranceCount: this.map.routes.length });
-    this.summoner = new Summoner({ seed: rng.int(0, 2 ** 31 - 1) });
     this.spawnRng = rng.fork();
     this.fxRng = rng.fork();
 
@@ -58,7 +64,7 @@ export class Game {
     this.units = [];
     this.projectiles = [];
     this.projectilePool = [];
-    this.bench = [];
+    this.deployed = new Map(); // defId -> number of copies on the field
     this.unitByTile = new Array(COLS * ROWS).fill(null);
     this.enemySeq = 0;
     this.currentPlan = null;
@@ -69,16 +75,21 @@ export class Game {
     this.autoTimer = GAME_CONFIG.autoStartDelay;
     this.cinematic = null;
     this.boss = null;
-    this.stats = { kills: 0, leaks: 0, summons: 0, bossesDefeated: 0, damage: 0, highestTier: 0, unitsPlaced: 0 };
+    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, goldSpent: 0, peakUnits: 0 };
     this.emit('runStart', this);
   }
 
-  get summonCost() {
-    return GAME_CONFIG.summonCost;
+  setLoadout(ids) {
+    const defs = [];
+    for (const id of ids) {
+      const def = getUnit(id);
+      if (def && !defs.includes(def)) defs.push(def);
+    }
+    this.loadout = defs;
   }
 
-  get oddsWave() {
-    return Math.max(1, this.wave);
+  inLoadout(defId) {
+    return this.loadout.some((d) => d.id === defId);
   }
 
   // ------------------------------------------------------------------ waves
@@ -252,6 +263,7 @@ export class Game {
         continue;
       }
       u.angle = Math.atan2(target.y - u.y, target.x - u.x);
+      if (Math.abs(target.x - u.x) > 2) u.facing = target.x > u.x ? 1 : -1;
       u.cooldown = 1 / Math.max(0.01, u.stats.rate);
       u.recoil = 1;
       if (u.def.onFire) u.def.onFire(u, target, this);
@@ -261,8 +273,11 @@ export class Game {
 
   fireProjectile(u, target) {
     const p = this.projectilePool.pop() ?? {};
-    p.x = u.x + Math.cos(u.angle) * 12;
-    p.y = u.y + Math.sin(u.angle) * 12;
+    p.x = u.x + Math.cos(u.angle) * 6;
+    p.y = u.y + Math.sin(u.angle) * 6;
+    p.sx = p.x;
+    p.sy = p.y;
+    p.kind = u.def.projectile?.kind ?? 'bolt';
     p.px = p.x;
     p.py = p.y;
     p.target = target;
@@ -271,7 +286,7 @@ export class Game {
     p.speed = u.stats.projectileSpeed;
     p.damage = u.stats.damage;
     p.splash = u.stats.splash;
-    p.color = u.def.color ?? '#ffffff';
+    p.color = u.def.projectile?.color ?? '#ffffff';
     p.tier = u.tier;
     p.source = u;
     p.life = 3;
@@ -384,32 +399,6 @@ export class Game {
 
   // ------------------------------------------------------------------ units
 
-  summon(count = 1) {
-    const results = [];
-    for (let i = 0; i < count; i++) {
-      if (this.gold < this.summonCost) break;
-      this.gold -= this.summonCost;
-      const unit = this.summoner.roll(this.oddsWave);
-      this.bench.push(unit);
-      this.stats.summons++;
-      this.stats.highestTier = Math.max(this.stats.highestTier, unit.tier);
-      results.push(unit);
-    }
-    if (results.length) this.emit('summon', results);
-    return results;
-  }
-
-  /** Bench grouped by unit definition, highest tier first. */
-  benchGroups() {
-    const groups = new Map();
-    for (const u of this.bench) {
-      const g = groups.get(u.def.id);
-      if (g) g.count++;
-      else groups.set(u.def.id, { def: u.def, count: 1 });
-    }
-    return [...groups.values()].sort((a, b) => b.def.tier - a.def.tier || a.def.name.localeCompare(b.def.name));
-  }
-
   canPlace(col, row) {
     return inBounds(col, row) && this.map.grid[tileIndex(col, row)] === TileType.GROUND && !this.unitByTile[tileIndex(col, row)];
   }
@@ -418,12 +407,49 @@ export class Game {
     return inBounds(col, row) ? this.unitByTile[tileIndex(col, row)] : null;
   }
 
-  /** Places a benched unit of the given definition. No unit cap: limited only by buildable tiles. */
-  placeFromBench(defId, col, row) {
-    if (!this.canPlace(col, row)) return null;
-    const i = this.bench.findIndex((u) => u.def.id === defId);
-    if (i < 0) return null;
-    const u = this.bench.splice(i, 1)[0];
+  deployedCount(defId) {
+    return this.deployed.get(defId) ?? 0;
+  }
+
+  /** Context handed to passives. Counts only units actually on the battlefield. */
+  passiveContext(def) {
+    return { deployed: this.deployedCount(def.id) };
+  }
+
+  /** Recomputes effective stats for one unit (level stats + passive). */
+  refreshUnit(u) {
+    const s = applyPassive(u.def, levelStats(u.def, u.level), this.passiveContext(u.def));
+    Object.assign(u.stats, s);
+  }
+
+  /**
+   * Event-driven refresh: called only when a unit of this type is deployed,
+   * sold or upgraded – never per frame. Passives that depend on deployed
+   * counts (e.g. Dude Power) update for every copy immediately.
+   */
+  refreshType(defId) {
+    for (const u of this.units) if (u.def.id === defId) this.refreshUnit(u);
+    this.emit('statsChanged', defId);
+  }
+
+  canDeploy(defId, col, row) {
+    const def = getUnit(defId);
+    if (!def || !this.inLoadout(defId)) return 'not-in-plan';
+    if (!this.canPlace(col, row)) return 'blocked';
+    if (this.gold < def.price) return 'gold';
+    return null;
+  }
+
+  /**
+   * Buys and places one copy of a battle-plan unit. There is no cap on copies:
+   * deployment is limited only by buildable tiles and gold.
+   */
+  deploy(defId, col, row) {
+    if (this.canDeploy(defId, col, row)) return null;
+    const def = getUnit(defId);
+    const u = createUnit(def);
+    this.gold -= def.price;
+    this.stats.goldSpent += def.price;
     u.col = col;
     u.row = row;
     u.x = col * TILE + TILE / 2;
@@ -433,22 +459,64 @@ export class Game {
     u.placedAt = this.time;
     this.units.push(u);
     this.unitByTile[tileIndex(col, row)] = u;
-    this.stats.unitsPlaced++;
-    u.def.onPlace?.(u, this);
+    this.deployed.set(def.id, this.deployedCount(def.id) + 1);
+    this.stats.unitsDeployed++;
+    this.stats.peakUnits = Math.max(this.stats.peakUnits, this.units.length);
+    if (def.passive) this.refreshType(def.id);
+    else this.refreshUnit(u);
+    def.onPlace?.(u, this);
     this.emit('place', u);
     return u;
   }
 
-  recallUnit(u) {
+  sellValue(u) {
+    return Math.floor(u.spent * GAME_CONFIG.sellRefund);
+  }
+
+  /** Removes a deployed unit for a partial refund. */
+  sell(u) {
     const i = this.units.indexOf(u);
-    if (i < 0) return false;
+    if (i < 0) return 0;
     this.units.splice(i, 1);
     this.unitByTile[tileIndex(u.col, u.row)] = null;
     u.placed = false;
-    u.col = -1;
-    u.row = -1;
-    this.bench.push(u);
-    this.emit('recall', u);
+    const refund = this.sellValue(u);
+    this.gold += refund;
+    this.deployed.set(u.def.id, Math.max(0, this.deployedCount(u.def.id) - 1));
+    if (u.def.passive) this.refreshType(u.def.id);
+    this.emit('sell', { unit: u, refund });
+    return refund;
+  }
+
+  /** Preview of the next upgrade: cost and before/after effective stats. */
+  upgradeInfo(u) {
+    const cost = upgradeCost(u.def, u.level);
+    const ctx = this.passiveContext(u.def);
+    const current = applyPassive(u.def, levelStats(u.def, u.level), ctx);
+    if (cost === null) return { maxed: true, level: u.level, maxLevel: maxLevel(u.def), current };
+    return {
+      maxed: false,
+      level: u.level,
+      nextLevel: u.level + 1,
+      maxLevel: maxLevel(u.def),
+      cost,
+      affordable: this.gold >= cost,
+      current,
+      next: applyPassive(u.def, levelStats(u.def, u.level + 1), ctx),
+    };
+  }
+
+  upgrade(u) {
+    if (!u.placed) return false;
+    const cost = upgradeCost(u.def, u.level);
+    if (cost === null || this.gold < cost) return false;
+    this.gold -= cost;
+    u.spent += cost;
+    u.level++;
+    this.stats.upgrades++;
+    this.stats.goldSpent += cost;
+    this.refreshUnit(u);
+    this.emit('upgrade', u);
     return true;
   }
 }

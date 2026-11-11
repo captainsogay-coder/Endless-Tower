@@ -1,7 +1,4 @@
-// Unit definition registry. The game ships with NO units – the roster is
-// designed separately and registered here (see roster.js for the schema).
-
-import { getTier } from './tiers.js';
+// Unit definition registry. Definitions are data (see roster.js for the schema).
 
 const units = new Map();
 
@@ -11,15 +8,22 @@ export function validateUnitDef(def) {
   if (!def.id || typeof def.id !== 'string') errors.push('id (string) is required');
   if (!def.name) errors.push('name is required');
   if (!Number.isInteger(def.tier) || def.tier < 1) errors.push('tier must be an integer ≥ 1');
-  const s = def.stats ?? {};
-  for (const k of ['damage', 'range', 'rate']) if (!(typeof s[k] === 'number' && s[k] >= 0)) errors.push(`stats.${k} must be a number ≥ 0`);
+  if (!(typeof def.price === 'number' && def.price >= 0)) errors.push('price must be a number ≥ 0');
+  if (!Array.isArray(def.levels) || def.levels.length < 1) errors.push('levels must be a non-empty array');
+  else {
+    def.levels.forEach((L, i) => {
+      for (const k of ['damage', 'range', 'rate']) if (!(typeof L[k] === 'number' && L[k] >= 0)) errors.push(`levels[${i}].${k} must be a number ≥ 0`);
+      if (i > 0 && !(typeof L.cost === 'number' && L.cost > 0)) errors.push(`levels[${i}].cost must be a number > 0`);
+    });
+  }
+  if (def.passive && typeof def.passive.modify !== 'function') errors.push('passive.modify must be a function');
   return errors;
 }
 
 export function registerUnit(def) {
   const errors = validateUnitDef(def);
   if (errors.length) throw new Error(`Invalid unit "${def?.id}": ${errors.join('; ')}`);
-  units.set(def.id, Object.freeze({ summonWeight: 1, targeting: 'first', ...def, stats: Object.freeze({ projectileSpeed: 520, splash: 0, ...def.stats }) }));
+  units.set(def.id, Object.freeze({ targeting: 'first', ...def }));
   return units.get(def.id);
 }
 
@@ -30,4 +34,3 @@ export const listUnits = () => [...units.values()];
 export const hasRoster = () => units.size > 0;
 export const unitsOfTier = (tier) => listUnits().filter((u) => u.tier === tier);
 export const registeredTiers = () => [...new Set(listUnits().map((u) => u.tier))].sort((a, b) => a - b);
-export const tierOf = (def) => getTier(def.tier);

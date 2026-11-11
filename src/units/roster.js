@@ -1,37 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  UNIT ROSTER — intentionally empty.
+//  UNIT ROSTER
 //
-//  Units are designed separately. Add definitions to ROSTER below and they are
-//  registered at startup, become summonable, and automatically replace the
-//  prototype proxies. Nothing else needs to change.
+//  Each unit is a self-contained definition module in ./defs. Add a module,
+//  list it here, and it is registered at startup, appears in Battle Plans and
+//  becomes deployable – nothing else needs to change.
 //
 //  Definition schema:
 //  {
-//    id: string,                 // unique key
-//    name: string,
-//    tier: integer >= 1,         // any tier – the tier scale is unbounded
-//    stats: {
-//      damage: number,           // per hit
-//      range: number,            // world pixels (1 tile = 32)
-//      rate: number,             // attacks per second
-//      projectileSpeed?: number, // px/s (default 520)
-//      splash?: number,          // splash radius in px (default 0)
-//    },
-//    summonWeight?: number,      // relative odds within its tier (default 1)
+//    id, name, tier (integer ≥ 1), role, description,
+//    price: number,                       // gold per deployed copy
 //    targeting?: 'first' | 'last' | 'strongest' | 'closest',
-//    color?: string,             // projectile / accent colour
-//    // Optional hooks — all receive the live unit instance and the game:
-//    render?(ctx, unit, time),   // custom drawing (world coordinates)
-//    onFire?(unit, target, game),// replace the default projectile attack
-//    onUpdate?(unit, dt, game),
-//    onPlace?(unit, game),
+//    projectile?: { kind, speed },        // visual style + px/s
+//    levels: [                            // [0] = base, [1..] = upgrades
+//      { damage, range, rate, cost? },    //   range in px (1 tile = 32), rate = attacks/s
+//    ],
+//    passive?: { id, name, summary, formula?, modify(stats, ctx), bonus?(ctx) },
+//                                         // ctx = { deployed } copies of this unit on the field
+//    art: string,                         // key into src/render/unitArt.js
+//    onFire?(unit, target, game), onUpdate?(unit, dt, game), onPlace?(unit, game)
 //  }
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { registerUnit } from './unitRegistry.js';
+import { registerUnit, getUnit } from './unitRegistry.js';
+import dude from './defs/dude.js';
 
-export const ROSTER = [];
+export const ROSTER = [dude];
+
+/** Units every new player owns. */
+export const STARTER_UNITS = ['dude'];
 
 export function registerRoster() {
-  for (const def of ROSTER) registerUnit(def);
+  for (const def of ROSTER) if (!getUnit(def.id)) registerUnit(def);
 }

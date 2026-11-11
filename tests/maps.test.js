@@ -53,3 +53,11 @@ test('buildable terrain exists and decorations never sit on the road', () => {
     for (const d of map.decor) for (const t of d.tiles) assert.notEqual(map.grid[tileIndex(t.x, t.y)], TileType.PATH);
   }
 });
+
+test('every realm places its recognisable landmark', () => {
+  for (const biome of listBiomes()) {
+    let found = 0;
+    for (const seed of SEEDS.slice(0, 20)) if (generateMap(biome, seed).decor.some((d) => d.landmark)) found++;
+    assert.ok(found >= 18, `${biome.id}: landmark placed in ${found}/20 maps`);
+  }
+});

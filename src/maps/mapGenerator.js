@@ -290,14 +290,27 @@ function maxRadiusFromPath(map, cx, cy) {
 
 function placeDecor(map, biome, rng, pathDist) {
   const { grid, goal, entrances } = map;
-  for (const spec of biome.decor ?? []) {
+  // Landmarks first so they get room; then everything else.
+  const specs = [...(biome.decor ?? [])].sort((a, b) => (b.landmark ? 1 : 0) - (a.landmark ? 1 : 0));
+  for (const spec of specs) {
     const count = rng.int(spec.count[0], spec.count[1]);
-    const fp = spec.fp ?? 1;
     const minPD = spec.minPathDist ?? 1;
+    // Clumping: items gather where this spec's own noise field is high (groves, rubble fields…).
+    const clumpNoise = spec.clump ? createNoise2D(rng.int(0, 2 ** 30)) : null;
+    const accept = (x, y) => !clumpNoise || rng.next() < Math.pow(fbm(clumpNoise, x * 0.14, y * 0.14, 2), 1 + spec.clump * 4) * 2.2;
     for (let n = 0; n < count; n++) {
-      for (let tries = 0; tries < 80; tries++) {
+      const sizes = spec.fallbackFp ? [spec.fp ?? 1, spec.fallbackFp] : [spec.fp ?? 1];
+      let placed = false;
+      for (const fp of sizes) {
+      if (placed) break;
+      for (let tries = 0; tries < (spec.landmark ? 400 : 80); tries++) {
         const x = rng.int(0, COLS - fp);
         const y = rng.int(0, ROWS - fp);
+        if (!accept(x, y)) continue;
+        if (spec.landmark) {
+          // keep landmarks off the very edge so they read as part of the scene
+          if (x < 1 || y < 1 || x + fp > COLS - 1 || y + fp > ROWS - 1) continue;
+        }
         const tiles = [];
         let ok = true;
         for (let dy = 0; dy < fp && ok; dy++) {
@@ -326,14 +339,17 @@ function placeDecor(map, biome, rng, pathDist) {
         if (blocks) for (const t of tiles) grid[tileIndex(t.x, t.y)] = TileType.BLOCKED;
         map.decor.push({
           kind: spec.kind,
+          landmark: !!spec.landmark,
           x: cx,
           y: cy,
           fp,
           tiles,
-          r: Math.min((spec.size ?? fp * 0.5) * TILE, maxRadiusFromPath(map, cx, cy)),
+          r: Math.min((spec.size ?? fp * 0.5) * TILE * (fp / (spec.fp ?? fp)), maxRadiusFromPath(map, cx, cy)),
           seed: rng.next(),
         });
+        placed = true;
         break;
+      }
       }
     }
   }

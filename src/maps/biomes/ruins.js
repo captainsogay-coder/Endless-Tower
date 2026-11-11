@@ -1,19 +1,20 @@
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType, tileIndex } from '../mapGenerator.js';
-import { scatter, softBlob, dropShadow } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow } from '../paint.js';
 import { rgba, shade } from '../../core/color.js';
 import { circle, drawGlow, polygon } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
 
 const palette = {
-  ground: '#56653f',
+  ground: '#5c6741',
+  groundRamp: ['#4a5636', '#5c6741', '#727250', '#86805c'],
   groundVariants: ['#6f7a4f', '#45533a', '#7d7a58', '#566040', '#62704a'],
   path: '#b6a886',
   pathEdge: '#5b5343',
   pathCenter: '#d0c29f',
-  feature: '#2b4d4a',
+  feature: '#3b5f58',
   featureEdge: '#7b725c',
-  featureDeep: '#1c3634',
+  featureDeep: '#30524c',
   featureShine: '#7fe3c8',
   bridge: '#8f846a',
   pad: '#8e8670',
@@ -22,7 +23,7 @@ const palette = {
   shadow: '#151a0c',
 };
 
-const RUNE = '#6ff0ff';
+const RUNE = '#8fd3cf';
 
 function glyph(ctx, x, y, s, seed) {
   ctx.beginPath();
@@ -44,20 +45,24 @@ export default {
   name: 'Ancient Ruins',
   tagline: 'A forgotten empire still keeps its vigil',
   palette,
+  // late-afternoon sun, low from the west
+  lighting: { pos: { x: -320, y: 300 }, strength: 0.22, vignette: 0.45, grade: '#f5eedb' },
+  atmosphere: { cloudShadows: 4 },
   enemyPalette: { body: '#8a2f3c', dark: '#360d16', eye: '#9ff7ff', glow: '#ff6b6b' },
   portalColor: '#6ff0ff',
   bossTitle: 'Warden of the Sunken Throne',
   bridgeStyle: 'stone',
   layout: { styles: { meander: 3, serpentine: 2, converge: 3 }, featureDensity: 0.06, rivers: [0, 0], noiseScale: 0.2 },
   decor: [
-    { kind: 'monument', count: [1, 2], fp: 2, minPathDist: 2, size: 1.1 },
-    { kind: 'pillar', count: [10, 16], fp: 1, minPathDist: 1, size: 0.55 },
-    { kind: 'toppled', count: [3, 5], fp: 2, minPathDist: 1, size: 1.0 },
-    { kind: 'runeCircle', count: [4, 7], fp: 1, minPathDist: 1, size: 0.6 },
-    { kind: 'overgrowth', count: [5, 9], fp: 1, minPathDist: 1, size: 0.6 },
+    { kind: 'colossus', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },
+    { kind: 'monument', count: [0, 1], fp: 2, minPathDist: 2, size: 1.1 },
+    { kind: 'pillar', count: [9, 14], fp: 1, minPathDist: 1, size: 0.55, clump: 0.8 },
+    { kind: 'toppled', count: [2, 4], fp: 2, minPathDist: 1, size: 1.0, clump: 0.6 },
+    { kind: 'runeCircle', count: [2, 4], fp: 1, minPathDist: 1, size: 0.6 },
+    { kind: 'overgrowth', count: [4, 7], fp: 1, minPathDist: 1, size: 0.6, clump: 0.5 },
   ],
 
-  paintGroundDetail(ctx, map, rng) {
+  paintGroundDetail(ctx, map, rng, density) {
     // flagstone plazas – ancient floors peeking through the grass
     for (let n = 0; n < 4; n++) {
       const cx = rng.int(2, map.cols - 3);
@@ -86,7 +91,7 @@ export default {
         }
       }
     }
-    scatter(map, rng, 1100, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], (x, y) => {
+    scatterWeighted(map, rng, 2000, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], density, (x, y) => {
       ctx.strokeStyle = rgba(rng.pick(['#7f9a52', '#4b6236', '#9aae60']), rng.float(0.5, 0.85));
       ctx.lineWidth = 1.1;
       ctx.beginPath();
@@ -123,6 +128,57 @@ export default {
   paintDecor(ctx, d) {
     const r = d.r;
     switch (d.kind) {
+      case 'colossus': {
+        // Landmark: the toppled head of a colossal statue, half sunk in the turf.
+        const a = d.seed * 0.8 - 0.4;
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        ctx.rotate(a);
+        dropShadow(ctx, r * 0.35, r * 0.35, r * 1.15, r * 0.8, 0.35);
+        const g = ctx.createLinearGradient(-r, -r, r, r);
+        g.addColorStop(0, '#d6ccb0');
+        g.addColorStop(1, '#8c846a');
+        ctx.fillStyle = g;
+        ctx.strokeStyle = '#4e4836';
+        ctx.lineWidth = 1.5;
+        // head mass
+        ctx.beginPath();
+        ctx.ellipse(0, 0, r * 0.95, r * 0.78, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        // crown band
+        ctx.fillStyle = '#b3a988';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.35, -r * 0.05, r * 0.5, r * 0.72, 0, Math.PI * 0.5, Math.PI * 1.5);
+        ctx.fill();
+        ctx.stroke();
+        // face, turned up to the sky
+        ctx.strokeStyle = 'rgba(60,50,30,0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(r * 0.25, -r * 0.32);
+        ctx.quadraticCurveTo(r * 0.38, -r * 0.4, r * 0.5, -r * 0.3);
+        ctx.moveTo(r * 0.25, r * 0.12);
+        ctx.quadraticCurveTo(r * 0.38, r * 0.04, r * 0.5, r * 0.14);
+        ctx.moveTo(r * 0.62, -r * 0.12);
+        ctx.lineTo(r * 0.8, -r * 0.05);
+        ctx.lineTo(r * 0.62, r * 0.02);
+        ctx.moveTo(r * 0.45, r * 0.38);
+        ctx.quadraticCurveTo(r * 0.55, r * 0.46, r * 0.68, r * 0.36);
+        ctx.stroke();
+        // a long crack and moss
+        ctx.strokeStyle = 'rgba(50,40,25,0.6)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.2, -r * 0.7);
+        ctx.lineTo(-r * 0.05, -r * 0.3);
+        ctx.lineTo(-r * 0.15, r * 0.1);
+        ctx.stroke();
+        softBlob(ctx, -r * 0.55, r * 0.4, r * 0.4, '#5f7a3a', 0.8);
+        softBlob(ctx, r * 0.1, -r * 0.6, r * 0.25, '#5f7a3a', 0.6);
+        ctx.restore();
+        break;
+      }
       case 'pillar': {
         dropShadow(ctx, d.x + r * 0.5, d.y + r * 0.6, r * 0.9, r * 0.5, 0.3);
         ctx.fillStyle = '#8a8270';
@@ -218,13 +274,21 @@ export default {
         break;
       }
       case 'overgrowth': {
-        for (let i = 0; i < 6; i++) {
-          const a = d.seed * 9 + i;
-          softBlob(ctx, d.x + Math.cos(a) * r * 0.4, d.y + Math.sin(a) * r * 0.4, r * 0.6, i % 2 ? '#3e6a2c' : '#5f8f3a', 0.9);
-        }
-        ctx.fillStyle = '#ffe9a0';
-        for (let i = 0; i < 4; i++) {
-          circle(ctx, d.x + Math.cos(d.seed * 20 + i * 1.7) * r * 0.5, d.y + Math.sin(d.seed * 20 + i * 1.7) * r * 0.5, 1.5);
+        // a low shrub that has grown over fallen masonry
+        const rr = Math.max(7, r * 0.7);
+        dropShadow(ctx, d.x + 3, d.y + 4, rr * 1.1, rr * 0.7, 0.3);
+        ctx.fillStyle = '#9b927a';
+        ctx.fillRect(d.x - rr * 0.9, d.y + rr * 0.1, rr * 0.9, rr * 0.5);
+        for (const [col, k, dx, dy] of [['#3d5a2a', 1, 0, 0], ['#4f7034', 0.78, -0.12, -0.12], ['#6a8a44', 0.45, -0.25, -0.28]]) {
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * TAU + d.seed * 4;
+            const x = d.x + rr * dx + Math.cos(a) * rr * 0.42 * k;
+            const y = d.y + rr * dy + Math.sin(a) * rr * 0.36 * k;
+            ctx.moveTo(x + rr * 0.45 * k, y);
+            ctx.arc(x, y, rr * 0.45 * k, 0, TAU);
+          }
           ctx.fill();
         }
         break;
@@ -235,46 +299,26 @@ export default {
 
   createAmbient(map, rng, scene) {
     const runes = map.decor.filter((d) => d.kind === 'runeCircle' || d.kind === 'monument');
-    const shafts = Array.from({ length: 5 }, () => ({ x: rng.float(-200, WORLD_W), w: rng.float(50, 120), ph: rng.float(0, TAU), sp: rng.float(0.08, 0.18) }));
-    const motes = Array.from({ length: Math.round(50 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), ph: rng.float(0, TAU), vy: rng.float(3, 9) }));
-    const glyphs = [];
-    let glyphTimer = 0;
+    const shafts = Array.from({ length: 4 }, () => ({ x: rng.float(-200, WORLD_W), w: rng.float(60, 120), ph: rng.float(0, TAU), sp: rng.float(0.05, 0.12) }));
 
     return {
-      update(dt, t) {
-        for (const m of motes) {
-          m.y -= m.vy * dt;
-          m.x += Math.sin(t * 0.5 + m.ph) * 4 * dt;
-          if (m.y < -4) { m.y = WORLD_H + 4; m.x = Math.random() * WORLD_W; }
-        }
-        glyphTimer -= dt;
-        if (glyphTimer <= 0 && runes.length) {
-          const src = rng.pick(runes);
-          glyphs.push({ x: src.x + rng.float(-8, 8), y: src.y - src.r * 0.5, life: 2.5, seed: rng.next() });
-          glyphTimer = rng.float(0.25, 0.6);
-        }
-        for (let i = glyphs.length - 1; i >= 0; i--) {
-          glyphs[i].life -= dt;
-          glyphs[i].y -= 12 * dt;
-          if (glyphs[i].life <= 0) glyphs.splice(i, 1);
-        }
-      },
+      update() {},
       drawUnder(ctx, t) {
         for (const d of runes) {
-          const pulse = 0.5 + 0.5 * Math.sin(t * 1.4 + d.seed * 12);
+          const pulse = 0.5 + 0.5 * Math.sin(t * 0.9 + d.seed * 12);
           const isMon = d.kind === 'monument';
           const cx = d.x;
           const cy = isMon ? d.y - d.r * 0.35 : d.y;
-          drawGlow(ctx, isMon ? palette.accent : RUNE, cx, cy, d.r * (isMon ? 1.4 : 1.5), 0.25 + 0.3 * pulse);
+          drawGlow(ctx, isMon ? palette.accent : RUNE, cx, cy, d.r * 1.2, 0.08 + 0.08 * pulse);
           ctx.save();
           ctx.translate(cx, cy);
-          ctx.strokeStyle = rgba(isMon ? palette.accent : RUNE, 0.5 + 0.45 * pulse);
-          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = rgba(isMon ? palette.accent : RUNE, 0.45 + 0.3 * pulse);
+          ctx.lineWidth = 1.3;
           if (isMon) {
             glyph(ctx, 0, 0, d.r * 0.22, d.seed);
             ctx.stroke();
           } else {
-            ctx.rotate(t * 0.25 * (d.seed > 0.5 ? 1 : -1));
+            ctx.rotate(t * 0.12 * (d.seed > 0.5 ? 1 : -1));
             circle(ctx, 0, 0, d.r * 0.68);
             ctx.stroke();
             for (let i = 0; i < 6; i++) {
@@ -287,12 +331,13 @@ export default {
         }
       },
       drawOver(ctx, t) {
+        // soft late-afternoon light shafts, matching the low westerly key light
         const fx = scene.effects;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         for (const s of shafts) {
-          const x = s.x + Math.sin(t * s.sp + s.ph) * 60;
-          const a = (0.035 + 0.02 * Math.sin(t * 0.4 + s.ph)) * fx;
+          const x = s.x + Math.sin(t * s.sp + s.ph) * 50;
+          const a = (0.025 + 0.012 * Math.sin(t * 0.3 + s.ph)) * fx;
           const g = ctx.createLinearGradient(x, 0, x + 260, WORLD_H);
           g.addColorStop(0, rgba(palette.light, a * 1.6));
           g.addColorStop(1, rgba(palette.light, 0));
@@ -305,14 +350,7 @@ export default {
           ctx.closePath();
           ctx.fill();
         }
-        for (const m of motes) drawGlow(ctx, '#fff1c0', m.x, m.y, 3, (0.25 + 0.2 * Math.sin(t * 2 + m.ph)) * fx);
         ctx.restore();
-        ctx.lineWidth = 1.2;
-        for (const g of glyphs) {
-          ctx.strokeStyle = rgba(RUNE, Math.min(1, g.life / 1.2) * 0.7 * fx);
-          glyph(ctx, g.x, g.y, 3, g.seed);
-          ctx.stroke();
-        }
       },
     };
   },

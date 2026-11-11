@@ -1,12 +1,13 @@
 import { TILE, WORLD_W, WORLD_H, COLS, ROWS } from '../../config.js';
 import { TileType, tileIndex } from '../mapGenerator.js';
-import { scatter, dropShadow, isType } from '../paint.js';
+import { scatterWeighted, dropShadow, isType, blobPoints } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow, makeCanvas } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
 
 const palette = {
-  ground: '#74bd55',
+  ground: '#78b257',
+  groundRamp: ['#5a9246', '#71a952', '#8cbc62', '#9fc56e'],
   groundVariants: ['#8fd469', '#5fa346', '#a2dd78', '#579640', '#7fc85e'],
   path: '#dcc490',
   pathEdge: '#8a6e45',
@@ -30,29 +31,31 @@ export default {
   name: 'Sky Islands',
   tagline: 'Shattered lands adrift above the clouds',
   palette,
+  lighting: { strength: 0.12, vignette: 0.22, grade: '#fbf8ee' },
+  atmosphere: { cloudShadows: 3 },
   enemyPalette: { body: '#4b3a8c', dark: '#1f1648', eye: '#ffef7a', glow: '#a58cff' },
   portalColor: '#ffd56a',
   bossTitle: 'Warden of the Endless Sky',
   layout: { styles: { meander: 3, serpentine: 1, converge: 3 }, featureDensity: 0.3, edgeBias: 0.8, rivers: [0, 0], noiseScale: 0.16 },
   decor: [
-    { kind: 'cloudTree', count: [8, 13], fp: 1, minPathDist: 1, size: 0.75 },
-    { kind: 'cloudTree', count: [2, 4], fp: 2, minPathDist: 2, size: 1.25 },
-    { kind: 'shrine', count: [1, 3], fp: 1, minPathDist: 1, size: 0.6 },
+    { kind: 'skyShrine', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.4 },
+    { kind: 'cloudTree', count: [8, 12], fp: 1, minPathDist: 1, size: 0.75, clump: 0.7 },
+    { kind: 'cloudTree', count: [2, 4], fp: 2, minPathDist: 2, size: 1.25, clump: 0.7 },
     { kind: 'waterfall', on: 'cliff', count: [3, 6], size: 0.5 },
-    { kind: 'floatingRock', on: 'feature', count: [6, 10], size: 0.4 },
+    { kind: 'floatingRock', on: 'feature', count: [5, 8], size: 0.4 },
   ],
 
-  paintGroundDetail(ctx, map, rng) {
-    scatter(map, rng, 1400, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], (x, y) => {
-      ctx.strokeStyle = rgba(rng.pick(['#9ee070', '#4f9a3c', '#b8ef8a']), rng.float(0.5, 0.9));
-      ctx.lineWidth = 1.2;
+  paintGroundDetail(ctx, map, rng, density) {
+    scatterWeighted(map, rng, 2200, [TileType.GROUND, TileType.BLOCKED, TileType.OBJECTIVE], density, (x, y) => {
+      ctx.strokeStyle = rgba(rng.pick(['#8fc066', '#57904a', '#a3cd78']), rng.float(0.5, 0.85));
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + rng.float(-2, 2), y - rng.float(3, 6));
       ctx.stroke();
     });
-    scatter(map, rng, 220, [TileType.GROUND], (x, y) => {
-      ctx.fillStyle = rng.pick(['#ffffff', '#ffe36e', '#ff9fc7', '#b6e0ff']);
+    scatterWeighted(map, rng, 200, [TileType.GROUND], (x, y) => density(x, y) ** 2, (x, y) => {
+      ctx.fillStyle = rng.pick(['#f4f1e4', '#efd98a', '#d9b8d0']);
       circle(ctx, x, y, 1.6);
       ctx.fill();
     });
@@ -60,11 +63,12 @@ export default {
 
   paintFeatures(ctx, map) {
     const tiles = map.featureTiles;
+    const blobs = blobPoints(map);
     // Cut the void out of the land.
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
-    for (const t of tiles) {
+    for (const t of blobs) {
       const x = t.x * TILE + TILE / 2;
       const y = t.y * TILE + TILE / 2;
       ctx.moveTo(x + TILE * 0.72, y);
@@ -138,6 +142,48 @@ export default {
         }
         break;
       }
+      case 'skyShrine': {
+        // Landmark: a ring of weathered pillars on a stone dais around an old bell.
+        dropShadow(ctx, d.x + r * 0.2, d.y + r * 0.3, r * 1.15, r * 0.8, 0.28);
+        ctx.fillStyle = '#c9c2ad';
+        ctx.strokeStyle = '#6d6553';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + Math.PI / 8;
+          ctx.lineTo(d.x + Math.cos(a) * r, d.y + Math.sin(a) * r);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ddd7c4';
+        circle(ctx, d.x, d.y, r * 0.62);
+        ctx.fill();
+        ctx.strokeStyle = '#a39a82';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU;
+          const px = d.x + Math.cos(a) * r * 0.82;
+          const py = d.y + Math.sin(a) * r * 0.82;
+          dropShadow(ctx, px + 2, py + 3, 4, 2.5, 0.3);
+          ctx.fillStyle = '#e6e0cd';
+          ctx.strokeStyle = '#6d6553';
+          circle(ctx, px, py, 3.6);
+          ctx.fill();
+          ctx.stroke();
+        }
+        // bronze bell, seen from above
+        ctx.fillStyle = '#9a7a3e';
+        ctx.strokeStyle = '#4e3a18';
+        circle(ctx, d.x, d.y, r * 0.22);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#c4a061';
+        circle(ctx, d.x - r * 0.06, d.y - r * 0.06, r * 0.1);
+        ctx.fill();
+        break;
+      }
       case 'shrine': {
         dropShadow(ctx, d.x + 3, d.y + 5, r, r * 0.6, 0.3);
         ctx.fillStyle = '#e8e2d0';
@@ -201,7 +247,6 @@ export default {
       while (ty < ROWS && isType(map, tx, ty, TileType.FEATURE)) { ty++; len++; }
       return { x: tx * TILE + TILE / 2, y: d.tiles[0].y * TILE + TILE, len: Math.max(1.2, len) * TILE + 30, ph: rng.float(0, TAU) };
     });
-    const sparkles = Array.from({ length: Math.round(24 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), ph: rng.float(0, TAU) }));
 
     return {
       update(dt) {
@@ -268,17 +313,8 @@ export default {
           ctx.ellipse(r.x, y, s, s * 0.42, 0, 0, TAU);
           ctx.fill();
         }
-        for (const d of map.decor) {
-          if (d.kind === 'shrine') drawGlow(ctx, '#9fe8ff', d.x, d.y, d.r * 1.6, 0.3 + 0.2 * Math.sin(t * 2 + d.seed * 9));
-        }
       },
-      drawOver(ctx, t) {
-        const fx = scene.effects;
-        for (const s of sparkles) {
-          const a = Math.max(0, Math.sin(t * 1.5 + s.ph * 4)) * 0.5 * fx;
-          if (a > 0.02) drawGlow(ctx, '#fffbe0', s.x, s.y, 4, a);
-        }
-      },
+      drawOver() {},
     };
   },
 };

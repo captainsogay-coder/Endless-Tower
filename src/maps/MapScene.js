@@ -2,7 +2,7 @@
 // biome's live ambient layers.
 import { WORLD_W, WORLD_H, TILE } from '../config.js';
 import { createRng } from '../core/rng.js';
-import { makeCanvas } from '../render/canvas.js';
+import { makeCanvas, drawGlow } from '../render/canvas.js';
 import { paintTerrain, featurePath } from './paint.js';
 
 export class MapScene {
@@ -16,6 +16,15 @@ export class MapScene {
     this.terrainScale = 0;
     this.featurePath = featurePath(map, TILE * 0.7);
     this.ambient = biome.createAmbient(map, createRng(map.seed ^ 0x51ed27), this);
+    // Atmosphere: large, slow cloud shadows drifting across the ground.
+    const arng = createRng(map.seed ^ 0x2c1b);
+    this.cloudShadows = Array.from({ length: biome.atmosphere?.cloudShadows ?? 0 }, () => ({
+      x: arng.float(-200, WORLD_W),
+      y: arng.float(0, WORLD_H),
+      r: arng.float(140, 240),
+      sp: arng.float(6, 12),
+      squash: arng.float(0.5, 0.8),
+    }));
   }
 
   /** (Re)paints the static terrain at the given pixel density. */
@@ -35,6 +44,12 @@ export class MapScene {
   update(dt) {
     this.time += dt;
     this.ambient.update?.(dt, this.time);
+    for (const c of this.cloudShadows) {
+      c.x += c.sp * dt;
+      c.y += c.sp * 0.25 * dt;
+      if (c.x - c.r > WORLD_W) c.x = -c.r * 1.5;
+      if (c.y - c.r > WORLD_H) c.y = -c.r;
+    }
   }
 
   drawBackground(ctx) {
@@ -46,6 +61,17 @@ export class MapScene {
   }
 
   drawUnder(ctx) {
+    if (this.cloudShadows.length && this.effects > 0) {
+      ctx.save();
+      for (const c of this.cloudShadows) {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.scale(1, c.squash);
+        drawGlow(ctx, '#0a1020', 0, 0, c.r, 0.16 * this.effects, 0.85);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
     ctx.save();
     this.ambient.drawUnder?.(ctx, this.time);
     ctx.restore();

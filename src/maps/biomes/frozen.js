@@ -1,19 +1,20 @@
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType } from '../mapGenerator.js';
-import { scatter, softBlob, dropShadow, isInterior } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow, isInterior, blobPoints } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
 
 const palette = {
-  ground: '#d9e5ef',
+  ground: '#d9e3ec',
+  groundRamp: ['#bccbd9', '#d3dee8', '#e4ecf3', '#f0f4f8'],
   groundVariants: ['#c3d4e5', '#eef5fb', '#b1c5d9', '#e5eef7', '#cddcea'],
   path: '#8396ad',
   pathEdge: '#52637a',
   pathCenter: '#a3b6ca',
-  feature: '#9fd4ec',
+  feature: '#a9cde0',
   featureEdge: '#f4f9ff',
-  featureDeep: '#76b8dc',
+  featureDeep: '#8ab6d0',
   featureShine: '#ffffff',
   bridge: '#7d8fa6',
   pad: '#8fa3bb',
@@ -27,21 +28,24 @@ export default {
   name: 'Frozen Frontier',
   tagline: 'Where the wind itself has teeth',
   palette,
+  lighting: { strength: 0.1, vignette: 0.32, grade: '#eef3fb' },
+  atmosphere: { cloudShadows: 3 },
   enemyPalette: { body: '#3e2b63', dark: '#170e2e', eye: '#ff5fd2', glow: '#b06bff' },
   portalColor: '#5fd8ff',
   bossTitle: 'Warden of the White Silence',
   bridgeStyle: 'stone',
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.1, rivers: [0, 1], noiseScale: 0.14 },
   decor: [
-    { kind: 'pine', count: [12, 20], fp: 1, minPathDist: 1, size: 0.7 },
-    { kind: 'pine', count: [3, 6], fp: 2, minPathDist: 2, size: 1.2 },
-    { kind: 'iceCrystal', count: [6, 10], fp: 1, minPathDist: 1, size: 0.6 },
+    { kind: 'glacier', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },
+    { kind: 'pine', count: [12, 18], fp: 1, minPathDist: 1, size: 0.7, clump: 0.7 },
+    { kind: 'pine', count: [3, 5], fp: 2, minPathDist: 2, size: 1.2, clump: 0.7 },
+    { kind: 'iceCrystal', count: [4, 7], fp: 1, minPathDist: 1, size: 0.6, clump: 0.4 },
     { kind: 'snowRock', count: [3, 6], fp: 1, minPathDist: 1, size: 0.5 },
     { kind: 'iceShard', on: 'feature', count: [3, 7], size: 0.35 },
   ],
 
-  paintGroundDetail(ctx, map, rng) {
-    scatter(map, rng, 120, [TileType.GROUND, TileType.BLOCKED], (x, y) => softBlob(ctx, x, y, rng.float(14, 40), rng.pick(['#ffffff', '#a9bfd6']), 0.4));
+  paintGroundDetail(ctx, map, rng, density) {
+    scatterWeighted(map, rng, 160, [TileType.GROUND, TileType.BLOCKED], density, (x, y) => softBlob(ctx, x, y, rng.float(14, 40), rng.pick(['#ffffff', '#b4c5d6']), 0.35));
     // wind-carved drift lines
     ctx.strokeStyle = 'rgba(140,165,195,0.35)';
     ctx.lineWidth = 1;
@@ -59,10 +63,11 @@ export default {
 
   paintFeatures(ctx, map, pal) {
     const tiles = map.featureTiles;
+    const blobs = blobPoints(map);
     const pass = (r, color, filter) => {
       ctx.fillStyle = color;
       ctx.beginPath();
-      for (const t of tiles) {
+      for (const t of blobs) {
         if (filter && !filter(t)) continue;
         const x = t.x * TILE + TILE / 2;
         const y = t.y * TILE + TILE / 2;
@@ -156,6 +161,51 @@ export default {
         }
         break;
       }
+      case 'glacier': {
+        // Landmark: a calved block of glacier ice, faceted and lit from the top-left.
+        dropShadow(ctx, d.x + r * 0.25, d.y + r * 0.35, r * 1.15, r * 0.75, 0.25);
+        const pts = [];
+        const n = 9;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU + d.seed;
+          const rr = r * (0.75 + 0.25 * Math.abs(Math.sin(d.seed * 17 + i * 2.3)));
+          pts.push([d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr * 0.85]);
+        }
+        const top = [d.x - r * 0.12, d.y - r * 0.2];
+        for (let i = 0; i < n; i++) {
+          const p0 = pts[i];
+          const p1 = pts[(i + 1) % n];
+          const mid = Math.atan2((p0[1] + p1[1]) / 2 - d.y, (p0[0] + p1[0]) / 2 - d.x);
+          const lit = Math.cos(mid + Math.PI * 0.75);
+          ctx.fillStyle = lit > 0.3 ? '#e8f6ff' : lit > -0.3 ? '#a9d4ec' : '#6fa6c8';
+          ctx.beginPath();
+          ctx.moveTo(top[0], top[1]);
+          ctx.lineTo(p0[0], p0[1]);
+          ctx.lineTo(p1[0], p1[1]);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = '#4d7a99';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
+        ctx.closePath();
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        for (const p of pts) {
+          ctx.moveTo(top[0], top[1]);
+          ctx.lineTo(p[0], p[1]);
+        }
+        ctx.stroke();
+        // snow cap
+        ctx.fillStyle = 'rgba(250,252,255,0.9)';
+        ctx.beginPath();
+        ctx.ellipse(top[0] - r * 0.05, top[1] - r * 0.05, r * 0.35, r * 0.22, -0.3, 0, TAU);
+        ctx.fill();
+        break;
+      }
       case 'snowRock': {
         dropShadow(ctx, d.x + 3, d.y + 4, r * 0.9, r * 0.55, 0.25);
         ctx.fillStyle = '#5d6b7c';
@@ -174,7 +224,7 @@ export default {
 
   createAmbient(map, rng, scene) {
     const crystals = map.decor.filter((d) => d.kind === 'iceCrystal' || d.kind === 'iceShard');
-    const flakes = Array.from({ length: Math.round(130 * scene.effects) }, () => ({
+    const flakes = Array.from({ length: Math.round(80 * scene.effects) }, () => ({
       x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), vy: rng.float(14, 34), s: rng.float(0.8, 2.4), ph: rng.float(0, TAU),
     }));
     const streaks = Array.from({ length: Math.round(26 * scene.effects) }, () => ({ x: rng.float(0, WORLD_W), y: rng.float(0, WORLD_H), len: rng.float(30, 90), sp: rng.float(260, 420) }));
@@ -218,7 +268,7 @@ export default {
         }
         for (const c of crystals) {
           const k = Math.sin(t * 1.7 + c.seed * 20);
-          drawGlow(ctx, '#9fefff', c.x, c.y - c.r * 0.3, c.r * 1.6, 0.18 + 0.12 * k);
+          drawGlow(ctx, '#bfefff', c.x, c.y - c.r * 0.3, c.r * 1.3, 0.08 + 0.05 * k);
           if (k > 0.96) {
             ctx.strokeStyle = 'rgba(255,255,255,0.9)';
             ctx.lineWidth = 1;
@@ -235,7 +285,7 @@ export default {
       },
       drawOver(ctx) {
         const fx = scene.effects;
-        ctx.fillStyle = rgba('#ffffff', 0.75 * fx);
+        ctx.fillStyle = rgba('#ffffff', 0.6 * fx);
         for (const f of flakes) {
           ctx.beginPath();
           ctx.arc(f.x, f.y, f.s, 0, TAU);

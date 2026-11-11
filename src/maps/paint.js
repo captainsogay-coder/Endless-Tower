@@ -5,7 +5,8 @@
 import { TILE, COLS, ROWS, WORLD_W, WORLD_H } from '../config.js';
 import { TileType, tileIndex, inBounds } from './mapGenerator.js';
 import { rgba, shade } from '../core/color.js';
-import { circle, roundedPolyline } from '../render/canvas.js';
+import { createNoise2D, fbm } from '../core/rng.js';
+import { circle, roundedPolyline, makeCanvas } from '../render/canvas.js';
 
 export const tc = (t) => t * TILE + TILE / 2;
 
@@ -22,8 +23,27 @@ export function isType(map, x, y, type) {
   return inBounds(x, y) && map.grid[tileIndex(x, y)] === type;
 }
 
+/**
+ * Points used to paint feature shapes: every feature tile plus the midpoint
+ * between each pair of touching feature tiles. Filling circles at both gives
+ * smooth, organic outlines instead of a scalloped chain of tile circles.
+ * Coordinates are in (fractional) tile units.
+ */
+export function blobPoints(map) {
+  if (map._blobPoints) return map._blobPoints;
+  const out = [...map.featureTiles];
+  for (const t of map.featureTiles) {
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [-1, 1]]) {
+      if (isType(map, t.x + dx, t.y + dy, TileType.FEATURE)) out.push({ x: t.x + dx / 2, y: t.y + dy / 2, mid: true, a: t, b: { x: t.x + dx, y: t.y + dy } });
+    }
+  }
+  map._blobPoints = out;
+  return out;
+}
+
 /** True when all 8 neighbours are feature tiles (used for the deep centre of pools). */
 export function isInterior(map, t) {
+  if (t.mid) return isInterior(map, t.a) && isInterior(map, t.b);
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!isType(map, t.x + dx, t.y + dy, TileType.FEATURE)) return false;
   return true;
 }
@@ -42,22 +62,73 @@ export function scatter(map, rng, count, types, fn) {
   }
 }
 
-export function paintGroundBase(ctx, map, pal, rng) {
-  ctx.fillStyle = pal.ground;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-  for (let i = 0; i < 150; i++) {
-    softBlob(ctx, rng.float(-40, WORLD_W + 40), rng.float(-40, WORLD_H + 40), rng.float(30, 140), rng.pick(pal.groundVariants), rng.float(0.18, 0.45));
+/**
+ * Rejection-sampled scatter: detail density follows weight(px, py) in [0, 1],
+ * so grass, pebbles and flowers gather in natural patches instead of an even dusting.
+ */
+export function scatterWeighted(map, rng, count, types, weight, fn) {
+  for (let n = 0; n < count; n++) {
+    const px = rng.float(0, WORLD_W);
+    const py = rng.float(0, WORLD_H);
+    const x = Math.floor(px / TILE);
+    const y = Math.floor(py / TILE);
+    if (!types.includes(map.grid[tileIndex(x, y)])) continue;
+    if (rng.next() > weight(px, py)) continue;
+    fn(px, py, x, y);
   }
-  // Fine grain
-  for (let i = 0; i < 2600; i++) {
-    ctx.fillStyle = rgba(rng.chance(0.5) ? '#ffffff' : '#000000', rng.float(0.02, 0.06));
-    ctx.fillRect(rng.float(0, WORLD_W), rng.float(0, WORLD_H), rng.float(1, 2.5), rng.float(1, 2.5));
+}
+
+/**
+ * Natural ground: a low-frequency noise field mapped onto the biome's ground
+ * ramp, drawn at low resolution and smoothly upscaled, plus finer mottling
+ * and grain. No two patches of ground repeat.
+ */
+export function paintGroundBase(ctx, map, pal, rng, noise) {
+  const ramp = pal.groundRamp ?? [shade(pal.ground, -0.12), pal.ground, shade(pal.ground, 0.1)];
+  const W = COLS * 3;
+  const H = ROWS * 3;
+  const c = makeCanvas(W, H);
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const cols = ramp.map(hex);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const v = Math.min(0.999, Math.max(0, (fbm(noise, x * 0.045, y * 0.045, 4) - 0.25) * 2));
+      const f = v * (cols.length - 1);
+      const i0 = Math.floor(f);
+      const t = f - i0;
+      const a = cols[i0];
+      const b = cols[Math.min(cols.length - 1, i0 + 1)];
+      const o = (y * W + x) * 4;
+      img.data[o] = a[0] + (b[0] - a[0]) * t;
+      img.data[o + 1] = a[1] + (b[1] - a[1]) * t;
+      img.data[o + 2] = a[2] + (b[2] - a[2]) * t;
+      img.data[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(c, 0, 0, WORLD_W, WORLD_H);
+  ctx.restore();
+  const fine = createNoise2D(rng.int(0, 1e9));
+  for (let i = 0; i < 900; i++) {
+    const x = rng.float(0, WORLD_W);
+    const y = rng.float(0, WORLD_H);
+    const v = fine(x * 0.05, y * 0.05);
+    softBlob(ctx, x, y, rng.float(6, 16), v > 0.5 ? shade(pal.ground, 0.14) : shade(pal.ground, -0.18), 0.12 + Math.abs(v - 0.5) * 0.25);
+  }
+  for (let i = 0; i < 2200; i++) {
+    ctx.fillStyle = rgba(rng.chance(0.5) ? '#ffffff' : '#000000', rng.float(0.025, 0.06));
+    ctx.fillRect(rng.float(0, WORLD_W), rng.float(0, WORLD_H), rng.float(1, 2), rng.float(1, 2));
   }
 }
 
 /** Organic union-of-circles painting for feature tiles (water, lava, ice…). */
 export function paintFeatureBlobs(ctx, map, pal) {
-  const tiles = map.featureTiles;
+  const tiles = blobPoints(map);
   if (!tiles.length) return;
   const pass = (r, color, filter, dy = 0) => {
     ctx.fillStyle = color;
@@ -77,7 +148,7 @@ export function paintFeatureBlobs(ctx, map, pal) {
 
 export function featurePath(map, r = TILE * 0.7) {
   const p = new Path2D();
-  for (const t of map.featureTiles) {
+  for (const t of blobPoints(map)) {
     p.moveTo(tc(t.x) + r, tc(t.y));
     p.arc(tc(t.x), tc(t.y), r, 0, Math.PI * 2);
   }
@@ -100,11 +171,27 @@ export function paintPath(ctx, map, pal) {
       ctx.restore();
     }
   };
-  stroke(TILE * 1.12, 'rgba(0,0,0,0.28)', 4);
-  stroke(TILE * 1.04, pal.pathEdge);
-  stroke(TILE * 0.84, pal.path);
-  stroke(TILE * 0.4, rgba(pal.pathCenter, 0.35));
+  stroke(TILE * 1.06, 'rgba(20,14,24,0.22)', 3);
+  stroke(TILE * 1.02, pal.pathEdge);
+  stroke(TILE * 0.86, pal.path);
+  stroke(TILE * 0.34, rgba(pal.pathCenter, 0.22));
   ctx.restore();
+}
+
+/** Breaks up the road's ruler-straight edges with worn, irregular verges. */
+export function paintPathWear(ctx, map, pal, rng) {
+  for (const route of map.routes) {
+    for (const t of route.tiles) {
+      for (let k = 0; k < 3; k++) {
+        const a = rng.float(0, Math.PI * 2);
+        const x = t.x * TILE + TILE / 2 + Math.cos(a) * TILE * 0.5;
+        const y = t.y * TILE + TILE / 2 + Math.sin(a) * TILE * 0.5;
+        if (isType(map, Math.floor(x / TILE), Math.floor(y / TILE), TileType.GROUND)) {
+          softBlob(ctx, x, y, rng.float(4, 8), rng.chance(0.6) ? pal.path : pal.pathEdge, 0.5);
+        }
+      }
+    }
+  }
 }
 
 export function paintPathGrain(ctx, map, pal, rng, density = 7) {
@@ -166,7 +253,6 @@ export function paintBridges(ctx, map, pal, style = 'wood') {
 
 export function paintObjectivePad(ctx, map, pal) {
   const { px, py } = map.goal;
-  softBlob(ctx, px, py, TILE * 2.6, pal.accent, 0.22);
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   circle(ctx, px, py + 4, TILE * 1.45);
@@ -177,28 +263,46 @@ export function paintObjectivePad(ctx, map, pal) {
   ctx.fillStyle = g;
   circle(ctx, px, py, TILE * 1.4);
   ctx.fill();
-  ctx.strokeStyle = rgba(pal.accent, 0.7);
-  ctx.lineWidth = 2;
-  circle(ctx, px, py, TILE * 1.28);
-  ctx.stroke();
-  ctx.setLineDash([4, 6]);
-  circle(ctx, px, py, TILE * 1.05);
+  ctx.strokeStyle = 'rgba(20,14,24,0.35)';
+  ctx.lineWidth = 1.5;
+  circle(ctx, px, py, TILE * 1.4);
   ctx.stroke();
   ctx.restore();
 }
 
-/** Cohesive lighting pass: tinted key light + vignette. Uses source-atop so transparent areas stay clear. */
-export function paintLighting(ctx, pal, lightPos = { x: WORLD_W * 0.3, y: WORLD_H * 0.2 }) {
+/**
+ * Lighting & grade. Each realm has its own key light (position, colour,
+ * strength), a colour grade multiplied over everything to bind the palette,
+ * and a vignette. Grade/light use source-atop so transparent voids stay clear.
+ */
+export function paintLighting(ctx, pal, lighting = {}) {
+  const L = { pos: { x: WORLD_W * 0.15, y: -WORLD_H * 0.1 }, strength: 0.14, vignette: 0.35, ...lighting };
   ctx.save();
   ctx.globalCompositeOperation = 'source-atop';
-  const lg = ctx.createRadialGradient(lightPos.x, lightPos.y, 0, lightPos.x, lightPos.y, WORLD_W * 0.8);
-  lg.addColorStop(0, rgba(pal.light, 0.16));
+  if (L.grade) {
+    // multiply, restricted to existing pixels via a temp canvas
+    const g = makeCanvas(ctx.canvas.width, ctx.canvas.height);
+    const gc = g.getContext('2d');
+    gc.drawImage(ctx.canvas, 0, 0);
+    gc.globalCompositeOperation = 'multiply';
+    gc.fillStyle = L.grade;
+    gc.fillRect(0, 0, g.width, g.height);
+    gc.globalCompositeOperation = 'destination-in';
+    gc.drawImage(ctx.canvas, 0, 0);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(g, 0, 0);
+    ctx.restore();
+  }
+  const lg = ctx.createRadialGradient(L.pos.x, L.pos.y, 0, L.pos.x, L.pos.y, WORLD_W * 0.95);
+  lg.addColorStop(0, rgba(pal.light, L.strength));
   lg.addColorStop(1, rgba(pal.light, 0));
   ctx.fillStyle = lg;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-  const vg = ctx.createRadialGradient(WORLD_W / 2, WORLD_H / 2, WORLD_H * 0.45, WORLD_W / 2, WORLD_H / 2, WORLD_W * 0.72);
+  const vg = ctx.createRadialGradient(WORLD_W / 2, WORLD_H / 2, WORLD_H * 0.5, WORLD_W / 2, WORLD_H / 2, WORLD_W * 0.72);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, rgba(pal.shadow ?? '#000000', 0.42));
+  vg.addColorStop(1, rgba(pal.shadow ?? '#000000', L.vignette));
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
   ctx.restore();
@@ -214,13 +318,17 @@ export function dropShadow(ctx, x, y, rx, ry, alpha = 0.3) {
 /** Full static terrain pass. Biome hooks are optional overrides. */
 export function paintTerrain(ctx, map, biome, rng) {
   const pal = biome.palette;
-  paintGroundBase(ctx, map, pal, rng);
-  biome.paintGroundDetail?.(ctx, map, rng);
+  const noise = createNoise2D(rng.int(0, 1e9));
+  // Detail density field shared by the biome's scatter passes (patches, not dustings).
+  const density = (px, py) => Math.max(0, Math.min(1, (fbm(noise, px * 0.012 + 40, py * 0.012 + 40, 3) - 0.3) * 2.2));
+  paintGroundBase(ctx, map, pal, rng, noise);
+  biome.paintGroundDetail?.(ctx, map, rng, density);
   (biome.paintFeatures ?? paintFeatureBlobs)(ctx, map, pal, rng);
+  paintPathWear(ctx, map, pal, rng);
   paintPath(ctx, map, pal);
   (biome.paintPathDetail ?? ((c, m, r) => paintPathGrain(c, m, pal, r)))(ctx, map, rng);
   paintBridges(ctx, map, pal, biome.bridgeStyle);
   paintObjectivePad(ctx, map, pal);
   for (const d of map.decor) biome.paintDecor?.(ctx, d, rng, map);
-  paintLighting(ctx, pal, biome.lightPos);
+  paintLighting(ctx, pal, biome.lighting);
 }

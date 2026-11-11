@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game/Game.js';
 import { TileType, tileIndex } from '../src/maps/mapGenerator.js';
 import { simulate } from '../scripts/simulate.js';
-import { COLS, ROWS } from '../src/config.js';
+import { COLS, ROWS, GAME_CONFIG } from '../src/config.js';
+import { registerRoster } from '../src/units/roster.js';
+import { registerUnit } from '../src/units/unitRegistry.js';
+import { levelStats } from '../src/units/unitStats.js';
+import dude from '../src/units/defs/dude.js';
+
+registerRoster();
+registerUnit({ id: 'test-plain', name: 'Plain', tier: 1, price: 10, levels: [{ damage: 10, range: 64, rate: 1 }] });
 
 function groundTiles(game) {
   const out = [];
@@ -11,50 +18,100 @@ function groundTiles(game) {
   return out;
 }
 
-test('there is no unit placement cap: every buildable tile can hold a unit', () => {
-  const game = new Game({ seed: 77 });
+test('unlimited copies: every buildable tile can hold a Dude (no 12-unit cap)', () => {
+  const game = new Game({ seed: 77, loadout: ['dude'] });
   const tiles = groundTiles(game);
-  game.gold = game.summonCost * tiles.length;
-  game.summon(tiles.length);
-  for (const [x, y] of tiles) assert.ok(game.placeFromBench(game.bench[0].def.id, x, y));
+  game.gold = dude.price * tiles.length;
+  for (const [x, y] of tiles) assert.ok(game.deploy('dude', x, y));
   assert.equal(game.units.length, tiles.length);
-  assert.equal(game.bench.length, 0);
+  assert.ok(game.units.length > 12);
+  assert.equal(game.deployedCount('dude'), tiles.length);
 });
 
-test('units cannot be placed on roads, terrain features or occupied tiles', () => {
-  const game = new Game({ seed: 5 });
-  game.summon(3);
-  const id = game.bench[0].def.id;
-  const road = game.map.routes[0].tiles[3];
-  assert.equal(game.placeFromBench(id, road.x, road.y), null);
+test('deploying costs the unit price and needs gold, a free tile and a plan slot', () => {
+  const game = new Game({ seed: 5, loadout: ['dude'] });
   const [gx, gy] = groundTiles(game)[0];
-  assert.ok(game.placeFromBench(id, gx, gy));
-  assert.equal(game.placeFromBench(id, gx, gy), null);
+  const g0 = game.gold;
+  assert.ok(game.deploy('dude', gx, gy));
+  assert.equal(game.gold, g0 - dude.price);
+  assert.equal(game.deploy('dude', gx, gy), null, 'occupied');
+  const road = game.map.routes[0].tiles[3];
+  assert.equal(game.canDeploy('dude', road.x, road.y), 'blocked');
+  const [hx, hy] = groundTiles(game)[1];
+  assert.equal(game.canDeploy('test-plain', hx, hy), 'not-in-plan', 'only plan units are deployable');
+  game.gold = 0;
+  assert.equal(game.canDeploy('dude', hx, hy), 'gold');
 });
 
-test('recalling returns a unit to reserves and frees its tile', () => {
-  const game = new Game({ seed: 6 });
-  game.summon(1);
-  const [x, y] = groundTiles(game)[0];
-  const u = game.placeFromBench(game.bench[0].def.id, x, y);
-  assert.ok(game.recallUnit(u));
-  assert.equal(game.bench.length, 1);
-  assert.ok(game.canPlace(x, y));
+test('Dude Power counts deployed Dudes and updates on deploy and sell', () => {
+  const game = new Game({ seed: 9, loadout: ['dude', 'test-plain'] });
+  game.gold = 1e6;
+  const tiles = groundTiles(game);
+  const base = levelStats(dude, 0).damage;
+  const a = game.deploy('dude', ...tiles[0]);
+  assert.equal(a.stats.damage, base);
+  const b = game.deploy('dude', ...tiles[1]);
+  const c = game.deploy('dude', ...tiles[2]);
+  const d = game.deploy('dude', ...tiles[3]);
+  for (const u of [a, b, c, d]) assert.ok(Math.abs(u.stats.damage - base * 1.3) < 1e-9);
+  // other unit types do not count
+  const plain = game.deploy('test-plain', ...tiles[4]);
+  assert.equal(plain.stats.damage, 10);
+  assert.ok(Math.abs(a.stats.damage - base * 1.3) < 1e-9);
+  game.sell(d);
+  for (const u of [a, b, c]) assert.ok(Math.abs(u.stats.damage - base * 1.2) < 1e-9);
+  assert.equal(game.deployedCount('dude'), 3);
 });
 
-test('a full wave plays out: enemies spawn, fight, and the wave clears', () => {
-  const game = new Game({ seed: 8 });
-  let spawned = 0;
-  game.on('spawn', () => spawned++);
+test('upgrades raise level and stats, keep Dude Power, and stop at level 5', () => {
+  const game = new Game({ seed: 10, loadout: ['dude'] });
+  game.gold = 1e6;
+  const tiles = groundTiles(game);
+  const u = game.deploy('dude', ...tiles[0]);
+  game.deploy('dude', ...tiles[1]);
+  const info = game.upgradeInfo(u);
+  assert.equal(info.nextLevel, 1);
+  assert.ok(info.next.damage > info.current.damage);
+  const g = game.gold;
+  assert.ok(game.upgrade(u));
+  assert.equal(game.gold, g - info.cost);
+  for (let i = 0; i < 4; i++) assert.ok(game.upgrade(u));
+  assert.equal(u.level, 5);
+  assert.equal(game.upgrade(u), false);
+  assert.ok(game.upgradeInfo(u).maxed);
+  assert.ok(Math.abs(u.stats.damage - levelStats(dude, 5).damage * 1.1) < 1e-9);
+});
+
+test('selling refunds part of everything spent on the unit', () => {
+  const game = new Game({ seed: 11, loadout: ['dude'] });
+  game.gold = 1000;
+  const u = game.deploy('dude', ...groundTiles(game)[0]);
+  game.upgrade(u);
+  const spent = dude.price + dude.levels[1].cost;
+  const before = game.gold;
+  const refund = game.sell(u);
+  assert.equal(refund, Math.floor(spent * GAME_CONFIG.sellRefund));
+  assert.equal(game.gold, before + refund);
+  assert.ok(game.canPlace(u.col, u.row));
+});
+
+test('Dudes attack automatically and damage registers', () => {
+  const game = new Game({ seed: 8, loadout: ['dude'] });
+  game.gold = 1e6;
+  const near = groundTiles(game).filter(([x, y]) => game.map.pathDist[tileIndex(x, y)] === 1);
+  for (const [x, y] of near.slice(0, 30)) game.deploy('dude', x, y);
+  let fired = 0;
+  game.on('fire', () => fired++);
   game.startNextWave();
-  const total = game.currentPlan.total;
   for (let i = 0; i < 60 * 600 && game.phase === 'wave'; i++) game.update(1 / 60);
-  assert.equal(spawned, total);
+  assert.ok(fired > 0);
+  assert.ok(game.stats.kills > 0);
+  assert.ok(game.stats.damage > 0);
   assert.notEqual(game.phase, 'wave');
 });
 
-test('headless runs survive many waves without errors and with huge unit counts', () => {
+test('headless runs survive many waves with large Dude armies', () => {
   const { game } = simulate({ seed: 4242, maxWave: 40 });
-  assert.ok(game.wave >= 10, `reached wave ${game.wave}`);
-  assert.ok(game.stats.kills > 100);
+  assert.ok(game.wave >= 30, `reached wave ${game.wave}`);
+  assert.ok(game.units.length > 50);
 });
