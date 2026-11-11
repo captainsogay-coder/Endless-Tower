@@ -29,7 +29,7 @@ function coverageMap(map) {
   return cov;
 }
 
-/** Spend gold: alternate between deploying new copies and upgrading existing ones. */
+/** Spend coins: alternate between deploying new copies and upgrading existing ones. */
 export function botStep(game, unitId = 'dude') {
   const { map } = game;
   if (!map._cov) map._cov = coverageMap(map);
@@ -49,13 +49,13 @@ export function botStep(game, unitId = 'dude') {
       const info = game.upgradeInfo(u);
       if (!info.maxed && (!best || info.cost < best.cost)) best = { u, cost: info.cost };
     }
-    const canDeploy = spots.length && game.gold >= def.price;
-    const preferUpgrade = best && (!spots.length || game.units.length > 40) && game.gold >= best.cost;
+    const canDeploy = spots.length && game.coins >= def.price;
+    const preferUpgrade = best && (!spots.length || game.units.length > 40) && game.coins >= best.cost;
     if (preferUpgrade) game.upgrade(best.u);
     else if (canDeploy) {
       const s = spots.shift();
       game.deploy(def.id, s.x, s.y);
-    } else if (best && game.gold >= best.cost) game.upgrade(best.u);
+    } else if (best && game.coins >= best.cost) game.upgrade(best.u);
     else break;
   }
 }

@@ -11,7 +11,7 @@ import { MapScene } from '../maps/MapScene.js';
 import { buildEnemySprites } from './enemySprites.js';
 import { drawUnit, unitSprite } from './unitArt.js';
 import { Effects } from './fx.js';
-import { circle } from './canvas.js';
+import { circle, drawGlow } from './canvas.js';
 import { rgba, shade } from '../core/color.js';
 import { getTrait } from '../waves/traits.js';
 import { TAU, easeOutBack, clamp } from '../core/math.js';
@@ -36,6 +36,8 @@ export class Renderer {
     this.breachPulse = [];
     this.bossFlash = 0;
     this.ui = { hover: null, placingDef: null, selected: null };
+    this.blasts = []; // flat, short-lived explosion shapes
+    this.decals = []; // scorch marks on the ground
     this.unsub = [];
   }
 
@@ -49,6 +51,8 @@ export class Renderer {
       this.sprites = buildEnemySprites(game.biome.enemyPalette);
       this.breachPulse = game.map.entrances.map(() => 0);
       this.fx = new Effects();
+      this.blasts = [];
+      this.decals = [];
       this.ui.selected = null;
       this.ui.placingDef = null;
       this.resize();
@@ -59,14 +63,8 @@ export class Renderer {
       this.breachPulse[e.routeIndex] = Math.min(1, (this.breachPulse[e.routeIndex] ?? 0) + (e.isBoss ? 1 : 0.3));
     });
     on('death', (e) => this.onDeath(e));
-    on('impact', (p) => {
-      if (p.kind === 'pebble') {
-        if (Math.random() < 0.6 * this.fx.density) this.fx.burst(p.x, p.y, 2, '#cbbfa8', { speed: 30, life: 0.3, size: 1.6, glow: false });
-      } else if (Math.random() < 0.5 * this.fx.density) {
-        this.fx.burst(p.x, p.y, 2, p.color, { speed: 40, life: 0.2, size: 1.5, glow: false });
-      }
-      if (p.splash > 0) this.fx.ring(p.x, p.y, 4, p.splash, 0.3, '#ffffff', 1.5);
-    });
+    on('impact', (p) => this.onImpact(p));
+    on('fire', (p) => this.onFire(p));
     on('leak', () => {
       this.towerHit = 1;
     });
@@ -106,6 +104,47 @@ export class Renderer {
 
   shake(amount) {
     this.shakeAmt = Math.min(8, Math.max(this.shakeAmt, amount * (0.5 + 0.5 * this.effectsLevel)));
+  }
+
+  /** Impact feedback scales with the weapon: dust for pebbles, sparks for bullets, blasts for explosives. */
+  onImpact(p) {
+    const d = this.fx.density;
+    switch (p.kind) {
+      case 'pebble':
+        if (Math.random() < 0.6 * d) this.fx.burst(p.x, p.y, 2, '#cbbfa8', { speed: 30, life: 0.3, size: 1.6, glow: false });
+        break;
+      case 'bullet':
+        if (Math.random() < 0.35 * d) this.fx.burst(p.x, p.y, 1, '#f4e3a1', { speed: 50, life: 0.12, size: 1.2, glow: false });
+        break;
+      case 'grenade':
+      case 'shell': {
+        const big = p.kind === 'shell';
+        const r = p.splash || (big ? 48 : 36);
+        this.blasts.push({ x: p.x, y: p.y, r, t: 0, max: big ? 0.32 : 0.26, seed: Math.random() * 6 });
+        if (this.blasts.length > 60) this.blasts.shift();
+        this.decals.push({ x: p.x, y: p.y, r: r * 0.55, t: 0, max: big ? 6 : 4, seed: Math.random() * 6 });
+        if (this.decals.length > 140) this.decals.shift();
+        this.fx.ring(p.x, p.y, r * 0.3, r * 1.05, 0.35, '#d8cbb0', 2);
+        this.fx.burst(p.x, p.y, big ? 8 : 5, '#3a332c', { speed: 70 + r, life: 0.5, size: 2, glow: false, gravity: 120 });
+        break;
+      }
+      default:
+        if (Math.random() < 0.5 * d) this.fx.burst(p.x, p.y, 2, p.color ?? '#e8e2d4', { speed: 40, life: 0.2, size: 1.5, glow: false });
+    }
+    if (p.splash > 0 && p.kind !== 'grenade' && p.kind !== 'shell') this.fx.ring(p.x, p.y, 4, p.splash, 0.3, '#ffffff', 1.5);
+  }
+
+  onFire(p) {
+    const u = p.source;
+    if (!u) return;
+    if (u.def.art === 'gunnerman' && Math.random() < 0.35 * this.fx.density) {
+      // ejected brass, flicked to the side away from the target
+      this.fx.particle(u.x - u.facing * 2, u.y - 1, -u.facing * (20 + Math.random() * 20), -40 - Math.random() * 20, 0.35, 1.6, '#c9a24a', { glow: false, gravity: 260, drag: 0.98, shrink: false });
+    } else if (u.def.art === 'tank') {
+      const mx = u.x + Math.cos(u.angle) * 20;
+      const my = u.y + Math.sin(u.angle) * 20;
+      for (let i = 0; i < 3; i++) this.fx.particle(mx, my, Math.cos(u.angle) * 30 + (Math.random() - 0.5) * 20, Math.sin(u.angle) * 30 - 10, 0.6, 4, '#8a857c', { glow: false, drag: 0.92 });
+    }
   }
 
   onDeath(e) {
@@ -170,6 +209,8 @@ export class Renderer {
     scene.drawBackground(ctx);
     scene.drawTerrain(ctx);
     scene.drawUnder(ctx);
+    this.drawDecals(ctx, gameDt);
+    this.drawHazards(ctx, t);
     this.drawBreaches(ctx, t);
     if (this.ui.placingDef) this.drawPlacementGrid(ctx);
     this.drawTower(ctx, t);
@@ -177,6 +218,7 @@ export class Renderer {
     this.drawCinematicUnder(ctx, t);
     this.drawActors(ctx, t);
     this.drawProjectiles(ctx);
+    this.drawBlasts(ctx, gameDt);
     this.drawPlacementGhost(ctx);
     this.fx.draw(ctx);
     scene.drawOver(ctx);
@@ -184,6 +226,100 @@ export class Renderer {
   }
 
   // -------------------------------------------------------------- layers
+
+  drawDecals(ctx, dt) {
+    let w = 0;
+    for (let i = 0; i < this.decals.length; i++) {
+      const d = this.decals[i];
+      d.t += dt;
+      if (d.t >= d.max) continue;
+      const a = 0.45 * Math.min(1, (d.max - d.t) / 1.5);
+      ctx.fillStyle = `rgba(28,20,16,${a})`;
+      ctx.beginPath();
+      for (let k = 0; k < 9; k++) {
+        const ang = (k / 9) * TAU;
+        const rr = d.r * (0.7 + 0.3 * Math.abs(Math.sin(d.seed + k * 1.7)));
+        ctx.lineTo(d.x + Math.cos(ang) * rr, d.y + Math.sin(ang) * rr * 0.75);
+      }
+      ctx.closePath();
+      ctx.fill();
+      this.decals[w++] = d;
+    }
+    this.decals.length = w;
+  }
+
+  /** Burning ground: flickering flame tongues over a scorched patch. Fire is a light source, so it may glow softly. */
+  drawHazards(ctx, t) {
+    const hz = this.game.hazards;
+    if (!hz.length) return;
+    for (const h of hz) {
+      const life = Math.min(1, h.ttl / h.max, (h.max - h.ttl) * 6 + 0.2);
+      ctx.fillStyle = `rgba(40,18,10,${0.35 * life})`;
+      ctx.beginPath();
+      ctx.ellipse(h.x, h.y, h.radius, h.radius * 0.7, 0, 0, TAU);
+      ctx.fill();
+      drawGlow(ctx, '#e0742e', h.x, h.y - 4, h.radius * 1.2, 0.18 * life);
+      const n = 6;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * TAU + h.x * 0.13;
+        const rr = h.radius * (0.25 + 0.5 * ((k * 37) % 10) / 10);
+        const fx = h.x + Math.cos(a) * rr;
+        const fy = h.y + Math.sin(a) * rr * 0.7;
+        const flick = 0.75 + 0.25 * Math.sin(t * 14 + k * 2.1 + h.y);
+        const fh = (5 + (k % 3) * 2.2) * flick * life;
+        this.flame(ctx, fx, fy, fh);
+      }
+    }
+  }
+
+  flame(ctx, x, y, h) {
+    ctx.fillStyle = '#c5401c';
+    ctx.beginPath();
+    ctx.moveTo(x - h * 0.42, y);
+    ctx.quadraticCurveTo(x - h * 0.45, y - h * 0.6, x, y - h);
+    ctx.quadraticCurveTo(x + h * 0.45, y - h * 0.6, x + h * 0.42, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#f2a23a';
+    ctx.beginPath();
+    ctx.moveTo(x - h * 0.22, y);
+    ctx.quadraticCurveTo(x - h * 0.24, y - h * 0.4, x, y - h * 0.62);
+    ctx.quadraticCurveTo(x + h * 0.24, y - h * 0.4, x + h * 0.22, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /** Explosions: a flat, hard-edged burst that pops and shrinks – readable, no bloom. */
+  drawBlasts(ctx, dt) {
+    let w = 0;
+    for (let i = 0; i < this.blasts.length; i++) {
+      const b = this.blasts[i];
+      b.t += dt;
+      if (b.t >= b.max) continue;
+      const k = b.t / b.max;
+      const grow = k < 0.3 ? k / 0.3 : 1;
+      const r = b.r * (0.45 + 0.4 * grow) * (k > 0.5 ? 1 - (k - 0.5) * 0.6 : 1);
+      const pts = 10;
+      const shape = (rad, col) => {
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        for (let j = 0; j < pts; j++) {
+          const a = (j / pts) * TAU + b.seed;
+          const rr = rad * (j % 2 ? 0.62 : 1) * (0.85 + 0.15 * Math.sin(b.seed * 3 + j));
+          ctx.lineTo(b.x + Math.cos(a) * rr, b.y + Math.sin(a) * rr * 0.8);
+        }
+        ctx.closePath();
+        ctx.fill();
+      };
+      ctx.globalAlpha = 1 - Math.max(0, k - 0.4) / 0.6;
+      if (k < 0.15) drawGlow(ctx, '#ffd38a', b.x, b.y, b.r * 1.2, 0.35);
+      shape(r, k < 0.55 ? '#e8742c' : '#6d5e52');
+      shape(r * 0.62, k < 0.4 ? '#ffd57a' : '#8b7d70');
+      ctx.globalAlpha = 1;
+      this.blasts[w++] = b;
+    }
+    this.blasts.length = w;
+  }
 
   drawPlacementGrid(ctx) {
     const { game } = this;
@@ -202,7 +338,7 @@ export class Renderer {
     if (h) {
       const reason = game.canDeploy(this.ui.placingDef.id, h.col, h.row);
       const ok = !reason;
-      ctx.strokeStyle = ok ? '#f2efe6' : reason === 'gold' ? '#e3a33b' : '#d9534a';
+      ctx.strokeStyle = ok ? '#f2efe6' : reason === 'coins' ? '#e3a33b' : '#d9534a';
       ctx.lineWidth = 2;
       ctx.strokeRect(h.col * TILE + 1.5, h.row * TILE + 1.5, TILE - 3, TILE - 3);
     }
@@ -212,7 +348,7 @@ export class Renderer {
     const { ui, game } = this;
     if (!ui.placingDef || !ui.hover || !game.canPlace(ui.hover.col, ui.hover.row)) return;
     const s = unitSprite(ui.placingDef.art, 0, 1, 0);
-    ctx.globalAlpha = game.gold >= ui.placingDef.price ? 0.75 : 0.35;
+    ctx.globalAlpha = game.coins >= ui.placingDef.price ? 0.75 : 0.35;
     ctx.drawImage(s.img, ui.hover.col * TILE + TILE / 2 + s.ox, ui.hover.row * TILE + TILE / 2 + 9 + s.oy, s.w, s.h);
     ctx.globalAlpha = 1;
   }
@@ -238,6 +374,14 @@ export class Renderer {
     circle(ctx, x, y, range);
     ctx.fill();
     ctx.stroke();
+    const def = ui.placingDef ?? ui.selected?.def;
+    if (def?.aura) {
+      ctx.strokeStyle = 'rgba(227,163,59,0.85)';
+      ctx.setLineDash([4, 4]);
+      circle(ctx, x, y, def.aura.radius);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   /** Where the road leaves the map: a darkened gap flanked by two marker stones. */
@@ -409,8 +553,38 @@ export class Renderer {
     } else if (e.age < 0.25) {
       scale = 0.6 + 0.4 * (e.age / 0.25);
     }
-    const bob = Math.sin(t * (e.category === 'minion' ? 14 : 8) + e.phase) * (e.category === 'boss' ? 1.2 : 1);
-    const squash = 1 + Math.sin(t * 14 + e.phase) * (e.category === 'minion' ? 0.05 : 0.025);
+    // Distinct gaits per weight class; wounded enemies limp (slower, uneven step).
+    const wounded = !!e.statuses && (e.statuses.wounded ?? 0) > this.game.time;
+    const pace = wounded ? 0.7 : 1;
+    const ph = t * pace + e.phase;
+    let bob = 0;
+    let squash = 1;
+    let tilt = 0;
+    switch (e.category) {
+      case 'minion': { // quick hops, squashing on landing
+        const hop = Math.abs(Math.sin(ph * 9));
+        bob = -hop * 3.2;
+        squash = 1 + (1 - hop) * 0.12 - 0.04;
+        break;
+      }
+      case 'regular': // marching waddle
+        bob = -Math.abs(Math.sin(ph * 6)) * 1.4;
+        tilt = Math.sin(ph * 6) * 0.08;
+        break;
+      case 'elite': { // heavy stomp: slow rise, hard drop
+        const st = (ph * 1.6) % 1;
+        bob = -Math.pow(Math.sin(st * Math.PI), 0.6) * 1.6;
+        squash = st < 0.08 ? 1.06 : 1;
+        tilt = Math.sin(ph * 3.2) * 0.04;
+        break;
+      }
+      default: // boss: lumbering sway
+        bob = -Math.abs(Math.sin(ph * 2.2)) * 2;
+        tilt = Math.sin(ph * 2.2) * 0.05;
+    }
+    if (wounded) tilt += Math.sin(ph * 6) > 0.6 ? 0.08 : 0;
+    // hit flinch: a brief squash when struck
+    if (e.flash > 0) squash *= 1 - Math.min(1, e.flash * 10) * 0.1;
 
     ctx.fillStyle = 'rgba(20,14,24,0.3)';
     ctx.beginPath();
@@ -448,6 +622,7 @@ export class Renderer {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(e.x, e.y + bob);
+    ctx.rotate(tilt);
     ctx.scale(scale * e.facing * (2 - squash), scale * squash);
     const h = spr.half;
     ctx.drawImage(spr.img, -h, -h, h * 2, h * 2);
@@ -473,6 +648,21 @@ export class Renderer {
       ctx.lineWidth = 1.5;
       circle(ctx, e.x, e.y + bob, r * 1.32 * scale);
       ctx.stroke();
+    }
+    if (wounded) {
+      // field-dressing mark: reads as "wounded" at a glance
+      const wx = e.x - r * 0.7;
+      const wy = e.y - r * 0.6 + bob;
+      ctx.fillStyle = '#f1ece2';
+      ctx.fillRect(wx - 2.5, wy - 2.5, 5, 5);
+      ctx.fillStyle = '#b8433a';
+      ctx.fillRect(wx - 2, wy - 0.7, 4, 1.4);
+      ctx.fillRect(wx - 0.7, wy - 2, 1.4, 4);
+    }
+    if (e.statuses && (e.statuses.burning ?? 0) > this.game.time) {
+      const fl = 0.8 + 0.2 * Math.sin(t * 16 + e.phase);
+      this.flame(ctx, e.x - r * 0.35, e.y + r * 0.2 + bob, r * 0.8 * fl);
+      this.flame(ctx, e.x + r * 0.3, e.y + r * 0.35 + bob, r * 0.6 * fl);
     }
     if (e.regen > 0 && e.hp < e.maxHp) {
       ctx.fillStyle = '#7fd98a';
@@ -503,30 +693,85 @@ export class Renderer {
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
       if (!p.alive) continue;
-      if (p.kind === 'pebble') {
-        // a lobbed stone: shadow on the ground, stone on an arc above it
-        const done = Math.hypot(p.x - p.sx, p.y - p.sy);
-        const left = Math.hypot(p.tx - p.x, p.ty - p.y);
-        const k = done / Math.max(1, done + left);
-        const hgt = 4 * 9 * k * (1 - k);
-        ctx.fillStyle = 'rgba(20,14,24,0.25)';
-        ctx.fillRect(p.x - 1.2, p.y - 0.6, 2.4, 1.2);
-        ctx.fillStyle = '#8d877c';
-        ctx.strokeStyle = '#2b2722';
-        ctx.lineWidth = 0.8;
-        circle(ctx, p.x, p.y - hgt, 1.7);
-        ctx.fill();
-        ctx.stroke();
-      } else {
-        const dx = p.x - p.px;
-        const dy = p.y - p.py;
-        const len = Math.hypot(dx, dy) || 1;
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(p.x - (dx / len) * 8, p.y - (dy / len) * 8);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
+      const done = Math.hypot(p.x - p.sx, p.y - p.sy);
+      const left = Math.hypot(p.tx - p.x, p.ty - p.y);
+      const k = done / Math.max(1, done + left);
+      switch (p.kind) {
+        case 'pebble': {
+          // a lobbed stone: shadow on the ground, stone on a shallow arc
+          const hgt = 4 * 9 * k * (1 - k);
+          ctx.fillStyle = 'rgba(20,14,24,0.25)';
+          ctx.fillRect(p.x - 1.2, p.y - 0.6, 2.4, 1.2);
+          ctx.fillStyle = '#8d877c';
+          ctx.strokeStyle = '#2b2722';
+          ctx.lineWidth = 0.8;
+          circle(ctx, p.x, p.y - hgt, 1.7);
+          ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case 'grenade': {
+          // high lob: the arc peaks well above the field; a shadow tracks the ground point
+          const hgt = 4 * 30 * k * (1 - k);
+          ctx.fillStyle = 'rgba(20,14,24,0.28)';
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, 2.6 - hgt * 0.03, 1.3, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#3f5530';
+          ctx.strokeStyle = '#15180e';
+          ctx.lineWidth = 0.8;
+          circle(ctx, p.x, p.y - hgt, 2.5);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#9aa38a';
+          ctx.fillRect(p.x - 0.6, p.y - hgt - 3, 1.2, 1.4);
+          break;
+        }
+        case 'shell': {
+          const hgt = 4 * 7 * k * (1 - k);
+          const a = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+          ctx.fillStyle = 'rgba(20,14,24,0.25)';
+          ctx.fillRect(p.x - 1.5, p.y - 0.7, 3, 1.4);
+          ctx.save();
+          ctx.translate(p.x, p.y - hgt);
+          ctx.rotate(a);
+          ctx.strokeStyle = 'rgba(160,150,135,0.45)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-14, 0);
+          ctx.lineTo(-3, 0);
+          ctx.stroke();
+          ctx.fillStyle = '#2f3324';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 3.6, 1.8, 0, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'bullet': {
+          // a short tracer streak along the line of fire
+          const dx = p.x - p.px;
+          const dy = p.y - p.py;
+          const len = Math.hypot(dx, dy) || 1;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 1.3;
+          ctx.beginPath();
+          ctx.moveTo(p.x - (dx / len) * 9, p.y - (dy / len) * 9);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          break;
+        }
+        default: {
+          const dx = p.x - p.px;
+          const dy = p.y - p.py;
+          const len = Math.hypot(dx, dy) || 1;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x - (dx / len) * 8, p.y - (dy / len) * 8);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        }
       }
     }
   }

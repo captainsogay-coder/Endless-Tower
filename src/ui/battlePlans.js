@@ -5,7 +5,7 @@ import { listUnits, getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
 import { levelStats, maxLevel } from '../units/unitStats.js';
 import { togglePlan, removeFromPlan, validatePlan, MAX_PLAN_TYPES } from '../meta/battlePlan.js';
-import { listBiomes } from '../maps/biomes.js';
+import { listBanners } from '../units/summoning.js';
 import { unitPortrait } from '../render/unitArt.js';
 import { esc, tiles, upgradeRange, passiveScale } from './format.js';
 
@@ -18,9 +18,10 @@ export function portrait(def, size = 160) {
 }
 
 export class BattlePlansView {
-  constructor({ profile, onBattle }) {
+  constructor({ profile, onBattle, onGoto }) {
     this.profile = profile;
     this.onBattle = onBattle;
+    this.onGoto = onGoto;
     this.focusId = null;
     this.el = {
       name: $('plan-name'),
@@ -30,7 +31,6 @@ export class BattlePlansView {
       rosterCount: $('roster-count'),
       dossier: $('dossier'),
       slots: $('army-slots'),
-      realm: $('realm-select'),
       battle: $('btn-battle'),
       msg: $('battle-msg'),
       screen: $('screen-plans'),
@@ -64,6 +64,12 @@ export class BattlePlansView {
     el.roster.addEventListener('click', (ev) => {
       const card = ev.target.closest('.unit-card');
       if (!card) return;
+      if (card.classList.contains('locked')) {
+        this.focusId = card.dataset.id;
+        this.message(`${card.dataset.name} is obtained by summoning. Open the Summoning tab to try for it.`);
+        this.render();
+        return;
+      }
       this.toggle(card.dataset.id);
     });
     el.slots.addEventListener('click', (ev) => {
@@ -83,16 +89,14 @@ export class BattlePlansView {
     el.dossier.addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-toggle]');
       if (b) this.toggle(b.dataset.toggle);
-    });
-    el.realm.addEventListener('change', () => {
-      this.profile.data.realm = el.realm.value || null;
-      this.profile.save();
+      if (ev.target.closest('[data-goto="summon"]')) this.onGoto?.('summon');
     });
     el.battle.addEventListener('click', () => this.battle());
   }
 
   toggle(id) {
     this.focusId = id;
+    if (!this.profile.isUnlocked(id)) return;
     const res = togglePlan(this.plan, id);
     if (!res.ok && res.reason === 'full') this.message(`A battle plan holds at most ${MAX_PLAN_TYPES} unit types. Remove one first.`, true);
     else this.message('');
@@ -125,7 +129,7 @@ export class BattlePlansView {
     this.plan.units = v.ids;
     this.profile.save();
     this.message('');
-    this.onBattle({ units: v.ids, realm: this.profile.data.realm });
+    this.onBattle({ units: v.ids });
   }
 
   show(on = true) {
@@ -140,7 +144,6 @@ export class BattlePlansView {
     this.renderRoster(units);
     this.renderDossier();
     this.renderSlots();
-    this.renderRealms();
   }
 
   renderHeader() {
@@ -162,8 +165,18 @@ export class BattlePlansView {
     else if (n > 0 && !el.msg.classList.contains('error')) this.message(`${n} unit type${n > 1 ? 's' : ''} ready. Copies are unlimited in battle.`);
   }
 
+  /** Where a locked unit can be obtained: banner name and per-pull chance. */
+  sourceOf(id) {
+    for (const b of listBanners()) {
+      const entry = b.pool.find((p) => p.unit === id);
+      if (entry) return { banner: b, chance: entry.chance };
+    }
+    return null;
+  }
+
   renderRoster(units) {
-    this.el.rosterCount.textContent = `${units.length} unlocked`;
+    const locked = listUnits().filter((u) => !this.profile.isUnlocked(u.id)).sort((a, b) => a.tier - b.tier);
+    this.el.rosterCount.textContent = `${units.length} of ${units.length + locked.length} unlocked`;
     const cards = units.map((def) => {
       const tier = getTier(def.tier);
       const s = levelStats(def, 0);
@@ -183,7 +196,19 @@ export class BattlePlansView {
         </div>
       </button>`;
     });
-    if (units.length < 4) cards.push('<div class="roster-note">New units will join the roster in future updates.</div>');
+    if (locked.length) {
+      cards.push('<div class="section-head roster-sub"><h2>Not yet obtained</h2><span class="muted">Unlock these by summoning</span></div>');
+      for (const def of locked) {
+        const tier = getTier(def.tier);
+        const src = this.sourceOf(def.id);
+        cards.push(`<button class="unit-card locked ${def.id === this.focusId ? 'focused' : ''}" data-id="${esc(def.id)}" data-name="${esc(def.name)}" aria-disabled="true">
+          <div class="uc-art"><img alt="" src="${portrait(def)}" /><span class="uc-tier">${esc(tier.label)}</span><span class="uc-pick">Locked</span></div>
+          <div class="uc-head"><h3>${esc(def.name)}</h3><span class="uc-price"><span class="coin sm"></span>${def.price}</span></div>
+          <div class="uc-role">${esc(def.role ?? '')}</div>
+          <div class="uc-foot"><div class="uc-line"><span class="k">Obtain</span><span class="v">${src ? `${esc(src.banner.name)} · ${Math.round(src.chance * 100)}% per summon` : 'Not available yet'}</span></div></div>
+        </button>`);
+      }
+    }
     this.el.roster.innerHTML = cards.join('');
   }
 
@@ -196,8 +221,11 @@ export class BattlePlansView {
     const tier = getTier(def.tier);
     const s = levelStats(def, 0);
     const selected = this.plan.units.includes(def.id);
+    const unlocked = this.profile.isUnlocked(def.id);
+    const hasSplash = def.levels.some((L) => L.splash);
+    const src = this.sourceOf(def.id);
     const rows = def.levels
-      .map((L, i) => `<tr class="${i === 0 ? 'current' : ''}"><td>${i === 0 ? 'Base' : `Lv ${i}`}</td><td>${i === 0 ? def.price : L.cost}</td><td>${L.damage}</td><td>${tiles(L.range)}</td><td>${L.rate.toFixed(2)}</td></tr>`)
+      .map((L, i) => `<tr class="${i === 0 ? 'current' : ''}"><td>${i === 0 ? 'Base' : `Lv ${i}`}</td><td>${i === 0 ? def.price : L.cost}</td><td>${L.damage}</td><td>${tiles(L.range)}</td><td>${L.rate.toFixed(2)}</td>${hasSplash ? `<td>${tiles(L.splash ?? 0)}</td>` : ''}</tr>`)
       .join('');
     const scale = def.passive?.bonus
       ? `<div class="scale-row">${passiveScale(def).map(([n, b]) => `<div><b>+${Math.round(b * 100)}%</b><span>${n} deployed</span></div>`).join('')}</div>`
@@ -211,11 +239,13 @@ export class BattlePlansView {
       <div class="ds-section">
         <h3>Base statistics</h3>
         <dl class="kv">
-          <dt>Purchase price</dt><dd>${def.price} gold</dd>
+          <dt>Purchase price</dt><dd>${def.price} coins</dd>
           <dt>Damage</dt><dd>${s.damage}</dd>
           <dt>Attack range</dt><dd>${tiles(s.range)} tiles</dd>
           <dt>Attack speed</dt><dd>${s.rate.toFixed(2)} / s</dd>
           <dt>Damage per second</dt><dd>${(s.damage * s.rate).toFixed(1)}</dd>
+          ${s.splash ? `<dt>Blast radius</dt><dd>${tiles(s.splash)} tiles</dd>` : ''}
+          ${def.impactHazard ? `<dt>Burning ground</dt><dd>${def.impactHazard.duration}s</dd>` : ''}
           <dt>Targeting</dt><dd>${esc(def.targeting === 'first' ? 'Furthest along' : def.targeting)}</dd>
         </dl>
       </div>
@@ -228,10 +258,20 @@ export class BattlePlansView {
       </div>` : ''}
       <div class="ds-section">
         <h3>Upgrade levels</h3>
-        <table class="levels"><thead><tr><th>Level</th><th>Cost</th><th>Dmg</th><th>Range</th><th>Speed</th></tr></thead><tbody>${rows}</tbody></table>
+        <table class="levels"><thead><tr><th>Level</th><th>Cost</th><th>Dmg</th><th>Range</th><th>Speed</th>${hasSplash ? '<th>Blast</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>
         <p class="muted small">Current upgrade level: <b>Base</b>. Each deployed copy is upgraded individually during battle, up to Lv ${maxLevel(def)}.</p>
       </div>
-      <div class="ds-actions"><button class="${selected ? 'btn-secondary' : 'btn-primary'}" data-toggle="${esc(def.id)}">${selected ? 'Remove from plan' : 'Add to plan'}</button></div>`;
+      <div class="ds-section">
+        <h3>Acquisition</h3>
+        <dl class="kv">
+          <dt>Status</dt><dd>${unlocked ? 'Unlocked' : 'Locked'}</dd>
+          <dt>Source</dt><dd>${src ? esc(src.banner.name) : 'Starter unit'}</dd>
+          ${src ? `<dt>Summon chance</dt><dd>${Math.round(src.chance * 100)}%</dd><dt>Times obtained</dt><dd>${this.profile.ownedCount(def.id)}</dd>` : ''}
+        </dl>
+      </div>
+      <div class="ds-actions">${unlocked
+        ? `<button class="${selected ? 'btn-secondary' : 'btn-primary'}" data-toggle="${esc(def.id)}">${selected ? 'Remove from plan' : 'Add to plan'}</button>`
+        : `<button class="btn-secondary" data-goto="summon">Go to Summoning</button>`}</div>`;
   }
 
   renderSlots() {
@@ -248,10 +288,4 @@ export class BattlePlansView {
     this.el.slots.innerHTML = out.join('');
   }
 
-  renderRealms() {
-    const current = this.profile.data.realm ?? '';
-    const opts = [['', 'Random battlefield'], ...listBiomes().map((b) => [b.id, b.name])];
-    const html = opts.map(([id, name]) => `<option value="${id}" ${id === current ? 'selected' : ''}>${esc(name)}</option>`).join('');
-    if (this.el.realm.innerHTML !== html) this.el.realm.innerHTML = html;
-  }
 }

@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#0f1115" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,14 +18,46 @@
     <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 3v10l8.5-5z"/></symbol>
     <symbol id="i-fx" viewBox="0 0 16 16"><path d="M8 2 14 5 8 8 2 5z"/><path d="M2.6 8.2 8 10.9l5.4-2.7L14 9.5 8 12.5 2 9.5z" opacity="0.6"/></symbol>
     <symbol id="i-flag" viewBox="0 0 16 16"><path d="M4 14V2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M4.8 2.5h7.5l-2 3 2 3H4.8z"/></symbol>
+    <symbol id="i-token" viewBox="0 0 16 16"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M8 4.5 11 6.3v3.4L8 11.5 5 9.7V6.3z" fill="#1c1406"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 6l3.5 4M14.5 6 11 10" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-tower" viewBox="0 0 16 16"><path d="M3 14V6h1.5V4H6v2h1.2V4h1.6v2H10V4h1.5v2H13v8z"/></symbol>
   </svg>
 
-  <!-- ============================================================ BATTLE PLANS -->
-  <section id="screen-plans" class="screen">
+  <!-- ============================================================ BOOT -->
+  <div id="boot" class="boot" role="status">
+    <div class="boot-inner">
+      <div class="wordmark">Endless Tower</div>
+      <div class="boot-bar"><div></div></div>
+      <div id="boot-text" class="boot-text">Loading…</div>
+    </div>
+  </div>
+  <div id="boot-error" class="boot boot-error" hidden role="alert">
+    <div class="boot-inner">
+      <div class="wordmark">Endless Tower</div>
+      <h2>Something went wrong</h2>
+      <p id="boot-error-text" class="muted">The game could not start.</p>
+      <button id="boot-reload" class="btn-primary" type="button">Reload</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ MENU -->
+  <div id="menu" class="screen">
+    <nav class="menu-bar" aria-label="Main">
+      <div class="wordmark">Endless Tower</div>
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" data-page="plans" aria-selected="true">Battle Plans</button>
+        <button class="tab" role="tab" data-page="summon" aria-selected="false">Summoning</button>
+      </div>
+      <div class="wallet" title="Tokens — earned by clearing waves, spent on summons">
+        <svg class="ico token"><use href="#i-token" /></svg>
+        <span id="wallet-tokens" class="num">0</span><span class="label">Tokens</span>
+      </div>
+    </nav>
+
+  <section id="screen-plans" class="page">
     <header class="bp-header">
       <div class="bp-title">
-        <div class="wordmark">Endless Tower</div>
         <h1>Battle Plans</h1>
       </div>
       <label class="bp-name">
@@ -50,15 +84,59 @@
         <ol id="army-slots" class="army-slots"></ol>
       </div>
       <div class="deploy">
-        <label class="realm-select">
-          <span class="label">Battlefield</span>
-          <select id="realm-select"></select>
-        </label>
+        <div class="battlefield-note"><span class="label">Battlefield</span><span>Assigned at random when the battle begins</span></div>
         <button id="btn-battle" class="btn-battle">Battle</button>
         <div id="battle-msg" class="battle-msg" role="status"></div>
       </div>
     </footer>
   </section>
+
+  <!-- ============================================================ SUMMONING -->
+  <section id="screen-summon" class="page" hidden>
+    <div class="sm-body">
+      <div class="sm-stage">
+        <canvas id="summon-stage" aria-hidden="true"></canvas>
+        <div class="sm-banner">
+          <div class="label">Summoning banner</div>
+          <h1 id="banner-name">Military Summoning Circle</h1>
+          <p id="banner-tagline" class="muted"></p>
+        </div>
+        <button id="btn-mute" class="icon-btn sm-mute" title="Sound on/off" type="button"><svg><use href="#i-sound" /></svg></button>
+      </div>
+      <aside class="sm-side">
+        <div class="section-head"><h2>Unit pool</h2><span class="muted">Every pull is independent</span></div>
+        <ul id="pool-list" class="pool-list"></ul>
+        <p class="muted small">Summoned units are unlocked permanently and appear in Battle Plans. Duplicates are recorded but add no extra unit type.</p>
+      </aside>
+    </div>
+    <footer class="sm-footer">
+      <div class="sm-earn"><span class="label">Price</span><span><b id="banner-price">150</b> Tokens per summon</span><span class="muted small">Earn 100 Tokens for every wave you clear.</span></div>
+      <div id="pull-buttons" class="pull-buttons"></div>
+    </footer>
+  </section>
+  </div>
+
+  <div id="screen-confirm" class="overlay" hidden>
+    <div class="modal small" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <h2 id="confirm-title">Summon</h2>
+      <dl id="confirm-body" class="kv confirm-kv"></dl>
+      <div class="modal-actions">
+        <button id="btn-confirm-cancel" class="btn-secondary" type="button">Cancel</button>
+        <button id="btn-confirm-ok" class="btn-primary" type="button">Summon</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-reveal" class="reveal" hidden>
+    <canvas id="reveal-canvas"></canvas>
+    <div id="reveal-card" class="reveal-card" hidden></div>
+    <div id="reveal-summary" class="reveal-summary" hidden></div>
+    <div class="reveal-controls">
+      <span id="reveal-progress" class="reveal-progress num"></span>
+      <button id="btn-reveal-skip" class="btn-secondary" type="button">Skip</button>
+      <button id="btn-reveal-done" class="btn-primary" type="button" hidden>Continue</button>
+    </div>
+  </div>
 
   <!-- ============================================================ BATTLE -->
   <div id="app" class="screen" hidden>
@@ -84,7 +162,8 @@
           <div class="hp-bar"><div id="hp-fill"></div></div>
           <span id="hp-text" class="num">100</span>
         </div>
-        <div class="gold" title="Gold"><span class="coin"></span><span id="gold" class="num">0</span></div>
+        <div class="tokens-earned" title="Tokens earned this battle (100 per cleared wave)"><svg class="ico token"><use href="#i-token" /></svg><span id="tokens-earned" class="num">+0</span></div>
+        <div class="gold" title="Coins — spent on deploying and upgrading units"><span class="coin"></span><span id="coins" class="num">0</span></div>
         <div class="controls">
           <button class="icon-btn" id="btn-pause" title="Pause (Space)"><svg><use href="#i-pause" /></svg></button>
           <div class="speed" role="group" aria-label="Game speed">
@@ -149,7 +228,29 @@
     </div>
   </div>
 
-  <noscript>Endless Tower needs JavaScript enabled.</noscript>
+  <noscript><div class="boot boot-error"><div class="boot-inner"><h2>JavaScript required</h2><p>Endless Tower needs JavaScript enabled to run.</p></div></div></noscript>
+  <script>
+    // Boot guard (classic script, runs before modules): surfaces load failures
+    // instead of leaving a blank page.
+    (function () {
+      function fail(msg) {
+        var b = document.getElementById('boot'); if (b) b.hidden = true;
+        var e = document.getElementById('boot-error'); if (!e) return;
+        document.getElementById('boot-error-text').textContent = msg;
+        e.hidden = false;
+      }
+      window.__etFail = fail;
+      document.getElementById('boot-reload').onclick = function () { location.reload(); };
+      window.addEventListener('error', function (ev) {
+        if (!window.__etBooted) fail('Failed to load: ' + (ev.message || (ev.target && ev.target.src) || 'unknown error'));
+      }, true);
+      window.addEventListener('unhandledrejection', function (ev) {
+        if (!window.__etBooted) fail('Failed to start: ' + (ev.reason && ev.reason.message || ev.reason));
+      });
+      setTimeout(function () { if (!window.__etBooted) fail('The game took too long to load. Check your connection and try again.'); }, 20000);
+    })();
+  </script>
+  <script nomodule>document.getElementById('boot-error-text').textContent = 'This browser is too old to run Endless Tower. Please use a current version of Chrome, Firefox, Safari or Edge.'; document.getElementById('boot').hidden = true; document.getElementById('boot-error').hidden = false;</script>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

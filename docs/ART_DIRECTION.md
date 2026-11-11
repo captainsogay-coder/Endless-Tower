@@ -36,3 +36,29 @@ These are the rules every asset follows. New units, enemies, realms and UI shoul
 - **Colour:** slate surfaces (`#161920` / `#1c2028` / `#252a34`), hairline borders, warm off-white text, and one accent: signal amber `#e3a33b`, the colour of the Tower's banner. Red is for danger and green for bonuses and health.
 - **Shape:** 3px radii, 1px borders. No gradients, glows or drop-shadowed panels.
 - **Selection** is shown with an accent outline plus an explicit "In plan" tag, never with glow alone.
+
+## Unit animation personalities
+
+No two units share an attack template:
+
+| Unit | Attack | Idle |
+| --- | --- | --- |
+| **Dude** | Underarm throw; the pebble follows a shallow lob | Lazy sway |
+| **Cadet** | Snaps the rifle to the shoulder for a split second with a crisp muzzle flash and a straight tracer | Stands at attention, glances around between engagements |
+| **Gunnerman** | Vibrates between two recoil frames while the gun runs, ejecting brass | Heavy breathing |
+| **Grenade Launcher** | Big kick-back and a smoke puff; the grenade takes a high arc with its shadow tracking the ground | Shifts weight |
+| **Tank** | Turret tracks the target independently of the hull; barrel recoils on each shot, with exhaust smoke at the muzzle | Engine shimmy |
+
+## Impacts and status
+
+- Feedback scales with the weapon: dust for pebbles, a spark for bullets, and a flat, hard-edged burst plus scorch decal for explosives. Burst size matches the real blast radius. Scorch marks fade within seconds.
+- Enemies flinch when hit and move with distinct gaits: minions hop, regulars march, elites stomp, bosses lumber.
+- **Wounded** enemies limp and carry a field-dressing mark. **Burning** enemies show small flames.
+- Fire is a light source, so flames may glow softly. Nothing else does.
+
+## Summoning presentation
+
+The motif is a stencilled requisition circle on a concrete slab under one hanging work lamp, not a magic portal.
+
+- **Rarity:** shown by how many ring locks you hear, how high the perimeter lamps climb through the tier colours, how hard the crate lands, and how full the sting is. Bloom is never used.
+- **Sound:** synthesized on the fly: mechanical clicks, a rising hum, a whoosh, a thud and a short chord.

@@ -16,7 +16,11 @@ export function validateUnitDef(def) {
       if (i > 0 && !(typeof L.cost === 'number' && L.cost > 0)) errors.push(`levels[${i}].cost must be a number > 0`);
     });
   }
-  if (def.passive && typeof def.passive.modify !== 'function') errors.push('passive.modify must be a function');
+  if (def.passive) {
+    if (!def.passive.name || !def.passive.summary) errors.push('passive needs name and summary');
+    if (def.passive.modify !== undefined && typeof def.passive.modify !== 'function') errors.push('passive.modify must be a function');
+  }
+  if (def.aura && !(def.aura.id && def.aura.radius > 0)) errors.push('aura needs id and radius');
   return errors;
 }
 

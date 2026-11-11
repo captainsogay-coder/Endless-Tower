@@ -1,10 +1,11 @@
 // Minimal zero-dependency static file server for local play: `npm start`.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('.', import.meta.url));
+// `node server.js` serves the source tree; `node server.js dist` previews a production build.
+const ROOT = process.argv[2] ? resolve(process.argv[2]) + '/' : fileURLToPath(new URL('.', import.meta.url));
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -14,6 +15,8 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.map': 'application/json',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 createServer(async (req, res) => {
@@ -30,6 +33,10 @@ createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(body);
   } catch {
-    res.writeHead(404).end('Not found');
+    try {
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' }).end(await readFile(join(ROOT, '404.html')));
+    } catch {
+      res.writeHead(404).end('Not found');
+    }
   }
 }).listen(PORT, () => console.log(`Endless Tower running at http://localhost:${PORT}`));

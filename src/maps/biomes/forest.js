@@ -37,6 +37,11 @@ export default {
   enemyPalette: { body: '#7448a6', dark: '#2a1446', eye: '#f2d65c', glow: '#c39ae8' },
   portalColor: '#9b6bd1',
   bossTitle: 'Warden of the Deepwood',
+  variants: [
+    { id: 'deepwood', name: 'Deepwood' },
+    { id: 'mossy-hollow', name: 'Mossy Hollow', layout: { featureDensity: 0.11, rivers: [1, 1] }, lighting: { strength: 0.12, grade: '#e4ecd8' } },
+    { id: 'sunlit-glade', name: 'Sunlit Glade', layout: { featureDensity: 0.035, rivers: [0, 0] }, lighting: { strength: 0.22, grade: '#f6f2dc' }, palette: { groundRamp: ['#3a5f35', '#517c42', '#6d9150', '#86a05a'] } },
+  ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 3 }, featureDensity: 0.07, rivers: [0, 1] },
   decor: [
     { kind: 'elderTree', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 2.7 },

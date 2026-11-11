@@ -1,61 +1,69 @@
-// Summoning infrastructure: rolls a unit *type* from the registered roster.
-// A summon rolls a tier from a decaying odds table (higher tiers rarer), then a
-// unit of that tier. Odds and the tier ceiling improve with progress and have
-// no upper bound. Intended for unlocking new unit types once the roster grows;
-// with a single unit there is nothing to roll yet, so it is not surfaced in UI.
+// Summoning: banners with explicit, fixed-probability unit pools.
+// A banner is pure data; summon() performs independent pulls, charges the
+// banner's currency atomically and unlocks what was obtained. Duplicates are
+// recorded but never create a second unit type.
 
 import { createRng } from '../core/rng.js';
-import { getTier } from './tiers.js';
-import { hasRoster, listUnits, unitsOfTier, registeredTiers } from './unitRegistry.js';
+import { getUnit } from './unitRegistry.js';
 
-export const SUMMON_SETTINGS = {
-  baseMaxTier: 3,
-  tierUnlockEvery: 10,
-  baseRatio: 0.3,
-  ratioPerWave: 0.002,
-  maxRatio: 0.5,
-};
+const banners = new Map();
 
-export class Summoner {
-  constructor({ seed, settings = SUMMON_SETTINGS } = {}) {
-    this.rng = createRng(seed);
-    this.settings = settings;
+export function registerBanner(def) {
+  const total = def.pool.reduce((s, p) => s + p.chance, 0);
+  if (Math.abs(total - 1) > 1e-9) throw new Error(`Banner "${def.id}" odds sum to ${total}, expected 1`);
+  if (!['tokens'].includes(def.currency)) throw new Error(`Banner "${def.id}" uses unknown currency "${def.currency}"`);
+  banners.set(def.id, Object.freeze({ ...def, pool: Object.freeze(def.pool.map((p) => Object.freeze({ ...p }))) }));
+}
+
+export const getBanner = (id) => banners.get(id);
+export const listBanners = () => [...banners.values()];
+
+export const MILITARY_CIRCLE = 'military-circle';
+
+registerBanner({
+  id: MILITARY_CIRCLE,
+  name: 'Military Summoning Circle',
+  tagline: 'Requisition forces from the front line.',
+  currency: 'tokens',
+  price: 150,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'cadet', chance: 0.5 },
+    { unit: 'gunnerman', chance: 0.3 },
+    { unit: 'grenade-launcher', chance: 0.15 },
+    { unit: 'tank', chance: 0.05 },
+  ],
+});
+
+export const summonCost = (banner, count) => banner.price * count;
+
+/** One independent pull: inverse-CDF over the pool using a single uniform draw. */
+export function pull(banner, rng) {
+  let r = rng.next();
+  for (const entry of banner.pool) {
+    r -= entry.chance;
+    if (r < 0) return entry;
   }
+  return banner.pool[banner.pool.length - 1];
+}
 
-  /** Highest tier currently reachable. Unbounded: rises every `tierUnlockEvery` waves. */
-  maxTier(wave) {
-    const s = this.settings;
-    const ceiling = s.baseMaxTier + Math.floor(Math.max(0, wave - 1) / s.tierUnlockEvery);
-    if (!hasRoster()) return 0;
-    const tiers = registeredTiers();
-    return Math.min(ceiling, tiers[tiers.length - 1]);
+/**
+ * Performs `count` independent pulls if the wallet can pay for all of them.
+ * Charges exactly price × count, unlocks new unit types, and saves the profile.
+ */
+export function summon(profile, banner, count, rng = createRng()) {
+  if (!banner.counts.includes(count)) return { ok: false, reason: 'invalid-count' };
+  const cost = summonCost(banner, count);
+  if (profile.balance(banner.currency) < cost) return { ok: false, reason: 'insufficient', cost };
+  profile.spend(banner.currency, cost);
+  const results = [];
+  for (let i = 0; i < count; i++) {
+    const entry = pull(banner, rng);
+    const def = getUnit(entry.unit);
+    const isNew = !profile.isUnlocked(entry.unit);
+    profile.recordSummon(entry.unit);
+    results.push({ unit: entry.unit, name: def?.name ?? entry.unit, tier: def?.tier ?? 1, chance: entry.chance, isNew });
   }
-
-  odds(wave) {
-    const s = this.settings;
-    const ratio = Math.min(s.maxRatio, s.baseRatio + s.ratioPerWave * wave);
-    const max = this.maxTier(wave);
-    const tiers = [];
-    if (!hasRoster()) return [];
-    const available = new Set(registeredTiers());
-    for (let t = 1; t <= max; t++) {
-      if (!available.has(t)) continue;
-      tiers.push({ tier: t, weight: Math.pow(ratio, t - 1) * (getTier(t).summonWeight ?? 1) });
-    }
-    if (!tiers.length) {
-      const lowest = registeredTiers()[0];
-      tiers.push({ tier: lowest, weight: 1 });
-    }
-    const total = tiers.reduce((s2, t) => s2 + t.weight, 0);
-    return tiers.map((t) => ({ tier: t.tier, chance: t.weight / total }));
-  }
-
-  /** Returns a unit definition, or null when the roster is empty. */
-  roll(wave) {
-    const odds = this.odds(wave);
-    if (!odds.length) return null;
-    const tier = this.rng.weighted(odds, (o) => o.chance).tier;
-    const pool = unitsOfTier(tier);
-    return this.rng.weighted(pool.length ? pool : listUnits(), (u) => u.summonWeight ?? 1);
-  }
+  profile.save();
+  return { ok: true, cost, results };
 }

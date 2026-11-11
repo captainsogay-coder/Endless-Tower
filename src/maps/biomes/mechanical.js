@@ -47,6 +47,11 @@ export default {
   portalColor: '#ffb12b',
   bossTitle: 'Warden of the Iron Heart',
   bridgeStyle: 'stone',
+  variants: [
+    { id: 'assembly-yard', name: 'Assembly Yard' },
+    { id: 'coolant-works', name: 'Coolant Works', layout: { featureDensity: 0.09, rivers: [1, 1] } },
+    { id: 'scrapyard', name: 'Scrapyard', layout: { featureDensity: 0.02, rivers: [0, 0] }, palette: { groundRamp: ['#34322f', '#423e39', '#4d4740', '#5a5148'] } },
+  ],
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.05, rivers: [0, 1], noiseScale: 0.22 },
   decor: [
     { kind: 'reactor', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.45 },

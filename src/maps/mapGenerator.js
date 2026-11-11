@@ -357,10 +357,12 @@ function placeDecor(map, biome, rng, pathDist) {
 
 // ---------------------------------------------------------------- generation
 
-function tryGenerate(biome, seed, attempt) {
+function tryGenerate(biome, seed, attempt, avoidStyles = []) {
   const rng = createRng((seed ^ Math.imul(attempt + 1, 0x9e3779b1)) >>> 0);
   const simple = attempt >= 30;
-  let style = simple ? 'meander' : weightedKey(biome.layout.styles, rng);
+  // Steer away from the layout style used last battle when another is available.
+  const styles = Object.fromEntries(Object.entries(biome.layout.styles).filter(([k]) => !avoidStyles.includes(k)));
+  let style = simple ? 'meander' : weightedKey(Object.keys(styles).length ? styles : biome.layout.styles, rng);
   const orientation = simple ? 'h' : rng.chance(style === 'serpentine' ? 0.35 : 0.3) ? 'v' : 'h';
   const A = orientation === 'h' ? COLS : ROWS;
   const B = orientation === 'h' ? ROWS : COLS;
@@ -401,6 +403,8 @@ function tryGenerate(biome, seed, attempt) {
   const map = {
     seed,
     biomeId: biome.id,
+    variantId: biome.variantId ?? 'base',
+    variantName: biome.variantName ?? null,
     cols: COLS,
     rows: ROWS,
     tile: TILE,
@@ -460,9 +464,9 @@ export function validateMap(map) {
   return { ok: errors.length === 0, errors };
 }
 
-export function generateMap(biome, seed) {
+export function generateMap(biome, seed, { avoidStyles = [] } = {}) {
   for (let attempt = 0; attempt < 40; attempt++) {
-    const map = tryGenerate(biome, seed >>> 0, attempt);
+    const map = tryGenerate(biome, seed >>> 0, attempt, avoidStyles);
     if (validateMap(map).ok) return map;
   }
   throw new Error(`Failed to generate a valid map for biome "${biome.id}" (seed ${seed})`);

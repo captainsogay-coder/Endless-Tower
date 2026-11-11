@@ -34,6 +34,11 @@ export default {
   portalColor: '#5fd8ff',
   bossTitle: 'Warden of the White Silence',
   bridgeStyle: 'stone',
+  variants: [
+    { id: 'snowfields', name: 'Snowfields' },
+    { id: 'frozen-lakes', name: 'Frozen Lakes', layout: { featureDensity: 0.16, rivers: [1, 1] } },
+    { id: 'tundra-pass', name: 'Tundra Pass', layout: { featureDensity: 0.05, rivers: [0, 0] }, lighting: { grade: '#e6edf6', vignette: 0.4 } },
+  ],
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.1, rivers: [0, 1], noiseScale: 0.14 },
   decor: [
     { kind: 'glacier', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },

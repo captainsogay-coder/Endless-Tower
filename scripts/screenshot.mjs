@@ -21,7 +21,7 @@ for (const b of biomes) {
   await page.waitForTimeout(300);
   await page.evaluate(() => {
     const { game } = window.endlessTower;
-    game.gold = 4000;
+    game.coins = 4000;
     const spots = [];
     for (let y = 0; y < game.map.rows; y++) for (let x = 0; x < game.map.cols; x++) {
       const i = y * game.map.cols + x;

@@ -9,7 +9,7 @@ export const tiles = (px) => String(Math.round((px / TILE) * 100) / 100);
 export function upgradeRange(def) {
   const costs = def.levels.slice(1).map((l) => l.cost);
   if (!costs.length) return 'none';
-  return `${Math.min(...costs)}–${Math.max(...costs)} gold`;
+  return `${Math.min(...costs)}–${Math.max(...costs)} coins`;
 }
 
 /** Sample points showing how a count-based passive scales. */

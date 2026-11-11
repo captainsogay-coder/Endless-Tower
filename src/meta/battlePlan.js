@@ -1,6 +1,6 @@
 // Battle Plans: which unit *types* a player brings into battle.
 // MAX_PLAN_TYPES caps distinct types, NOT deployed copies – copies are
-// unlimited in battle (bounded only by buildable ground and gold).
+// unlimited in battle (bounded only by buildable ground and coins).
 
 export const MAX_PLAN_TYPES = 12;
 

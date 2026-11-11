@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getTier, defineTier } from '../src/units/tiers.js';
-import { Summoner } from '../src/units/summoning.js';
 import { registerUnit, getUnit, validateUnitDef } from '../src/units/unitRegistry.js';
 import { ROSTER, registerRoster } from '../src/units/roster.js';
 import { levelStats, upgradeCost, maxLevel, applyPassive } from '../src/units/unitStats.js';
@@ -9,8 +8,9 @@ import dude, { dudePowerMultiplier } from '../src/units/defs/dude.js';
 
 registerRoster();
 
-test('Dude is the first and only roster unit', () => {
-  assert.deepEqual(ROSTER.map((d) => d.id), ['dude']);
+test('roster: Dude plus the four Military Circle units, all valid', () => {
+  assert.deepEqual(ROSTER.map((d) => d.id), ['dude', 'cadet', 'gunnerman', 'grenade-launcher', 'tank']);
+  for (const d of ROSTER) assert.deepEqual(validateUnitDef(d), [], d.id);
   assert.deepEqual(validateUnitDef(dude), []);
   assert.equal(getUnit('dude').tier, 1);
 });
@@ -57,14 +57,19 @@ test('tiers are unbounded and increase in power', () => {
   assert.equal(getTier(42).label, 'Custom');
 });
 
-test('summoning infrastructure rolls registered unit types with valid odds', () => {
-  const s = new Summoner({ seed: 1 });
-  const odds = s.odds(10);
-  assert.ok(Math.abs(odds.reduce((a, o) => a + o.chance, 0) - 1) < 1e-9);
-  assert.equal(s.roll(10).id, 'dude');
-});
-
 test('invalid unit definitions are rejected', () => {
   assert.throws(() => registerUnit({ id: 'bad', name: 'Bad', tier: 0, price: 1, levels: [] }));
   assert.throws(() => registerUnit({ id: 'bad2', name: 'Bad', tier: 1, price: 1, levels: [{ damage: 1, range: 1, rate: 1 }, { damage: 2, range: 1, rate: 1 }] }));
+});
+
+test('new units match their brief', () => {
+  const s0 = (id) => levelStats(getUnit(id), 0);
+  const dps = (id) => s0(id).damage * s0(id).rate;
+  assert.deepEqual(['cadet', 'gunnerman', 'grenade-launcher', 'tank'].map((id) => getUnit(id).tier), [1, 2, 3, 5]);
+  assert.ok(dps('cadet') > dps('dude') && s0('cadet').range > s0('dude').range, 'Cadet beats Dude on DPS and range');
+  assert.ok(dps('gunnerman') > dps('cadet') && s0('gunnerman').range > s0('cadet').range, 'Gunnerman: DPS focus, good range');
+  assert.ok(s0('grenade-launcher').splash > 0 && s0('grenade-launcher').rate < 0.6, 'Grenade: small AoE, slow cooldown');
+  assert.ok(s0('tank').damage > s0('grenade-launcher').damage && s0('tank').range > s0('grenade-launcher').range, 'Tank out-hits the grenadier');
+  assert.ok(s0('tank').splash > 0 && getUnit('tank').impactHazard && getUnit('tank').aura);
+  for (const d of ROSTER) assert.equal(maxLevel(d), 5, `${d.id} has 5 upgrade levels`);
 });

@@ -61,3 +61,31 @@ test('every realm places its recognisable landmark', () => {
     assert.ok(found >= 18, `${biome.id}: landmark placed in ${found}/20 maps`);
   }
 });
+
+test('battlefields rotate: no repeats of the last two realms, variants and layouts vary', async () => {
+  const { chooseBattlefield, biomeWithVariant } = await import('../src/maps/rotation.js');
+  const { createRng } = await import('../src/core/rng.js');
+  const rng = createRng(77);
+  const history = [];
+  const combos = new Set();
+  for (let i = 0; i < 60; i++) {
+    const pick = chooseBattlefield(rng, history);
+    const recent = history.slice(-2).map((h) => h.biome);
+    assert.ok(!recent.includes(pick.biomeId), `battle ${i}: ${pick.biomeId} repeated within 2`);
+    const biome = biomeWithVariant(pick.biomeId, pick.variantId);
+    const map = generateMap(biome, rng.int(0, 1e9), { avoidStyles: pick.avoidStyles });
+    assert.ok(validateMap(map).ok);
+    if (history.length) assert.notEqual(map.layoutStyle, history[history.length - 1].style, 'layout style alternates');
+    history.push({ biome: pick.biomeId, variant: pick.variantId, style: map.layoutStyle });
+    combos.add(`${pick.biomeId}/${pick.variantId}/${map.layoutStyle}`);
+  }
+  assert.ok(combos.size > 25, `${combos.size} distinct combinations in 60 battles`);
+});
+
+test('every realm variant generates valid maps', async () => {
+  const { biomeWithVariant } = await import('../src/maps/rotation.js');
+  for (const b of listBiomes()) {
+    assert.ok((b.variants ?? []).length >= 2, `${b.id} has variants`);
+    for (const v of b.variants) for (const seed of [1, 2, 3, 4, 5]) assert.ok(validateMap(generateMap(biomeWithVariant(b.id, v.id), seed)).ok, `${b.id}/${v.id}`);
+  }
+});

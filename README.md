@@ -2,103 +2,116 @@
 
 > There is no final wave. There is always another challenge.
 
-An endless tower-defense game. Plan your army, deploy as many units as you can afford on open ground, and hold off waves that never stop coming and keep changing.
+An endless tower-defense game. Summon units, plan your army, deploy as many as you can afford on open ground, and hold off waves that never stop coming and keep changing.
 
-**Status: Foundation + Battle Plans + first unit (Dude).** Art direction is documented in [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md).
+**Play:** https://endlesstower.com (once the domain is configured; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) · Art direction: [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)
 
-## Play
-
-No build step and no dependencies.
+## Run locally
 
 ```bash
-npm start            # serves the game at http://localhost:8080
+npm start            # source version at http://localhost:8080 (no build needed)
+npm run preview      # production build (dist/) at http://localhost:8080
 ```
 
-URL options: `?realm=forest|volcanic|frozen|ruins|sky|mechanical`, `?seed=1234` (reproducible battle), `?fx=0` (ambient effects off).
+Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible battle), `?realm=forest|volcanic|frozen|ruins|sky|mechanical`, `?tokens=5000`, `?fx=0` (ambient effects off).
 
-### Flow
+## How it plays
 
-1. **Battle Plans:** choose up to **12 unit types** for your army, name the plan, pick a battlefield (or leave it random), then press **Battle**. The plan is saved in the browser and stays in place between battles.
-2. **Battle:** only units in your plan can be deployed. Each copy costs its purchase price, and **there is no limit on copies**; you are limited only by gold and open ground. Upgrade and sell individual copies.
-3. When the Tower falls, choose **Battle again** (same plan, new map) or return to **Battle Plans**. **Retreat** (flag icon) ends a battle early.
+1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle.
+2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
+3. **Tokens:** every **fully completed wave pays exactly 100 Tokens**. They are saved immediately and kept between battles and sessions.
+4. **Summoning:** spend Tokens at the **Military Summoning Circle** to unlock new unit types permanently.
 
-| Input | Action |
+| Input (battle) | Action |
 | --- | --- |
 | Deploy card / `1`–`9`, `0`, `-`, `=` | Choose a plan unit to place |
 | Click or drag on open ground | Deploy copies (placement stays active) |
-| Click a deployed unit | Open its panel: stats, passive, upgrade preview |
+| Click a deployed unit | Stats, passive, upgrade preview |
 | `U` / `X` | Upgrade / sell the selected unit |
 | Right-click / `Esc` | Cancel placement or selection |
 | Start wave / `N` | Start the next wave (or tick **Auto**) |
 | `Space`, `F` | Pause, cycle game speed |
 
+## Currencies
+
+| Currency | Earned | Spent on | Lifetime |
+| --- | --- | --- | --- |
+| **Coins** | Defeating enemies, clearing waves | Deploying and upgrading units in battle | One battle |
+| **Tokens** | 100 per completed wave | Summoning | Saved permanently |
+
+The two balances never mix. There is no Gem currency. If one is introduced later, a banner's `currency` field is the only thing that needs to change.
+
+## Summoning: Military Summoning Circle
+
+**150 Tokens per summon.** ×1 = 150 · ×5 = 750 · ×10 = 1,500 · ×25 = 3,750.
+
+| Unit | Chance | Tier |
+| --- | --- | --- |
+| Cadet | 50% | I |
+| Gunnerman | 30% | II |
+| Grenade Launcher | 15% | III |
+| Tank | 5% | V |
+
+- **Independent pulls:** every pull is a separate random draw. A multi-summon charges exactly price × count and shows all results together.
+- **Before buying:** the total cost and resulting balance are shown before you confirm. Buttons you can't afford are disabled and say how many Tokens you still need.
+- **The reveal:** the rings lock into place, the perimeter lamps climb through the rarity colours up to the result's tier, and then a supply crate drops onto the circle and opens. Rarer pulls get more locks, a heavier landing and a fuller sting, and the Tank adds an alarm. Multi-summons reveal crates one after another (click to advance) and can be skipped straight to the summary.
+- **Unlocks:** results unlock units permanently. Duplicates are counted but never add a second unit type to Battle Plans. Summoned units are never auto-deployed.
+
 ## Units
 
-### Dude (Tier I)
+Every unit has a base level plus 5 upgrades, bought per copy in battle. All numbers live in one data table per unit in `src/units/defs/`.
 
-An ordinary guy who throws rocks. He is cheap (15 gold), short-ranged and weak alone.
-
-- **Dude Power (passive):** every deployed Dude deals `Base Damage × [1 + 0.10 × (deployed Dudes − 1)]`. Only Dudes on the battlefield count. The bonus updates for every Dude the moment one is deployed or sold. It shows on the deploy card, in the unit panel and as a scaling table in Battle Plans.
-- **Upgrades:** a base level plus 5 upgrade levels, bought per Dude in battle. The panel shows the current and next level, the cost and before/after stats. The numbers are in one table in `src/units/defs/dude.js`.
-
-| Level | Cost | Damage | Range (tiles) | Attacks/s |
-| --- | --- | --- | --- | --- |
-| Base | 15 | 4 | 2 | 1.25 |
-| 1 | 25 | 6 | 2 | 1.25 |
-| 2 | 45 | 8 | 2 | 1.40 |
-| 3 | 80 | 11 | 2.25 | 1.40 |
-| 4 | 130 | 15 | 2.25 | 1.60 |
-| 5 | 210 | 21 | 2.5 | 1.80 |
+| Unit | Tier | Price | Damage | Range (tiles) | Attacks/s | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dude | I | 15 | 4 | 2 | 1.25 | Starter. **Dude Power:** `Damage × [1 + 0.10 × (deployed Dudes − 1)]` |
+| Cadet | I | 30 | 7 | 2.5 | 1.5 | Better DPS and range than Dude |
+| Gunnerman | II | 75 | 5 | 3.5 | 4.0 | Sustained machine-gun DPS |
+| Grenade Launcher | III | 160 | 32 | 4 | 0.45 | Small blast (1.1 tiles). **Wounded:** 20% per enemy hit, −5% speed for 4 s, refreshes, never stacks |
+| Tank | V | 450 | 85 | 5 | 0.4 | Blast 1.5 tiles. Leaves **flames** for 3 s (8% of shell damage per second). **Command Presence:** allies within 2.5 tiles attack 10% faster; overlapping Tanks don't stack |
 
 Selling refunds 70% of everything spent on that copy.
 
 ### Adding a unit
 
-Create a definition module in `src/units/defs/` (schema in `src/units/roster.js`), add it to `ROSTER`, and give it an art painter in `src/render/unitArt.js`. It then appears in Battle Plans and becomes deployable. Combat, targeting, upgrades and passives all use the shared systems (`unitStats.js`, `Game.deploy/upgrade/sell`). Passives receive `{ deployed }` and are recomputed only when a unit of that type is deployed, sold or upgraded, never every frame.
+1. Create a definition in `src/units/defs/` (the schema is in `src/units/roster.js`) and add it to `ROSTER`.
+2. Give it an art painter in `src/render/unitArt.js`.
+3. To make it summonable, add it to a banner pool in `src/units/summoning.js`.
 
-The summoning system (`src/units/summoning.js`) is kept as infrastructure for unlocking future unit types. With one unit there is nothing to roll yet, so it isn't shown in the UI.
+Shared systems handle the rest: targeting, upgrades, passives, `onHit` statuses, `impactHazard` ground effects and `aura` buffs, all in `src/game/effects.js`. Passives and auras are recomputed only when units are deployed, sold or upgraded, never every frame.
 
 ## Waves, scaling and realms
 
-These are unchanged from the foundation phase:
-- Endless waves built from four archetypes: Swarm, Army, Commando and Boss.
-- Gradual, finite-forever scaling with progressive encounter traits.
-- Six procedurally laid-out realms. Each now has a landmark, natural ground variation, clustered decoration, its own lighting grade and purposeful ambient animation.
+- **Waves:** endless, built from four archetypes (Swarm, Army, Commando and Boss), with gradual, finite-forever scaling and progressive encounter traits.
+- **Realms:** six, each with three terrain variants, a landmark, natural ground and its own lighting.
+- **Layouts:** procedurally generated and validated so every route is a contiguous road from the edge to the Tower.
 
 ## Architecture
 
 ```
 src/
-  config.js                 world grid + tunables
+  config.js                 world grid + tunables (coins, tokens per wave, …)
   core/                     seeded RNG & noise, spatial hash, events, math, colour
   game/Game.js              the simulation – DOM-free, event-driven, runs headless
-  maps/
-    mapGenerator.js         procedural layouts, features, decorations, validation
-    biomes.js               biome registry  (add a realm = add one module here)
-    biomes/*.js             palette, layout tuning, decor painters, ambient animation
-    paint.js, MapScene.js   cached static terrain + live ambient layers
-  waves/
-    archetypes.js           Swarm / Army / Commando / Boss  (registerArchetype)
-    waveDirector.js         archetype selection & wave plans
-    scaling.js              endless difficulty curves
-    traits.js               encounter traits  (registerTrait)
-    spawnSchedule.js        plan → timed spawn events per entrance
-  enemies/enemyCategories.js  minion / regular / elite / boss weight classes
-                              + registerEnemyVariant() hook for the future roster
-  units/                    tiers, registry, roster, defs/ (Dude), stats/upgrades, summoning
-  meta/                     battle-plan model (12 types max) + persistent profile
-  render/                   renderer, unit art & sprite caches, enemy sprites, effects
-  ui/                       Battle Plans screen, battle HUD
+  game/effects.js           statuses (Wounded, Burning), hazards (flames), auras
+  maps/                     generator, biomes + variants, rotation (random battlefields), painters
+  waves/                    archetypes, director, scaling, traits, spawn schedules
+  enemies/                  weight classes + roster variant hook
+  units/                    tiers, registry, roster, defs/, stats/upgrades, summoning banners
+  meta/                     battle plans (12 types) + persistent profile (tokens, unlocks)
+  render/                   renderer, unit art & animation, summoning circle & reveal, effects
+  audio/sfx.js              synthesized sound effects (WebAudio, no assets)
+  ui/                       Battle Plans, Summoning, battle HUD
 ```
-
-Each system is a registry, so future units, enemies, realms, archetypes, traits and tiers can be added on their own without touching the other systems.
 
 ## Development
 
 ```bash
-npm test                           # maps, waves, scaling, Dude, Dude Power, upgrades, plans, persistence
-npm run sim -- 10 150              # headless balance sim: a bot deploys/upgrades Dudes, 10 runs to wave 150
-node scripts/screenshot.mjs URL    # Battle Plans + every realm mid-battle (needs Playwright + server)
-node scripts/interactions.mjs URL  # drives real clicks/drags/keys: plan edit, deploy, upgrade, sell, boss
-node scripts/encounters.mjs URL    # forced swarm / boss / commando / army encounters
+npm test                           # 46 unit tests: maps, rotation, waves, units, effects, tokens, summoning, persistence
+npm run build                      # production build → dist/
+node scripts/e2e.mjs URL           # 26 browser checks against a running build (needs Playwright)
+npm run sim -- 10 150              # headless balance sim
+node scripts/screenshot.mjs URL    # every realm mid-battle
+node scripts/interactions.mjs URL  # real clicks/drags/keys: plan edit, deploy, upgrade, sell, boss
 ```
+
+Pushes to `main` deploy to GitHub Pages automatically. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the one-time setup and the DNS records for endlesstower.com.

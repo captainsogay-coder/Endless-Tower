@@ -27,7 +27,7 @@ for (const s of shots) {
     const { getArchetype } = await import('/src/waves/archetypes.js');
     const { createRng } = await import('/src/core/rng.js');
     const { game } = window.endlessTower;
-    game.gold = 1e6;
+    game.coins = 1e6;
     game.wave = wave - 1;
     const spots = [];
     for (let y = 0; y < game.map.rows; y++) for (let x = 0; x < game.map.cols; x++) {

@@ -5,13 +5,19 @@ import { Game } from './game/Game.js';
 import { Renderer } from './render/Renderer.js';
 import { Hud, SLOT_KEYS } from './ui/hud.js';
 import { BattlePlansView } from './ui/battlePlans.js';
+import { SummoningView } from './ui/summoning.js';
+import { chooseBattlefield } from './maps/rotation.js';
+import { formatNumber } from './core/math.js';
 import { registerRoster, STARTER_UNITS } from './units/roster.js';
 import { Profile } from './meta/profile.js';
-import { randomSeed } from './core/rng.js';
+import { randomSeed, createRng } from './core/rng.js';
 
 registerRoster();
 
-const params = new URLSearchParams(location.search);
+// Debug URL parameters (?seed, ?realm, ?tokens) work only on a local dev server –
+// players can never choose a battlefield.
+const LOCAL = ['localhost', '127.0.0.1', ''].includes(location.hostname);
+const params = LOCAL ? new URLSearchParams(location.search) : new URLSearchParams();
 const profile = new Profile({ starterUnits: STARTER_UNITS });
 if (!profile.plan.units.length && !profile.data.battles) {
   // First visit: start with the starter unit already in the plan.
@@ -19,11 +25,14 @@ if (!profile.plan.units.length && !profile.data.battles) {
   profile.save();
 }
 
+if (LOCAL && params.get('tokens')) profile.earn('tokens', Number(params.get('tokens')));
+
 const canvas = document.getElementById('game');
 const appEl = document.getElementById('app');
+const menuEl = document.getElementById('menu');
 const settings = { speed: 1, paused: false, effects: params.get('fx') === '0' ? 0 : 1, inBattle: false };
 
-const game = new Game({ seed: Number(params.get('seed')) || randomSeed(), biomeId: params.get('realm') || null, loadout: profile.plan.units });
+const game = new Game({ seed: randomSeed(), loadout: profile.plan.units });
 const renderer = new Renderer(canvas, { effects: settings.effects });
 const ui = renderer.ui;
 
@@ -32,9 +41,13 @@ function setPaused(p) {
   hud.setPaused(p);
 }
 
-function startBattle({ units, realm }) {
-  game.newRun({ seed: Number(params.get('seed')) || randomSeed(), biomeId: params.get('realm') || realm || null, loadout: units });
-  plans.show(false);
+/** The game assigns the battlefield: a random realm/variant/layout, avoiding recent repeats. */
+function startBattle({ units }) {
+  const seed = Number(params.get('seed')) || randomSeed();
+  const pick = chooseBattlefield(createRng(seed ^ 0x5a5a), profile.data.mapHistory);
+  game.newRun({ seed, biomeId: params.get('realm') || pick.biomeId, variantId: params.get('realm') ? null : pick.variantId, avoidStyles: pick.avoidStyles, loadout: units });
+  profile.recordMap({ biome: game.biome.id, variant: game.biome.variantId, style: game.map.layoutStyle });
+  menuEl.hidden = true;
   appEl.hidden = false;
   settings.inBattle = true;
   setPaused(false);
@@ -43,12 +56,37 @@ function startBattle({ units, realm }) {
   requestAnimationFrame(() => renderer.resize());
 }
 
+function showPage(page) {
+  document.querySelectorAll('.tab').forEach((t) => {
+    const on = t.dataset.page === page;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', String(on));
+  });
+  plans.show(page === 'plans');
+  summoning.show(page === 'summon');
+  updateWallet();
+}
+
+let lastTokens = null;
+function updateWallet() {
+  const n = profile.balance('tokens');
+  const el = document.getElementById('wallet-tokens');
+  el.textContent = formatNumber(n);
+  if (lastTokens !== null && n !== lastTokens) {
+    el.parentElement.classList.remove('bump');
+    void el.offsetWidth;
+    el.parentElement.classList.add('bump');
+  }
+  lastTokens = n;
+}
+
 function toPlans() {
   settings.inBattle = false;
   hud.hideGameOver();
   hud.showRetreat(false);
   appEl.hidden = true;
-  plans.show(true);
+  menuEl.hidden = false;
+  showPage('plans');
 }
 
 // ----------------------------------------------------------------- actions
@@ -79,7 +117,7 @@ const actions = {
     if (!ui.selected) return;
     if (!game.upgrade(ui.selected)) {
       const info = game.upgradeInfo(ui.selected);
-      if (!info.maxed) hud.toast(`Need ${info.cost} gold to upgrade`, '#d9534a');
+      if (!info.maxed) hud.toast(`Need ${info.cost} coins to upgrade`, '#d9534a');
     }
   },
   sellSelected() {
@@ -104,29 +142,46 @@ const actions = {
     toPlans();
   },
   again() {
-    startBattle({ units: game.loadout.map((d) => d.id), realm: profile.data.realm });
+    startBattle({ units: game.loadout.map((d) => d.id) });
   },
   toPlans,
 };
 
 const hud = new Hud(actions);
-const plans = new BattlePlansView({ profile, onBattle: startBattle });
+const plans = new BattlePlansView({ profile, onBattle: startBattle, onGoto: (p) => showPage(p) });
+const summoning = new SummoningView({ profile, onChange: () => updateWallet() });
+document.querySelector('.tabs').addEventListener('click', (ev) => {
+  const t = ev.target.closest('.tab');
+  if (t) showPage(t.dataset.page);
+});
 renderer.attach(game);
 hud.setEffects(!!settings.effects);
 hud.onRunStart(game);
 
 game.on('runStart', () => hud.onRunStart(game));
 game.on('waveStart', (plan) => hud.onWaveStart(plan, game));
-game.on('waveClear', (d) => hud.onWaveClear(d));
+game.on('waveClear', (d) => {
+  // Tokens are persisted the moment a wave is completed.
+  profile.earn('tokens', d.tokens);
+  profile.recordWaveCleared();
+  profile.save();
+  hud.onWaveClear(d, game);
+});
 game.on('bossArrived', (e) => hud.onBossArrived(e, game));
-game.on('sell', ({ refund }) => hud.toast(`Sold for ${refund} gold`, '#8d939e'));
+game.on('sell', ({ refund }) => hud.toast(`Sold for ${refund} coins`, '#8d939e'));
 game.on('gameOver', (d) => {
   ui.placingDef = null;
   profile.recordBattle(d.wave);
   setTimeout(() => settings.inBattle && hud.showGameOver(d), 900);
 });
 
+showPage('plans');
+summoning.show(false);
 plans.show(true);
+updateWallet();
+if (!profile.storageOk) {
+  plans.message('Saving is unavailable in this browser (private mode?). Progress will be lost when you close the page.', true);
+}
 
 // ----------------------------------------------------------------- input
 
@@ -146,9 +201,9 @@ function tryPlace(t) {
   lastPlaced = key;
   const reason = game.canDeploy(ui.placingDef.id, t.col, t.row);
   if (!reason) game.deploy(ui.placingDef.id, t.col, t.row);
-  else if (reason === 'gold' && performance.now() - lastWarn > 1200) {
+  else if (reason === 'coins' && performance.now() - lastWarn > 1200) {
     lastWarn = performance.now();
-    hud.toast(`Not enough gold — ${ui.placingDef.name} costs ${ui.placingDef.price}`, '#d9534a');
+    hud.toast(`Not enough coins — ${ui.placingDef.name} costs ${ui.placingDef.price}`, '#d9534a');
   }
 }
 
@@ -164,7 +219,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   const t = tileFromEvent(ev);
   ui.hover = t;
   if (ui.placingDef) {
-    // Placement mode stays active: click or drag to deploy as many copies as gold allows.
+    // Placement mode stays active: click or drag to deploy as many copies as coins allows.
     dragging = true;
     lastPlaced = null;
     canvas.setPointerCapture(ev.pointerId);
@@ -185,7 +240,7 @@ canvas.addEventListener('contextmenu', (ev) => {
 window.addEventListener('keydown', (ev) => {
   if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLSelectElement) return;
   if (!settings.inBattle) {
-    if (ev.key === 'Enter') plans.battle();
+    if (ev.key === 'Enter' && !document.getElementById('screen-plans').hidden && document.getElementById('screen-confirm').hidden) plans.battle();
     return;
   }
   const slot = SLOT_KEYS.indexOf(ev.key);
@@ -259,4 +314,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Exposed for debugging and automated screenshots.
-window.endlessTower = { game, renderer, settings, actions, profile, plans };
+window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning };
+
+// Boot complete: hide the loader.
+window.__etBooted = true;
+document.getElementById('boot').hidden = true;

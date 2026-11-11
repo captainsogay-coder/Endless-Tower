@@ -46,6 +46,11 @@ export default {
   portalColor: '#ff5a1f',
   bossTitle: 'Warden of the Molten Deep',
   bridgeStyle: 'stone',
+  variants: [
+    { id: 'cinder-flats', name: 'Cinder Flats' },
+    { id: 'magma-fields', name: 'Magma Fields', layout: { featureDensity: 0.09, rivers: [2, 2] } },
+    { id: 'ashen-plateau', name: 'Ashen Plateau', layout: { featureDensity: 0.03, rivers: [0, 1] }, lighting: { grade: '#ebe5e2', vignette: 0.45 }, palette: { groundRamp: ['#2a2626', '#383233', '#4a4241', '#5a5150'] } },
+  ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 2 }, featureDensity: 0.055, rivers: [1, 2], noiseScale: 0.2 },
   decor: [
     { kind: 'volcano', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 2.4 },

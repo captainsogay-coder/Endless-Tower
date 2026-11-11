@@ -6,12 +6,14 @@ import { createRng, randomSeed, hashString } from '../core/rng.js';
 import { Emitter } from '../core/events.js';
 import { SpatialHash } from '../core/spatialHash.js';
 import { getBiome, pickBiome } from '../maps/biomes.js';
+import { biomeWithVariant } from '../maps/rotation.js';
 import { generateMap, TileType, tileIndex, inBounds, sampleRoute } from '../maps/mapGenerator.js';
 import { WaveDirector } from '../waves/waveDirector.js';
 import { buildSpawnSchedule } from '../waves/spawnSchedule.js';
 import { getTrait } from '../waves/traits.js';
 import { getEnemyCategory } from '../enemies/enemyCategories.js';
-import { getUnit } from '../units/unitRegistry.js';
+import { getUnit, listUnits } from '../units/unitRegistry.js';
+import { applyStatus, statusSpeedMultiplier, computeAuras, HAZARD_TICK } from './effects.js';
 import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
 
 const TARGETING = {
@@ -42,14 +44,18 @@ export class Game {
    * Starts a new battle. `loadout` is the battle plan: a list of unit ids
    * (up to 12 types). It persists across newRun() calls unless replaced.
    */
-  newRun({ seed = randomSeed(), biomeId = null, loadout } = {}) {
+  newRun({ seed = randomSeed(), biomeId = null, variantId = null, avoidStyles = [], loadout } = {}) {
     if (loadout) this.setLoadout(loadout);
     else if (!this.loadout) this.loadout = [];
     this.seed = seed >>> 0;
     const rng = createRng(this.seed);
-    this.biome = biomeId ? getBiome(biomeId) : pickBiome(rng, this.biome?.id);
+    // Battlefields are assigned by the game (see maps/rotation.js); biomeId/variantId
+    // are only passed by the rotation, tests and local debugging.
+    const id = biomeId ?? pickBiome(rng, this.biome?.id).id;
+    const variants = getBiome(id).variants ?? [];
+    this.biome = biomeWithVariant(id, variantId ?? (variants.length ? rng.pick(variants).id : null));
     // Mix the biome into the map seed so the same run seed gives each realm its own layout.
-    this.map = generateMap(this.biome, (rng.int(0, 2 ** 31 - 1) ^ hashString(this.biome.id)) >>> 0);
+    this.map = generateMap(this.biome, (rng.int(0, 2 ** 31 - 1) ^ hashString(this.biome.id)) >>> 0, { avoidStyles });
     this.director = new WaveDirector(rng.int(0, 2 ** 31 - 1), { entranceCount: this.map.routes.length });
     this.spawnRng = rng.fork();
     this.fxRng = rng.fork();
@@ -57,13 +63,17 @@ export class Game {
     this.phase = 'build';
     this.wave = 0;
     this.time = 0;
-    this.gold = GAME_CONFIG.startingGold;
+    this.coins = GAME_CONFIG.startingCoins;
     this.towerMaxHp = GAME_CONFIG.towerMaxHp;
     this.towerHp = this.towerMaxHp;
     this.enemies = [];
     this.units = [];
     this.projectiles = [];
     this.projectilePool = [];
+    this.hazards = [];
+    this.hazardTimer = 0;
+    this.tokensEarned = 0;
+    this.combatRng = rng.fork();
     this.deployed = new Map(); // defId -> number of copies on the field
     this.unitByTile = new Array(COLS * ROWS).fill(null);
     this.enemySeq = 0;
@@ -75,7 +85,7 @@ export class Game {
     this.autoTimer = GAME_CONFIG.autoStartDelay;
     this.cinematic = null;
     this.boss = null;
-    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, goldSpent: 0, peakUnits: 0 };
+    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0 };
     this.emit('runStart', this);
   }
 
@@ -207,6 +217,7 @@ export class Game {
     for (const e of this.enemies) if (e.alive && e.intro >= 1) this.hash.insert(e);
     this.updateUnits(dt);
     this.updateProjectiles(dt);
+    this.updateHazards(dt);
     this.compact();
 
     if (this.phase === 'wave' && this.scheduleIdx >= this.schedule.length && this.enemies.length === 0) {
@@ -223,7 +234,7 @@ export class Game {
       if (e.intro < 1) continue; // boss emerging – holds position
       if (e.regen > 0 && e.hp < e.maxHp && this.time - e.lastHit > 1.5) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regen * dt);
       e.variant?.onUpdate?.(e, dt, this);
-      e.d += e.speed * dt;
+      e.d += e.speed * (e.statuses ? statusSpeedMultiplier(e, this.time) : 1) * dt;
       if (e.d >= e.route.length) {
         this.leak(e);
         continue;
@@ -266,6 +277,7 @@ export class Game {
       if (Math.abs(target.x - u.x) > 2) u.facing = target.x > u.x ? 1 : -1;
       u.cooldown = 1 / Math.max(0.01, u.stats.rate);
       u.recoil = 1;
+      u.lastFire = this.time;
       if (u.def.onFire) u.def.onFire(u, target, this);
       else this.fireProjectile(u, target);
     }
@@ -326,12 +338,49 @@ export class Game {
   }
 
   impact(p) {
-    if (p.splash > 0) {
-      this.hash.each(p.x, p.y, p.splash, (e) => this.damageEnemy(e, p.damage, p.source));
-    } else if (p.target) {
-      this.damageEnemy(p.target, p.damage, p.source);
-    }
+    const def = p.source?.def;
+    const hit = (e) => {
+      if (!e.alive || e.invulnerable) return;
+      this.damageEnemy(e, p.damage, p.source);
+      if (def?.onHit && e.alive) {
+        for (const h of def.onHit) if (this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time);
+      }
+    };
+    if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
+    else if (p.target) hit(p.target);
+    if (def?.impactHazard) this.addHazard(p.x, p.y, def.impactHazard, p.damage, p.source);
     this.emit('impact', p);
+  }
+
+  /** Ground hazard such as flames: periodic damage to enemies standing in it. */
+  addHazard(x, y, spec, baseDamage, source) {
+    const h = { x, y, kind: spec.kind, radius: spec.radius, ttl: spec.duration, max: spec.duration, dps: baseDamage * spec.dpsFactor, source };
+    this.hazards.push(h);
+    if (this.hazards.length > 400) this.hazards.shift();
+    this.emit('hazard', h);
+    return h;
+  }
+
+  updateHazards(dt) {
+    if (!this.hazards.length) return;
+    this.hazardTimer += dt;
+    const tick = this.hazardTimer >= HAZARD_TICK;
+    if (tick) this.hazardTimer -= HAZARD_TICK;
+    let w = 0;
+    for (let i = 0; i < this.hazards.length; i++) {
+      const h = this.hazards[i];
+      h.ttl -= dt;
+      if (h.ttl <= 0) continue;
+      if (tick) {
+        this.hash.each(h.x, h.y, h.radius, (e) => {
+          if (!e.alive || e.invulnerable) return;
+          applyStatus(e, 'burning', this.time);
+          this.damageEnemy(e, h.dps * HAZARD_TICK, h.source);
+        });
+      }
+      this.hazards[w++] = h;
+    }
+    this.hazards.length = w;
   }
 
   damageEnemy(e, amount, source = null) {
@@ -354,7 +403,7 @@ export class Game {
 
   killEnemy(e, source) {
     e.alive = false;
-    this.gold += e.reward;
+    this.coins += e.reward;
     this.stats.kills++;
     if (source) source.kills++;
     e.variant?.onDeath?.(e, this);
@@ -385,16 +434,19 @@ export class Game {
 
   completeWave() {
     const plan = this.currentPlan;
-    this.gold += plan.reward;
+    this.coins += plan.reward;
+    // Tokens are only granted for fully completed waves.
+    const tokens = GAME_CONFIG.tokensPerWave;
+    this.tokensEarned += tokens;
     this.phase = 'build';
     this.autoTimer = GAME_CONFIG.autoStartDelay;
-    this.emit('waveClear', { wave: this.wave, reward: plan.reward, plan });
+    this.emit('waveClear', { wave: this.wave, reward: plan.reward, tokens, plan });
   }
 
   gameOver() {
     if (this.phase === 'gameover') return;
     this.phase = 'gameover';
-    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome });
+    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome, tokens: this.tokensEarned });
   }
 
   // ------------------------------------------------------------------ units
@@ -418,8 +470,21 @@ export class Game {
 
   /** Recomputes effective stats for one unit (level stats + passive). */
   refreshUnit(u) {
-    const s = applyPassive(u.def, levelStats(u.def, u.level), this.passiveContext(u.def));
-    Object.assign(u.stats, s);
+    // Auras: each distinct aura id applies once, however many sources overlap.
+    Object.assign(u.stats, this.effectiveStats(u));
+  }
+
+  auraDefs() {
+    if (!this._auraDefs) {
+      this._auraDefs = new Map();
+      for (const d of listUnits()) if (d.aura) this._auraDefs.set(d.aura.id, d.aura);
+    }
+    return this._auraDefs;
+  }
+
+  /** Called when units appear or disappear (never per frame): re-resolve aura coverage. */
+  refreshAuras() {
+    for (const u of computeAuras(this.units)) this.refreshUnit(u);
   }
 
   /**
@@ -436,20 +501,20 @@ export class Game {
     const def = getUnit(defId);
     if (!def || !this.inLoadout(defId)) return 'not-in-plan';
     if (!this.canPlace(col, row)) return 'blocked';
-    if (this.gold < def.price) return 'gold';
+    if (this.coins < def.price) return 'coins';
     return null;
   }
 
   /**
    * Buys and places one copy of a battle-plan unit. There is no cap on copies:
-   * deployment is limited only by buildable tiles and gold.
+   * deployment is limited only by buildable tiles and coins.
    */
   deploy(defId, col, row) {
     if (this.canDeploy(defId, col, row)) return null;
     const def = getUnit(defId);
     const u = createUnit(def);
-    this.gold -= def.price;
-    this.stats.goldSpent += def.price;
+    this.coins -= def.price;
+    this.stats.coinsSpent += def.price;
     u.col = col;
     u.row = row;
     u.x = col * TILE + TILE / 2;
@@ -462,8 +527,9 @@ export class Game {
     this.deployed.set(def.id, this.deployedCount(def.id) + 1);
     this.stats.unitsDeployed++;
     this.stats.peakUnits = Math.max(this.stats.peakUnits, this.units.length);
-    if (def.passive) this.refreshType(def.id);
+    if (def.passive?.modify) this.refreshType(def.id);
     else this.refreshUnit(u);
+    this.refreshAuras();
     def.onPlace?.(u, this);
     this.emit('place', u);
     return u;
@@ -481,18 +547,28 @@ export class Game {
     this.unitByTile[tileIndex(u.col, u.row)] = null;
     u.placed = false;
     const refund = this.sellValue(u);
-    this.gold += refund;
+    this.coins += refund;
     this.deployed.set(u.def.id, Math.max(0, this.deployedCount(u.def.id) - 1));
-    if (u.def.passive) this.refreshType(u.def.id);
+    if (u.def.passive?.modify) this.refreshType(u.def.id);
+    this.refreshAuras();
     this.emit('sell', { unit: u, refund });
     return refund;
+  }
+
+  /** Effective stats for a unit at a level: level table + passive + auras. */
+  effectiveStats(u, level = u.level) {
+    const s = applyPassive(u.def, levelStats(u.def, level), this.passiveContext(u.def));
+    for (const id of u.auras ?? []) {
+      const aura = this.auraDefs().get(id);
+      if (aura?.cooldownMult) s.rate /= aura.cooldownMult;
+    }
+    return s;
   }
 
   /** Preview of the next upgrade: cost and before/after effective stats. */
   upgradeInfo(u) {
     const cost = upgradeCost(u.def, u.level);
-    const ctx = this.passiveContext(u.def);
-    const current = applyPassive(u.def, levelStats(u.def, u.level), ctx);
+    const current = this.effectiveStats(u);
     if (cost === null) return { maxed: true, level: u.level, maxLevel: maxLevel(u.def), current };
     return {
       maxed: false,
@@ -500,21 +576,21 @@ export class Game {
       nextLevel: u.level + 1,
       maxLevel: maxLevel(u.def),
       cost,
-      affordable: this.gold >= cost,
+      affordable: this.coins >= cost,
       current,
-      next: applyPassive(u.def, levelStats(u.def, u.level + 1), ctx),
+      next: this.effectiveStats(u, u.level + 1),
     };
   }
 
   upgrade(u) {
     if (!u.placed) return false;
     const cost = upgradeCost(u.def, u.level);
-    if (cost === null || this.gold < cost) return false;
-    this.gold -= cost;
+    if (cost === null || this.coins < cost) return false;
+    this.coins -= cost;
     u.spent += cost;
     u.level++;
     this.stats.upgrades++;
-    this.stats.goldSpent += cost;
+    this.stats.coinsSpent += cost;
     this.refreshUnit(u);
     this.emit('upgrade', u);
     return true;

@@ -19,7 +19,7 @@ export class Hud {
       realmName: $('realm-name'), realmLayout: $('realm-layout'),
       waveNum: $('wave-num'), waveArch: $('wave-arch'), waveRemaining: $('wave-remaining'),
       waveProgress: $('wave-progress'), waveTraits: $('wave-traits'),
-      hpFill: $('hp-fill'), hpText: $('hp-text'), gold: $('gold'),
+      hpFill: $('hp-fill'), hpText: $('hp-text'), coins: $('coins'), tokens: $('tokens-earned'),
       deployBar: $('deploy-bar'),
       nextPreview: $('next-preview'), next: $('btn-next'), auto: $('auto'),
       banner: $('banner'), toasts: $('toasts'), unitPanel: $('unit-panel'),
@@ -70,7 +70,7 @@ export class Hud {
       ['Enemies defeated', formatNumber(s.kills)],
       ['Bosses felled', s.bossesDefeated],
       ['Units deployed', formatNumber(s.unitsDeployed)],
-      ['Upgrades bought', formatNumber(s.upgrades)],
+      ['Tokens earned', formatNumber(data.tokens ?? 0)],
       ['Damage dealt', formatNumber(s.damage)],
     ];
     this.el.overStats.innerHTML = stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
@@ -89,7 +89,7 @@ export class Hud {
 
   onRunStart(game) {
     this.el.realmName.textContent = game.biome.name;
-    this.el.realmLayout.textContent = `${game.map.layoutLabel} · ${game.map.routes.length} ${game.map.routes.length > 1 ? 'entrances' : 'entrance'}`;
+    this.el.realmLayout.textContent = `${game.map.variantName ? `${game.map.variantName} · ` : ''}${game.map.layoutLabel} · ${game.map.routes.length} ${game.map.routes.length > 1 ? 'entrances' : 'entrance'}`;
     this.deployKey = '';
     this.panelKey = '';
     this.npKey = '';
@@ -97,6 +97,7 @@ export class Hud {
     this.el.toasts.innerHTML = '';
     this.el.banner.innerHTML = '';
     this.el.auto.checked = game.autoStart;
+    this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
     this.update(game, null, true);
   }
 
@@ -122,8 +123,12 @@ export class Hud {
     }
   }
 
-  onWaveClear({ wave, reward }) {
-    this.banner(`<div class="b-kicker">Wave ${wave} held</div><div class="b-title">+${formatNumber(reward)} gold</div>`, '#8fcf6a', 'small');
+  onWaveClear({ wave, reward, tokens }, game) {
+    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens</div>`, '#e3a33b', 'small');
+    this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
+    this.el.tokens.parentElement.classList.remove('bump');
+    void this.el.tokens.offsetWidth;
+    this.el.tokens.parentElement.classList.add('bump');
   }
 
   onBossArrived(e, game) {
@@ -159,7 +164,7 @@ export class Hud {
 
   update(game, ui, force = false) {
     const { el } = this;
-    el.gold.textContent = formatNumber(game.gold);
+    el.coins.textContent = formatNumber(game.coins);
     const canStart = game.phase === 'build';
     el.next.disabled = !canStart;
     el.next.textContent = canStart ? (game.autoStart ? `Start wave · ${Math.ceil(Math.max(0, game.autoTimer))}` : 'Start wave') : game.phase === 'wave' ? 'Wave in progress' : 'Start wave';
@@ -225,13 +230,13 @@ export class Hud {
     const parts = game.loadout.map((def) => {
       const n = game.deployedCount(def.id);
       const bonus = def.passive?.bonus ? def.passive.bonus({ deployed: n }) : null;
-      return { def, n, bonus, poor: game.gold < def.price };
+      return { def, n, bonus, poor: game.coins < def.price };
     });
     const key = parts.map((p) => `${p.def.id}:${p.n}:${p.poor}`).join(',') + `|${active}`;
     if (key === this.deployKey) return;
     this.deployKey = key;
     this.el.deployBar.innerHTML = parts
-      .map(({ def, n, bonus, poor }, i) => `<button class="deploy-card ${def.id === active ? 'active' : ''} ${poor ? 'poor' : ''}" data-def="${esc(def.id)}" title="${esc(def.name)} — ${def.price} gold (key ${SLOT_KEYS[i]})">
+      .map(({ def, n, bonus, poor }, i) => `<button class="deploy-card ${def.id === active ? 'active' : ''} ${poor ? 'poor' : ''}" data-def="${esc(def.id)}" title="${esc(def.name)} — ${def.price} coins (key ${SLOT_KEYS[i]})">
         <div class="dc-art"><img alt="" src="${portrait(def, 96)}" /></div>
         <span class="dc-key">${SLOT_KEYS[i]}</span><span class="dc-count">×${n}</span>
         <div class="dc-info"><div class="dc-name">${esc(def.name)}</div>

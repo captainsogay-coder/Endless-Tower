@@ -36,6 +36,11 @@ export default {
   enemyPalette: { body: '#4b3a8c', dark: '#1f1648', eye: '#ffef7a', glow: '#a58cff' },
   portalColor: '#ffd56a',
   bossTitle: 'Warden of the Endless Sky',
+  variants: [
+    { id: 'high-meadows', name: 'High Meadows' },
+    { id: 'scattered-isles', name: 'Scattered Isles', layout: { featureDensity: 0.36, edgeBias: 1.0 } },
+    { id: 'grand-plateau', name: 'Grand Plateau', layout: { featureDensity: 0.2, edgeBias: 0.6 } },
+  ],
   layout: { styles: { meander: 3, serpentine: 1, converge: 3 }, featureDensity: 0.3, edgeBias: 0.8, rivers: [0, 0], noiseScale: 0.16 },
   decor: [
     { kind: 'skyShrine', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.4 },

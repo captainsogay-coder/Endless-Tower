@@ -1,15 +1,21 @@
 {
   "name": "endless-tower",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Endless Tower — an endless tower-defense prototype. There is no final wave.",
+  "description": "Endless Tower \u2014 an endless tower-defense game. There is no final wave.",
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/build.mjs && node server.js dist",
     "test": "node --test tests/*.test.js",
     "sim": "node scripts/simulate.js"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  },
+  "homepage": "https://endlesstower.com"
 }

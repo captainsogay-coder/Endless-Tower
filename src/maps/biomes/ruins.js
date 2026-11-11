@@ -52,6 +52,11 @@ export default {
   portalColor: '#6ff0ff',
   bossTitle: 'Warden of the Sunken Throne',
   bridgeStyle: 'stone',
+  variants: [
+    { id: 'old-capital', name: 'Old Capital' },
+    { id: 'sunken-courts', name: 'Sunken Courts', layout: { featureDensity: 0.1 } },
+    { id: 'overgrown-terraces', name: 'Overgrown Terraces', layout: { featureDensity: 0.03 }, palette: { groundRamp: ['#42552f', '#55693b', '#6a7a45', '#7d8550'] }, lighting: { strength: 0.16 } },
+  ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 3 }, featureDensity: 0.06, rivers: [0, 0], noiseScale: 0.2 },
   decor: [
     { kind: 'colossus', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },

@@ -17,7 +17,7 @@ export function levelStats(def, level) {
   };
 }
 
-/** Gold cost to go from `level` to `level + 1`, or null at max level. */
+/** Coins cost to go from `level` to `level + 1`, or null at max level. */
 export function upgradeCost(def, level) {
   return level < maxLevel(def) ? def.levels[level + 1].cost : null;
 }

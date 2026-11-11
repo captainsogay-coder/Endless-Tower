@@ -44,7 +44,7 @@ for (let k = 1; k < 5; k++) { const q = sc(pts.x + k, pts.y); await page.mouse.m
 await page.mouse.up();
 const st = await page.evaluate(() => {
   const { game } = window.endlessTower;
-  return { deployed: game.deployedCount('dude'), gold: game.gold, dmg: game.units.map((u) => u.stats.damage) };
+  return { deployed: game.deployedCount('dude'), coins: game.coins, dmg: game.units.map((u) => u.stats.damage) };
 });
 log('drag-deployed:', st);
 await page.mouse.move(p.x, p.y + box.height / 22 * 2);
@@ -53,7 +53,7 @@ await page.screenshot({ path: 'screenshots/ui-placing.png' });
 await page.keyboard.press('Escape');
 await page.mouse.click(p.x, p.y);
 await page.waitForTimeout(100);
-await page.evaluate(() => { window.endlessTower.game.gold += 500; });
+await page.evaluate(() => { window.endlessTower.game.coins += 500; });
 await page.waitForTimeout(100);
 await page.click('[data-act="upgrade"]');
 await page.keyboard.press('u');
