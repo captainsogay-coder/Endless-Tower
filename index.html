@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Endless Tower</title>
+  <meta name="description" content="Endless Tower — an endless tower-defense prototype. There is no final wave." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Nunito+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="hud-top">
+      <div class="brand">
+        <div class="logo"><span class="logo-mark"></span>Endless Tower</div>
+        <div class="realm"><span id="realm-name">—</span><span class="dot">•</span><span id="realm-layout">—</span></div>
+      </div>
+
+      <div class="wave-info">
+        <div class="wave-num"><span class="label">Wave</span><span id="wave-num">0</span></div>
+        <div class="wave-detail">
+          <div class="wave-line">
+            <span id="wave-arch" class="arch-chip">Preparing</span>
+            <span id="wave-pattern" class="muted"></span>
+            <span id="wave-remaining" class="muted"></span>
+          </div>
+          <div class="progress"><div id="wave-progress"></div></div>
+          <div id="wave-traits" class="trait-row"></div>
+        </div>
+      </div>
+
+      <div class="resources">
+        <div class="tower-hp" title="Tower integrity">
+          <div class="res-label">Tower</div>
+          <div class="hp-bar"><div id="hp-fill"></div><span id="hp-text">100</span></div>
+        </div>
+        <div class="gold" title="Gold"><span class="coin"></span><span id="gold">0</span></div>
+        <div class="controls">
+          <button class="icon-btn" id="btn-pause" title="Pause (Space)">❚❚</button>
+          <div class="speed" role="group" aria-label="Game speed">
+            <button data-speed="1" class="active" title="Speed 1× (1)">1×</button>
+            <button data-speed="2" title="Speed 2× (2)">2×</button>
+            <button data-speed="3" title="Speed 3× (3)">3×</button>
+          </div>
+          <button class="icon-btn" id="btn-fx" title="Toggle ambient effects">✦</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="stage">
+      <canvas id="game"></canvas>
+      <div id="boss-bar" hidden>
+        <div class="boss-title"><span id="boss-name">Boss</span><span id="boss-hp-text"></span></div>
+        <div class="boss-track"><div id="boss-shield"></div><div id="boss-fill"></div></div>
+      </div>
+      <div id="banner" aria-live="polite"></div>
+      <div id="toasts"></div>
+      <aside id="unit-panel" hidden></aside>
+      <div id="pause-veil" hidden><div>Paused</div></div>
+    </main>
+
+    <footer id="dock">
+      <section class="summon-panel">
+        <div class="section-title">Summon</div>
+        <div class="summon-buttons">
+          <button id="btn-summon" class="btn-primary">
+            <span class="btn-label">Summon</span>
+            <span class="btn-cost"><span class="coin sm"></span><span id="summon-cost">100</span></span>
+          </button>
+          <button id="btn-summon10" class="btn-secondary" title="Summon up to 10">×10</button>
+        </div>
+        <div id="odds" class="odds"></div>
+      </section>
+
+      <section class="bench-panel">
+        <div class="section-title">Reserves <span id="bench-count" class="muted"></span><span class="hint">Select, then click or drag on open ground · right-click cancels</span></div>
+        <div id="bench-list"></div>
+      </section>
+
+      <section class="next-panel">
+        <div class="section-title">Next Encounter</div>
+        <div id="next-preview" class="next-preview"></div>
+        <div class="next-actions">
+          <button id="btn-next" class="btn-wave">Begin Wave</button>
+          <label class="auto"><input id="auto" type="checkbox" /> Auto</label>
+        </div>
+      </section>
+    </footer>
+
+    <div id="screen-start" class="overlay">
+      <div class="panel title-panel">
+        <div class="title-kicker">A tower-defense prototype</div>
+        <h1>Endless Tower</h1>
+        <p class="motto">There is no final wave. There is always another challenge.</p>
+        <div class="realm-picker">
+          <div class="picker-label">Choose a realm</div>
+          <div id="realm-chips" class="chips"></div>
+        </div>
+        <div class="start-actions">
+          <button id="btn-reroll" class="btn-secondary">↻ Reroll Map</button>
+          <button id="btn-begin" class="btn-primary big">Enter the Tower</button>
+        </div>
+        <ul class="howto">
+          <li><b>Summon</b> units with gold, then place as many as you like on open ground.</li>
+          <li>Hold the line against <b>Swarms</b>, <b>Armies</b>, <b>Commandos</b> and <b>Bosses</b>.</li>
+          <li>Keys: <kbd>S</kbd> summon · <kbd>N</kbd> next wave · <kbd>Space</kbd> pause · <kbd>1</kbd>–<kbd>3</kbd> speed · <kbd>Esc</kbd> cancel</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="screen-over" class="overlay" hidden>
+      <div class="panel over-panel">
+        <div class="title-kicker">The Tower has fallen</div>
+        <h2>Wave <span id="over-wave">0</span></h2>
+        <div id="over-stats" class="stats-grid"></div>
+        <div class="start-actions">
+          <button id="btn-again" class="btn-primary big">Rise Again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <noscript>Endless Tower needs JavaScript enabled.</noscript>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
