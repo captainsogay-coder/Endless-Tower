@@ -4,7 +4,7 @@
 
 An endless tower-defense game. Summon units, plan your army, deploy as many as you can afford on open ground, and hold off waves that never stop coming and keep changing.
 
-**Play:** https://endlesstower.com (once the domain is configured; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) · Art direction: [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)
+**Play:** https://captainsogay-coder.github.io/Endless-Tower/ (endlesstower.com once its DNS is set up; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) · Art direction: [docs/ART_DIRECTION.md](docs/ART_DIRECTION.md)
 
 ## Run locally
 
@@ -114,4 +114,4 @@ node scripts/screenshot.mjs URL    # every realm mid-battle
 node scripts/interactions.mjs URL  # real clicks/drags/keys: plan edit, deploy, upgrade, sell, boss
 ```
 
-Pushes to `main` deploy to GitHub Pages automatically. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the one-time setup and the DNS records for endlesstower.com.
+Pushes to `main` build the game and publish it to the `gh-pages` branch, which GitHub Pages serves. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for setup and the DNS records for endlesstower.com.

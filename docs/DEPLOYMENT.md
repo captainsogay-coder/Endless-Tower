@@ -17,22 +17,27 @@ node scripts/e2e.mjs http://localhost:8080   # browser end-to-end checks (needs 
 
 ## GitHub Pages (automated)
 
-`.github/workflows/deploy.yml` runs on every push to `main` and can also be started by hand. It installs, tests, builds and publishes `dist/` with the official Pages actions. `.github/workflows/ci.yml` runs the tests and a build on every other branch and on pull requests.
+`.github/workflows/deploy.yml` runs on every push to `main` and can also be started by hand from the Actions tab. It:
+1. installs, tests and builds,
+2. force-pushes `dist/` to the `gh-pages` branch,
+3. checks that GitHub Pages is serving that branch, and tries to enable it if not.
 
-### One-time setup (repository owner, in the GitHub web UI)
+`.github/workflows/ci.yml` runs the tests and a build on every other branch and on pull requests.
 
-1. **Get the code onto `main`.** The repository currently has only the `claude/endless-tower-core-zoe5z4` branch. Merge it into `main`, or create `main` from it. The deploy workflow only runs from `main`.
-2. **Enable Pages.** Go to Settings → Pages → Build and deployment → Source, and choose **GitHub Actions**.
-3. **Run the workflow.** Push to `main`, or go to Actions → *Deploy to GitHub Pages* → Run workflow. The site then appears at `https://captainsogay-coder.github.io/Endless-Tower/`.
+The live game is at **https://captainsogay-coder.github.io/Endless-Tower/**.
+
+**If the site shows a 404:** GitHub didn't switch Pages on by itself. The run summary will show a warning. Fix it once, in the GitHub web UI: go to Settings → Pages → Build and deployment and set:
+- **Source:** Deploy from a branch
+- **Branch:** `gh-pages`, folder `/ (root)`
+
+Then Save. The site appears within a minute or two, and every later push to `main` updates it automatically.
 
 ## Custom domain: endlesstower.com
 
-> **Status: not verified.** I could not check DNS from the build environment, so nothing here confirms that `endlesstower.com` points at GitHub Pages or that you own it. Treat the domain as **not live** until the steps below are done and GitHub shows a green "DNS check successful".
-
-With Actions-based deployments, GitHub reads the custom domain from **repository settings**, not from the `CNAME` file. The file is shipped in `dist/` anyway for hosts that use it.
+> **Status: not configured.** The repository deliberately ships **without** a `CNAME` file right now. With branch-based Pages, a `CNAME` file switches the site to the custom domain and redirects github.io visitors there. Until `endlesstower.com` has DNS pointing at GitHub, that redirect would send everyone to a domain that doesn't resolve, which shows up as an HTTPS/DNS error in the browser. Do the steps below in order.
 
 1. **Own the domain.** Register `endlesstower.com` with a registrar if you haven't already.
-2. **Verify the domain** (recommended; prevents domain takeover). Go to GitHub → your profile **Settings** → **Pages** → **Add a domain**, enter `endlesstower.com`, and add the TXT record GitHub shows at your DNS provider. It has the form `_github-pages-challenge-captainsogay-coder.endlesstower.com`.
+2. **Verify the domain** (recommended; prevents domain takeover). Go to GitHub → your profile **Settings** → **Pages** → **Add a domain**, enter `endlesstower.com`, and add the TXT record GitHub shows at your DNS provider.
 3. **Add DNS records** at your DNS provider:
 
    | Type | Name / host | Value |
@@ -47,14 +52,10 @@ With Actions-based deployments, GitHub reads the custom domain from **repository
    | AAAA | `@` | `2606:50c0:8003::153` |
    | CNAME | `www` | `captainsogay-coder.github.io` |
 
-   Remove any other A, AAAA or ALIAS records on the apex. These are GitHub's published Pages addresses; check them against GitHub's documentation ("Managing a custom domain for your GitHub Pages site") when you set this up.
-4. **Set the domain on the repository.** Go to Settings → Pages → Custom domain, enter `endlesstower.com` and save. Wait for the DNS check to pass; propagation can take up to 24 hours.
-5. **Tick "Enforce HTTPS"** once GitHub has issued the certificate.
-6. **Confirm it works** from your own machine, then test the live site with `node scripts/e2e.mjs https://endlesstower.com`:
-   ```bash
-   dig +short endlesstower.com A          # should list the four 185.199.x.153 addresses
-   dig +short www.endlesstower.com CNAME  # should be captainsogay-coder.github.io.
-   ```
+   These are GitHub's published Pages addresses; check them against GitHub's documentation ("Managing a custom domain for your GitHub Pages site") when you set this up.
+4. **Wait for DNS to resolve.** Check that `dig +short endlesstower.com A` lists the four `185.199.x.153` addresses.
+5. **Turn the domain on.** Add a file named `CNAME` at the repository root containing `endlesstower.com`, and push it to `main`. The build copies it into the published site; don't add it only through the Settings page, because each deploy replaces the `gh-pages` branch.
+6. **Enforce HTTPS.** In Settings → Pages, wait for "DNS check successful", then tick **Enforce HTTPS** once the certificate has been issued (this can take up to an hour).
 
 ## Runtime robustness
 
