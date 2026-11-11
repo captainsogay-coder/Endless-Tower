@@ -1,10 +1,9 @@
 name: Deploy to GitHub Pages
 
-# Builds the game and publishes dist/ to the `gh-pages` branch, which GitHub
-# Pages serves at https://<owner>.github.io/<repo>/.
-# If Pages is not yet enabled, the last step tries to enable it; if GitHub
-# refuses (the default token cannot change repository settings), it prints
-# the one setting to change: Settings → Pages → Deploy from a branch → gh-pages / (root).
+# Builds the game and publishes it so it works with EITHER GitHub Pages setting:
+#   - Source "Deploy from a branch" → served from the gh-pages branch (always updated)
+#   - Source "GitHub Actions"       → deployed directly by the second job
+# If Pages is switched off, the run summary says exactly which setting to change.
 on:
   push:
     branches: [main]
@@ -13,14 +12,17 @@ on:
 permissions:
   contents: write
   pages: write
+  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.mode.outputs.mode }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -43,15 +45,35 @@ jobs:
           git commit -q -m "Deploy ${GITHUB_SHA::7}"
           git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
 
-      - name: Make sure GitHub Pages serves the gh-pages branch
+      - name: Detect how GitHub Pages is configured
+        id: mode
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
-            echo "GitHub Pages is enabled."
-          elif gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" >/dev/null 2>&1; then
-            echo "Enabled GitHub Pages from the gh-pages branch."
-          else
-            echo "::warning::GitHub Pages is not enabled yet. In the repository go to Settings → Pages → Build and deployment → Source: 'Deploy from a branch', Branch: gh-pages, folder: / (root), then Save."
+          mode=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>/dev/null || true)
+          if [ -z "$mode" ]; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" >/dev/null 2>&1 && mode=legacy
           fi
+          echo "mode=${mode:-none}" >> "$GITHUB_OUTPUT"
+          case "$mode" in
+            workflow) echo "Pages source: GitHub Actions – deploying in the next job." ;;
+            legacy)   echo "Pages source: gh-pages branch – the site updates from the branch just pushed." ;;
+            *)        echo "::warning::GitHub Pages is switched off. Open https://github.com/${GITHUB_REPOSITORY}/settings/pages and set Source to 'Deploy from a branch', Branch 'gh-pages', folder '/ (root)', then Save." ;;
+          esac
           echo "Site: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+
+      - if: steps.mode.outputs.mode == 'workflow'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.mode == 'workflow'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

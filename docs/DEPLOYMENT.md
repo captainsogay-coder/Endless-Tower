@@ -26,11 +26,11 @@ node scripts/e2e.mjs http://localhost:8080   # browser end-to-end checks (needs 
 
 The live game is at **https://captainsogay-coder.github.io/Endless-Tower/**.
 
-**If the site shows a 404:** GitHub didn't switch Pages on by itself. The run summary will show a warning. Fix it once, in the GitHub web UI: go to Settings → Pages → Build and deployment and set:
-- **Source:** Deploy from a branch
-- **Branch:** `gh-pages`, folder `/ (root)`
+**If the site shows a 404:** GitHub Pages is switched off for the repository, and only the owner can switch it on. Open https://github.com/captainsogay-coder/Endless-Tower/settings/pages and choose either option; the workflow supports both:
+- **Deploy from a branch** → `gh-pages` / `(root)` → Save (recommended), or
+- **GitHub Actions**, then re-run *Deploy to GitHub Pages* from the Actions tab.
 
-Then Save. The site appears within a minute or two, and every later push to `main` updates it automatically.
+The site appears within a minute or two. After that, every push to `main` updates it automatically.
 
 ## Custom domain: endlesstower.com
 
