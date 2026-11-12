@@ -20,7 +20,9 @@ export function validateUnitDef(def) {
     if (!def.passive.name || !def.passive.summary) errors.push('passive needs name and summary');
     if (def.passive.modify !== undefined && typeof def.passive.modify !== 'function') errors.push('passive.modify must be a function');
   }
-  if (def.aura && !(def.aura.id && def.aura.radius > 0)) errors.push('aura needs id and radius');
+  for (const b of def.buffs ?? []) if (!(b.id && b.radius > 0)) errors.push('each buff needs an id and a radius > 0 (Infinity = map-wide)');
+  if (def.economy && !(def.economy.id && def.economy.coinMult > 0)) errors.push('economy needs id and coinMult');
+  if (def.summon && !(def.summon.every > 0 && def.summon.kind)) errors.push('summon needs every (s) and kind');
   return errors;
 }
 

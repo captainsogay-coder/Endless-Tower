@@ -21,6 +21,8 @@
     <symbol id="i-token" viewBox="0 0 16 16"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M8 4.5 11 6.3v3.4L8 11.5 5 9.7V6.3z" fill="#1c1406"/></symbol>
     <symbol id="i-sound" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
     <symbol id="i-mute" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 6l3.5 4M14.5 6 11 10" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .3-5.6A4 4 0 0 0 4.3 7.6 2.5 2.5 0 0 0 4.5 12.5z"/></symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 16 16"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .3-5.6A4 4 0 0 0 4.3 7.6 2.5 2.5 0 0 0 4.5 12.5z" opacity="0.45"/><path d="M2.5 2.5l11 11" stroke="currentColor" stroke-width="1.6"/></symbol>
     <symbol id="i-tower" viewBox="0 0 16 16"><path d="M3 14V6h1.5V4H6v2h1.2V4h1.6v2H10V4h1.5v2H13v8z"/></symbol>
   </svg>
 
@@ -96,6 +98,7 @@
     <div class="sm-body">
       <div class="sm-stage">
         <canvas id="summon-stage" aria-hidden="true"></canvas>
+        <div id="banner-tabs" class="banner-tabs" role="tablist" aria-label="Summoning circles"></div>
         <div class="sm-banner">
           <div class="label">Summoning banner</div>
           <h1 id="banner-name">Military Summoning Circle</h1>
@@ -106,7 +109,7 @@
       <aside class="sm-side">
         <div class="section-head"><h2>Unit pool</h2><span class="muted">Every pull is independent</span></div>
         <ul id="pool-list" class="pool-list"></ul>
-        <p class="muted small">Summoned units are unlocked permanently and appear in Battle Plans. Duplicates are recorded but add no extra unit type.</p>
+        <p id="pool-note" class="muted small"></p>
       </aside>
     </div>
     <footer class="sm-footer">
@@ -142,6 +145,7 @@
   <div id="app" class="screen" hidden>
     <header id="hud-top">
       <div class="hud-left">
+        <button class="icon-btn weather-toggle" id="btn-weather" type="button" title="Weather on/off" aria-pressed="true"><svg><use href="#i-cloud" /></svg></button>
         <div class="wave-block"><span class="label">Wave</span><span id="wave-num">0</span></div>
         <div class="wave-detail">
           <div class="wave-line">
@@ -172,6 +176,7 @@
             <button data-speed="3" title="Fastest">3×</button>
           </div>
           <button class="icon-btn" id="btn-fx" title="Ambient effects"><svg><use href="#i-fx" /></svg></button>
+          <button class="icon-btn" id="btn-sound" title="Sound on/off"><svg><use href="#i-sound" /></svg></button>
           <button class="icon-btn" id="btn-retreat" title="Retreat to Battle Plans"><svg><use href="#i-flag" /></svg></button>
         </div>
       </div>
@@ -179,6 +184,7 @@
 
     <main id="stage">
       <canvas id="game"></canvas>
+      <div id="weather-card" class="weather-card" hidden aria-live="polite"></div>
       <div id="boss-bar" hidden>
         <div class="boss-title"><span id="boss-name">Boss</span><span id="boss-hp-text" class="num"></span></div>
         <div class="boss-track"><div id="boss-shield"></div><div id="boss-fill"></div></div>
@@ -191,15 +197,19 @@
 
     <footer id="dock">
       <section class="deploy-panel">
-        <div class="section-head"><h2>Deploy</h2><span class="muted hint">Pick a unit, then click or drag on open ground · right-click cancels</span></div>
+        <div class="section-head"><h2>Deploy</h2><span class="muted hint">Tap a unit, then tap open ground to place it · right-click or Esc cancels</span></div>
         <div id="deploy-bar" class="deploy-bar"></div>
       </section>
       <section class="next-panel">
-        <div class="section-head"><h2>Next encounter</h2></div>
+        <div class="section-head"><h2>Next encounter</h2><span id="queue-info" class="muted"></span></div>
         <div id="next-preview" class="next-preview"></div>
         <div class="next-actions">
-          <button id="btn-next" class="btn-primary">Start wave</button>
-          <label class="auto"><input id="auto" type="checkbox" /> Auto</label>
+          <button id="btn-next" class="btn-primary">Call wave</button>
+          <div class="call-many" role="group" aria-label="Call several waves">
+            <input id="call-count" type="number" min="1" max="1000" value="10" inputmode="numeric" aria-label="Number of waves to call" />
+            <button id="btn-call-many" class="btn-secondary" type="button" title="Call this many waves at once">Call ×10</button>
+          </div>
+          <label class="auto" title="Start the next wave as soon as the current one has finished arriving"><input id="auto" type="checkbox" /> Auto Skip</label>
         </div>
       </section>
     </footer>

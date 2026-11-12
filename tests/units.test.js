@@ -8,8 +8,8 @@ import dude, { dudePowerMultiplier } from '../src/units/defs/dude.js';
 
 registerRoster();
 
-test('roster: Dude plus the four Military Circle units, all valid', () => {
-  assert.deepEqual(ROSTER.map((d) => d.id), ['dude', 'cadet', 'gunnerman', 'grenade-launcher', 'tank']);
+test('roster: Dude, the Military Circle and Advanced Military Circle units, all valid', () => {
+  assert.deepEqual(ROSTER.map((d) => d.id), ['dude', 'cadet', 'gunnerman', 'grenade-launcher', 'tank', 'special-forces', 'drone', 'commander', 'colonel', 'general', 'fortress']);
   for (const d of ROSTER) assert.deepEqual(validateUnitDef(d), [], d.id);
   assert.deepEqual(validateUnitDef(dude), []);
   assert.equal(getUnit('dude').tier, 1);
@@ -70,6 +70,6 @@ test('new units match their brief', () => {
   assert.ok(dps('gunnerman') > dps('cadet') && s0('gunnerman').range > s0('cadet').range, 'Gunnerman: DPS focus, good range');
   assert.ok(s0('grenade-launcher').splash > 0 && s0('grenade-launcher').rate < 0.6, 'Grenade: small AoE, slow cooldown');
   assert.ok(s0('tank').damage > s0('grenade-launcher').damage && s0('tank').range > s0('grenade-launcher').range, 'Tank out-hits the grenadier');
-  assert.ok(s0('tank').splash > 0 && getUnit('tank').impactHazard && getUnit('tank').aura);
+  assert.ok(s0('tank').splash > 0 && getUnit('tank').impactHazard && getUnit('tank').buffs?.length);
   for (const d of ROSTER) assert.equal(maxLevel(d), 5, `${d.id} has 5 upgrade levels`);
 });

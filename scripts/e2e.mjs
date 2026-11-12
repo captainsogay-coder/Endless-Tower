@@ -85,6 +85,7 @@ for (const n of [1, 5, 10, 25]) {
   await page.click('#btn-confirm-ok');
   await page.waitForTimeout(400);
   const shown = await ev(() => window.endlessTower.summoning.results.length);
+  const comp = await ev(() => window.endlessTower.summoning.results.reduce((a, r) => a + r.compensation, 0));
   await page.click('#btn-reveal-skip').catch(() => {});
   await page.waitForTimeout(300);
   if (n > 1) {
@@ -95,7 +96,7 @@ for (const n of [1, 5, 10, 25]) {
   }
   await page.click('#btn-reveal-done');
   const after = await wallet();
-  check(`×${n} costs ${150 * n} Tokens (total shown before confirming)`, before - after === 150 * n && /Total cost/.test(confirmText), `${before} → ${after}`);
+  check(`×${n} costs ${150 * n} Tokens, duplicates refund 45 each (total shown before confirming)`, before - after === 150 * n - comp && comp % 45 === 0 && /Total cost/.test(confirmText), `${before} → ${after} (+${comp} compensation)`);
 }
 const odds = await page.$$eval('.pi-chance', (els) => els.map((e) => e.firstChild.textContent.trim()));
 check('pool shows Cadet 50%, Gunnerman 30%, Grenade Launcher 15%, Tank 5%', JSON.stringify(odds) === '["50%","30%","15%","5%"]', odds.join(' '));
@@ -167,6 +168,75 @@ await page.waitForTimeout(500);
 await page.screenshot({ path: 'screenshots/e2e-battle.png' });
 await page.click('#btn-retreat');
 await page.click('#btn-retreat-confirm');
+
+// 10. Gameplay & content update: two-tap deploy, multi-wave, weather, Advanced circle
+await page.click('.tab[data-page="plans"]').catch(() => {});
+await page.click('#btn-battle');
+await page.waitForTimeout(300);
+const box = await page.locator('#game').boundingBox();
+const spot = await ev(() => {
+  const { game } = window.endlessTower;
+  for (let y = 2; y < 20; y++) for (let x = 2; x < 38; x++) if (game.canPlace(x, y) && game.canPlace(x + 3, y)) return [x, y];
+});
+const sc = (x, y) => ({ x: box.x + ((x + 0.5) / 40) * box.width, y: box.y + ((y + 0.5) / 22) * box.height });
+const coins0 = await ev(() => window.endlessTower.game.coins);
+await page.keyboard.press('1'); // first tap equivalent: select Dude
+const coinsSel = await ev(() => window.endlessTower.game.coins);
+const p0 = sc(...spot);
+await page.mouse.click(p0.x, p0.y);
+await page.mouse.click(p0.x, p0.y); // double tap must not double-buy
+const tapRes = await ev(() => ({ coins: window.endlessTower.game.coins, n: window.endlessTower.game.units.length }));
+check('two-tap deploy: selecting is free, one tap buys exactly one unit', coinsSel === coins0 && tapRes.n === 1 && coins0 - tapRes.coins === 15, `${coins0} → ${coinsSel} → ${tapRes.coins}, ${tapRes.n} unit(s)`);
+await page.waitForTimeout(250);
+const p1 = sc(spot[0] + 3, spot[1]);
+await page.mouse.move(p1.x, p1.y);
+await page.mouse.down();
+await page.mouse.move(p1.x + 60, p1.y + 40, { steps: 6 });
+await page.mouse.up();
+const dragN = await ev(() => window.endlessTower.game.units.length);
+check('dragging across the map deploys nothing', dragN === 1, `${dragN} units`);
+await page.keyboard.press('Escape');
+await page.fill('#call-count', '40');
+await page.click('#btn-call-many');
+await page.waitForTimeout(1500);
+const mw = await ev(() => {
+  const { game } = window.endlessTower;
+  return { active: game.activeWaveNumbers().length, queued: game.queuedWaveNumbers().length, waves: new Set(game.enemies.map((e) => e.wave?.number)).size, info: document.getElementById('queue-info').textContent };
+});
+check('calling 40 waves: several waves active at once, rest queued, HUD lists them', mw.active > 1 && mw.active + mw.queued >= 39 && mw.waves > 1 && /queued/.test(mw.info), JSON.stringify(mw));
+const wx = await ev(() => {
+  const { game } = window.endlessTower;
+  game.weather.start('nova');
+  const card = document.getElementById('weather-card');
+  return { id: game.weather.current?.id, rem: game.weather.remaining, rate: game.units[0].stats.rate };
+});
+await page.waitForTimeout(400);
+const card = await page.textContent('#weather-card');
+check('weather: Nova shows its card with remaining time and effects', wx.id === 'nova' && wx.rem === 20 && /Nova/i.test(card) && /30% cooldown/.test(card), card.replace(/\s+/g, ' ').slice(0, 80));
+await page.click('#btn-weather');
+const off = await ev(() => ({ cur: window.endlessTower.game.weather.current, en: window.endlessTower.game.weatherEnabled }));
+check('weather toggle turns weather off and clears the active weather', off.cur === null && off.en === false);
+await page.click('#btn-weather');
+await page.click('#btn-retreat');
+await page.click('#btn-retreat-confirm');
+await page.click('.tab[data-page="summon"]');
+await page.waitForTimeout(200);
+await page.click('[data-banner="advanced-military-circle"]');
+const adv = await page.$$eval('.pi-chance', (els) => els.map((e) => e.firstChild.textContent.trim()));
+check('Advanced circle odds 40/30/10/12/7.5/0.5%', JSON.stringify(adv) === '["40%","30%","10%","12%","7.5%","0.5%"]', adv.join(' '));
+const rareRow = await page.$$eval('.pool-item.rare', (els) => els.length);
+check('only the 0.5% Fortress is flagged rare', rareRow === 1);
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 250 * 25; p.save(); window.endlessTower.summoning.render(); });
+const b0 = await wallet();
+await page.click('[data-count="25"]');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(300);
+const advComp = await ev(() => window.endlessTower.summoning.results.reduce((a, r) => a + r.compensation, 0));
+const compShown = await page.$$eval('.rs-comp', (els) => els.length);
+await page.click('#btn-reveal-done');
+const b1 = await wallet();
+check('Advanced ×25 costs 6,250 and pays 75 per duplicate, shown in results', b0 - b1 === 6250 - advComp && advComp === compShown * 75 && compShown > 0, `${b0} → ${b1}, ${compShown} dupes`);
 
 // 8. Persistence across a restart
 const snap = await ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units] }));

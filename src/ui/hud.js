@@ -10,6 +10,25 @@ import { esc, tiles } from './format.js';
 import { portrait } from './battlePlans.js';
 
 const $ = (id) => document.getElementById(id);
+
+/** Compact list of wave numbers: "12–15, 18" (runs collapse into ranges). */
+export function waveRange(nums) {
+  if (!nums.length) return '';
+  const sorted = [...nums].sort((a, b) => a - b);
+  const parts = [];
+  let start = sorted[0];
+  let prev = start;
+  for (const n of sorted.slice(1).concat(Infinity)) {
+    if (n === prev + 1) {
+      prev = n;
+      continue;
+    }
+    parts.push(start === prev ? `${start}` : `${start}–${prev}`);
+    start = prev = n;
+  }
+  const text = parts.join(', ');
+  return text.length > 40 ? `${sorted[0]}–${sorted[sorted.length - 1]}` : text;
+}
 export const SLOT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 
 export class Hud {
@@ -22,6 +41,8 @@ export class Hud {
       hpFill: $('hp-fill'), hpText: $('hp-text'), coins: $('coins'), tokens: $('tokens-earned'),
       deployBar: $('deploy-bar'),
       nextPreview: $('next-preview'), next: $('btn-next'), auto: $('auto'),
+      callCount: $('call-count'), callMany: $('btn-call-many'), queueInfo: $('queue-info'),
+      weatherBtn: $('btn-weather'), weatherCard: $('weather-card'), sound: $('btn-sound'),
       banner: $('banner'), toasts: $('toasts'), unitPanel: $('unit-panel'),
       bossBar: $('boss-bar'), bossName: $('boss-name'), bossFill: $('boss-fill'), bossShield: $('boss-shield'), bossHpText: $('boss-hp-text'),
       pause: $('btn-pause'), pauseVeil: $('pause-veil'), fx: $('btn-fx'),
@@ -38,7 +59,13 @@ export class Hud {
   bind() {
     const { el, actions } = this;
     el.next.addEventListener('click', () => actions.nextWave());
-    el.auto.addEventListener('change', () => actions.setAuto(el.auto.checked));
+    el.auto.addEventListener('change', () => actions.setAutoSkip(el.auto.checked));
+    const count = () => Math.max(1, Math.min(1000, Math.floor(Number(el.callCount.value) || 1)));
+    el.callCount.addEventListener('input', () => (el.callMany.textContent = `Call ×${count()}`));
+    el.callCount.addEventListener('keydown', (ev) => ev.key === 'Enter' && actions.callWaves(count()));
+    el.callMany.addEventListener('click', () => actions.callWaves(count()));
+    el.weatherBtn.addEventListener('click', () => actions.toggleWeather());
+    el.sound.addEventListener('click', () => actions.toggleSound());
     el.pause.addEventListener('click', () => actions.togglePause());
     el.fx.addEventListener('click', () => actions.toggleEffects());
     $('btn-retreat').addEventListener('click', () => actions.askRetreat());
@@ -96,7 +123,8 @@ export class Hud {
     this.el.bossBar.hidden = true;
     this.el.toasts.innerHTML = '';
     this.el.banner.innerHTML = '';
-    this.el.auto.checked = game.autoStart;
+    this.el.auto.checked = game.autoSkip;
+    this.weatherKey = '';
     this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
     this.update(game, null, true);
   }
@@ -165,9 +193,9 @@ export class Hud {
   update(game, ui, force = false) {
     const { el } = this;
     el.coins.textContent = formatNumber(game.coins);
-    const canStart = game.phase === 'build';
-    el.next.disabled = !canStart;
-    el.next.textContent = canStart ? (game.autoStart ? `Start wave · ${Math.ceil(Math.max(0, game.autoTimer))}` : 'Start wave') : game.phase === 'wave' ? 'Wave in progress' : 'Start wave';
+    el.next.disabled = game.phase === 'gameover';
+    el.next.textContent = `Call wave ${game.nextPlan.wave}`;
+    this.renderWeather(game);
 
     this.renderDeployBar(game, ui);
     this.renderUnitPanel(game, ui);
@@ -179,12 +207,16 @@ export class Hud {
 
     el.waveNum.textContent = game.wave;
     const plan = game.phase === 'wave' ? game.currentPlan : null;
+    const active = game.activeWaveNumbers();
+    const queued = game.queuedWaveNumbers();
+    el.queueInfo.textContent = queued.length ? `${formatNumber(queued.length)} queued (${waveRange(queued)})` : '';
     if (plan) {
-      el.waveArch.textContent = plan.label;
+      el.waveArch.textContent = active.length > 1 ? `${active.length} waves` : plan.label;
       el.waveArch.style.setProperty('--c', plan.color);
       const remaining = game.waveRemaining;
-      el.waveRemaining.textContent = `${formatNumber(remaining)} remaining · ${plan.patternLabel}`;
-      el.waveProgress.style.width = `${(1 - remaining / Math.max(1, plan.total)) * 100}%`;
+      const list = active.length > 1 ? `Active ${waveRange(active)}` : plan.patternLabel;
+      el.waveRemaining.textContent = `${formatNumber(remaining)} remaining · ${list}${queued.length ? ` · ${formatNumber(queued.length)} queued` : ''}`;
+      el.waveProgress.style.width = `${(1 - remaining / Math.max(1, game.waveTotal)) * 100}%`;
       const traitsHtml = plan.traits.map((id) => {
         const t = getTrait(id);
         return `<span class="trait" style="--c:${t.color}" title="${esc(t.description)}">${esc(t.label)}</span>`;
@@ -210,6 +242,39 @@ export class Hud {
       const traits = np.traits.map((id) => getTrait(id).label).join(' · ');
       el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div>`;
     }
+  }
+
+  setWeatherEnabled(on) {
+    this.el.weatherBtn.setAttribute('aria-pressed', String(on));
+    this.el.weatherBtn.innerHTML = `<svg><use href="#i-${on ? 'cloud' : 'cloud-off'}" /></svg>`;
+    this.el.weatherBtn.title = on ? 'Weather on (tap to disable)' : 'Weather off (tap to enable)';
+  }
+
+  setSound(on) {
+    this.el.sound.innerHTML = `<svg><use href="#i-${on ? 'sound' : 'mute'}" /></svg>`;
+    this.el.sound.classList.toggle('off', !on);
+  }
+
+  /** Top-left weather card: name, time left and what it does. */
+  renderWeather(game) {
+    const w = game.weather.current;
+    const card = this.el.weatherCard;
+    if (!w) {
+      if (!card.hidden) card.hidden = true;
+      this.weatherKey = '';
+      return;
+    }
+    const rem = Math.max(0, game.weather.remaining);
+    const key = w.id;
+    if (this.weatherKey !== key) {
+      this.weatherKey = key;
+      card.style.setProperty('--c', w.color);
+      card.innerHTML = `<div class="wc-head"><span class="wc-name">${esc(w.label)}</span><span class="wc-time num"></span></div>
+        <div class="wc-bar"><div></div></div><ul>${w.effects.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>`;
+      card.hidden = false;
+    }
+    card.querySelector('.wc-time').textContent = `${Math.ceil(rem)}s`;
+    card.querySelector('.wc-bar div').style.width = `${(rem / game.weather.settings.duration) * 100}%`;
   }
 
   updateBoss(game) {
@@ -256,7 +321,7 @@ export class Hud {
     }
     const info = game.upgradeInfo(u);
     const n = game.deployedCount(u.def.id);
-    const key = `${u.uid}:${u.level}:${n}:${info.affordable}:${u.kills}`;
+    const key = `${u.uid}:${u.level}:${n}:${info.affordable}:${u.kills}:${u.auraKey ?? ''}:${game.weather.current?.id ?? ''}`;
     if (key === this.panelKey) return;
     this.panelKey = key;
     const def = u.def;
@@ -268,15 +333,20 @@ export class Hud {
     };
     const f1 = (v) => (Math.round(v * 10) / 10).toString();
     const nx = info.maxed ? {} : info.next;
+    const bonusFn = def.passive?.bonus;
     const passive = def.passive
-      ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b><span class="pct">+${Math.round((def.passive.bonus?.({ deployed: n }) ?? 0) * 100)}%</span></div>
-         <div class="muted">${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ${esc(def.passive.summary)}</div></div>`
+      ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b>${bonusFn ? `<span class="pct">+${Math.round(bonusFn({ deployed: n }) * 100)}%</span>` : ''}</div>
+         <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ` : ''}${esc(def.passive.summary)}</div></div>`
       : '';
+    const buffNames = (u.auras ?? []).map((id) => game.buffDefs().get(id)?.label ?? id);
+    if (game.weather.current) buffNames.push(`${game.weather.current.label} weather`);
+    const buffs = buffNames.length ? `<div class="muted small">Active buffs: ${buffNames.map(esc).join(' · ')}</div>` : '';
     this.el.unitPanel.innerHTML = `
       <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub">${esc(tier.label)} · Level ${u.level} / ${maxLevel(def)}</div></div>
         <button class="up-close" data-act="close" aria-label="Close">×</button></div>
       <div class="up-body">
         ${passive}
+        ${buffs}
         <div class="up-upgrade">
           <h4><span>${info.maxed ? `Level ${u.level} · max` : `Level ${info.level} → ${info.nextLevel}`}</span><span>${formatNumber(u.kills)} kills</span></h4>
           <table class="cmp">

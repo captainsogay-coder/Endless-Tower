@@ -44,6 +44,8 @@ export class Profile {
       battles: 0,
       bestWave: 0,
       wavesCleared: 0,
+      weatherEnabled: true,
+      muted: false,
     };
   }
 
@@ -68,6 +70,8 @@ export class Profile {
       battles: Number(d.battles) || 0,
       bestWave: Number(d.bestWave) || 0,
       wavesCleared: Number(d.wavesCleared) || 0,
+      weatherEnabled: d.weatherEnabled !== false,
+      muted: d.muted === true,
     };
   }
 

@@ -18,7 +18,9 @@
 //                                         // ctx = { deployed } copies of this unit on the field
 //    onHit?: [{ status, chance }],        // status rolled per enemy damaged (see game/effects.js)
 //    impactHazard?: { kind, radius, duration, dpsFactor }, // ground left burning where shots land
-//    aura?: { id, radius, cooldownMult }, // buffs allies in range; same id never stacks
+//    buffs?: [{ id, radius, damageMult?, cooldownMult?, rangeMult? }], // allies in radius (Infinity = map-wide); same id never stacks
+//    economy?: { id, coinMult },          // battle-wide coin gain; same id never stacks
+//    summon?: { every, kind, speed, damageFactor, splash, explosive?, onHit? }, // secondary drone launches
 //    art: string,                         // key into src/render/unitArt.js
 //    onFire?(unit, target, game), onUpdate?(unit, dt, game), onPlace?(unit, game)
 //  }
@@ -30,8 +32,14 @@ import cadet from './defs/cadet.js';
 import gunnerman from './defs/gunnerman.js';
 import grenadeLauncher from './defs/grenadeLauncher.js';
 import tank from './defs/tank.js';
+import specialForces from './defs/specialForces.js';
+import drone from './defs/drone.js';
+import commander from './defs/commander.js';
+import colonel from './defs/colonel.js';
+import general from './defs/general.js';
+import fortress from './defs/fortress.js';
 
-export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank];
+export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress];
 
 /** Units every new player owns. Everything else is obtained by summoning. */
 export const STARTER_UNITS = ['dude'];

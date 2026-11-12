@@ -1,4 +1,4 @@
-// Drives real UI interactions (clicks, drags, keys) and screenshots the results.
+// Drives real UI interactions (clicks, taps, keys) and screenshots the results.
 // Usage: node scripts/interactions.mjs [baseUrl]
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -23,7 +23,7 @@ await page.fill('#plan-name', 'Dude Ranch');
 await page.click('#btn-battle');
 await page.waitForTimeout(300);
 
-// Deploy by keyboard slot + drag along open ground near the road
+// Deploy by keyboard slot, then one tap per unit on open ground near the road
 await page.keyboard.press('1');
 const pts = await page.evaluate(() => {
   const { game } = window.endlessTower;
@@ -38,15 +38,12 @@ const pts = await page.evaluate(() => {
 const box = await page.locator('#game').boundingBox();
 const sc = (x, y) => ({ x: box.x + ((x + 0.5) / 40) * box.width, y: box.y + ((y + 0.5) / 22) * box.height });
 let p = sc(pts.x, pts.y);
-await page.mouse.move(p.x, p.y);
-await page.mouse.down();
-for (let k = 1; k < 5; k++) { const q = sc(pts.x + k, pts.y); await page.mouse.move(q.x, q.y, { steps: 2 }); }
-await page.mouse.up();
+for (let k = 0; k < 5; k++) { const q = sc(pts.x + k, pts.y); await page.mouse.click(q.x, q.y); await page.waitForTimeout(220); }
 const st = await page.evaluate(() => {
   const { game } = window.endlessTower;
   return { deployed: game.deployedCount('dude'), coins: game.coins, dmg: game.units.map((u) => u.stats.damage) };
 });
-log('drag-deployed:', st);
+log('tap-deployed:', st);
 await page.mouse.move(p.x, p.y + box.height / 22 * 2);
 await page.screenshot({ path: 'screenshots/ui-placing.png' });
 // select a Dude and upgrade with the panel button, then key U

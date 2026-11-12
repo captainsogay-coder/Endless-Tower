@@ -11,6 +11,7 @@ import { MapScene } from '../maps/MapScene.js';
 import { buildEnemySprites } from './enemySprites.js';
 import { drawUnit, unitSprite } from './unitArt.js';
 import { Effects } from './fx.js';
+import { WeatherFx } from './weatherFx.js';
 import { circle, drawGlow } from './canvas.js';
 import { rgba, shade } from '../core/color.js';
 import { getTrait } from '../waves/traits.js';
@@ -38,6 +39,7 @@ export class Renderer {
     this.ui = { hover: null, placingDef: null, selected: null };
     this.blasts = []; // flat, short-lived explosion shapes
     this.decals = []; // scorch marks on the ground
+    this.weatherFx = new WeatherFx();
     this.unsub = [];
   }
 
@@ -90,6 +92,12 @@ export class Renderer {
       this.bossFlash = 0.35;
       this.fx.ring(e.x, e.y, 20, 160, 0.8, '#ffffff', 3);
     });
+    on('lightning', (l) => {
+      this.weatherFx.strike(l.x, l.y);
+      this.blasts.push({ x: l.x, y: l.y, r: l.radius, t: 0, max: 0.25, seed: Math.random() * 6, palette: 'lightning' });
+      this.decals.push({ x: l.x, y: l.y, r: l.radius * 0.5, t: 0, max: 4, seed: Math.random() * 6 });
+      this.fx.ring(l.x, l.y, 4, l.radius * 1.2, 0.3, '#e8ecff', 2);
+    });
     on('bossDefeated', (e) => {
       this.shake(7);
       this.bossFlash = 0.4;
@@ -117,21 +125,31 @@ export class Renderer {
         if (Math.random() < 0.35 * d) this.fx.burst(p.x, p.y, 1, '#f4e3a1', { speed: 50, life: 0.12, size: 1.2, glow: false });
         break;
       case 'grenade':
-      case 'shell': {
-        const big = p.kind === 'shell';
+      case 'shell':
+      case 'artillery':
+      case 'siege':
+      case 'drone':
+      case 'explosive-drone': {
+        const big = p.kind !== 'grenade' && p.kind !== 'drone';
         const r = p.splash || (big ? 48 : 36);
-        this.blasts.push({ x: p.x, y: p.y, r, t: 0, max: big ? 0.32 : 0.26, seed: Math.random() * 6 });
-        if (this.blasts.length > 60) this.blasts.shift();
+        const max = p.kind === 'siege' ? 0.45 : big ? 0.32 : 0.26;
+        // Under heavy AOE load, thin out repeated blasts rather than stacking hundreds of shapes.
+        if (this.blasts.length < 90 || p.kind === 'siege' || p.kind === 'explosive-drone') {
+          this.blasts.push({ x: p.x, y: p.y, r, t: 0, max, seed: Math.random() * 6, palette: p.kind === 'explosive-drone' ? 'hot' : null });
+          if (this.blasts.length > 120) this.blasts.shift();
+        }
         this.decals.push({ x: p.x, y: p.y, r: r * 0.55, t: 0, max: big ? 6 : 4, seed: Math.random() * 6 });
         if (this.decals.length > 140) this.decals.shift();
         this.fx.ring(p.x, p.y, r * 0.3, r * 1.05, 0.35, '#d8cbb0', 2);
-        this.fx.burst(p.x, p.y, big ? 8 : 5, '#3a332c', { speed: 70 + r, life: 0.5, size: 2, glow: false, gravity: 120 });
+        if (p.kind === 'siege') this.fx.ring(p.x, p.y, r * 0.6, r * 1.6, 0.6, '#efe6d0', 3);
+        if (p.kind === 'explosive-drone') this.fx.ring(p.x, p.y, r * 0.2, r * 0.9, 0.3, '#d9533f', 2.5);
+        this.fx.burst(p.x, p.y, Math.round((big ? 8 : 5) * d), '#3a332c', { speed: 70 + r, life: 0.5, size: 2, glow: false, gravity: 120 });
         break;
       }
       default:
         if (Math.random() < 0.5 * d) this.fx.burst(p.x, p.y, 2, p.color ?? '#e8e2d4', { speed: 40, life: 0.2, size: 1.5, glow: false });
     }
-    if (p.splash > 0 && p.kind !== 'grenade' && p.kind !== 'shell') this.fx.ring(p.x, p.y, 4, p.splash, 0.3, '#ffffff', 1.5);
+    if (p.splash > 0 && !['grenade', 'shell', 'artillery', 'siege', 'drone', 'explosive-drone'].includes(p.kind)) this.fx.ring(p.x, p.y, 4, p.splash, 0.3, '#ffffff', 1.5);
   }
 
   onFire(p) {
@@ -192,6 +210,7 @@ export class Renderer {
     this.time += dt;
     scene.update(dt);
     this.fx.update(gameDt);
+    this.weatherFx.update(dt, this.game.weather?.current, this.effectsLevel);
     this.towerHit = Math.max(0, this.towerHit - dt * 3);
     this.bossFlash = Math.max(0, this.bossFlash - dt);
     for (let i = 0; i < this.breachPulse.length; i++) this.breachPulse[i] = Math.max(0, this.breachPulse[i] - dt * 1.2);
@@ -209,6 +228,7 @@ export class Renderer {
     scene.drawBackground(ctx);
     scene.drawTerrain(ctx);
     scene.drawUnder(ctx);
+    this.weatherFx.drawUnder(ctx);
     this.drawDecals(ctx, gameDt);
     this.drawHazards(ctx, t);
     this.drawBreaches(ctx, t);
@@ -222,6 +242,7 @@ export class Renderer {
     this.drawPlacementGhost(ctx);
     this.fx.draw(ctx);
     scene.drawOver(ctx);
+    this.weatherFx.drawOver(ctx);
     this.drawCinematicOver(ctx);
   }
 
@@ -313,8 +334,9 @@ export class Renderer {
       };
       ctx.globalAlpha = 1 - Math.max(0, k - 0.4) / 0.6;
       if (k < 0.15) drawGlow(ctx, '#ffd38a', b.x, b.y, b.r * 1.2, 0.35);
-      shape(r, k < 0.55 ? '#e8742c' : '#6d5e52');
-      shape(r * 0.62, k < 0.4 ? '#ffd57a' : '#8b7d70');
+      const pal = b.palette === 'lightning' ? ['#cfd8ff', '#ffffff'] : b.palette === 'hot' ? ['#d9432c', '#ffcf6a'] : ['#e8742c', '#ffd57a'];
+      shape(r, k < 0.55 ? pal[0] : '#6d5e52');
+      shape(r * 0.62, k < 0.4 ? pal[1] : '#8b7d70');
       ctx.globalAlpha = 1;
       this.blasts[w++] = b;
     }
@@ -375,10 +397,12 @@ export class Renderer {
     ctx.fill();
     ctx.stroke();
     const def = ui.placingDef ?? ui.selected?.def;
-    if (def?.aura) {
+    // finite buff radii (map-wide buffs are shown in the unit panel instead)
+    for (const b of def?.buffs ?? []) {
+      if (!Number.isFinite(b.radius)) continue;
       ctx.strokeStyle = 'rgba(227,163,59,0.85)';
       ctx.setLineDash([4, 4]);
-      circle(ctx, x, y, def.aura.radius);
+      circle(ctx, x, y, b.radius);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -534,6 +558,8 @@ export class Renderer {
       ctx.stroke();
     }
     const enemies = game.enemies;
+    // Level of detail: with huge crowds, drop shadows, per-enemy bars and marks.
+    this.lite = enemies.length > 900;
     for (let order = 0; order <= 3; order++) {
       for (let i = 0; i < enemies.length; i++) {
         const e = enemies[i];
@@ -554,7 +580,7 @@ export class Renderer {
       scale = 0.6 + 0.4 * (e.age / 0.25);
     }
     // Distinct gaits per weight class; wounded enemies limp (slower, uneven step).
-    const wounded = !!e.statuses && (e.statuses.wounded ?? 0) > this.game.time;
+    const wounded = !!e.statuses && ((e.statuses.wounded ?? 0) > this.game.time || (e.statuses.crippled ?? 0) > this.game.time);
     const pace = wounded ? 0.7 : 1;
     const ph = t * pace + e.phase;
     let bob = 0;
@@ -586,6 +612,13 @@ export class Renderer {
     // hit flinch: a brief squash when struck
     if (e.flash > 0) squash *= 1 - Math.min(1, e.flash * 10) * 0.1;
 
+    const lite = this.lite && !e.isBoss && e.category !== 'elite';
+    if (lite) {
+      // crowd mode: sprite only
+      const h = spr.half;
+      ctx.drawImage(e.flash > 0 ? spr.flash : spr.img, e.x - h, e.y + bob - h, h * 2, h * 2);
+      return;
+    }
     ctx.fillStyle = 'rgba(20,14,24,0.3)';
     ctx.beginPath();
     ctx.ellipse(e.x + 2, e.y + r * 0.78, r * 0.95 * scale, r * 0.36 * scale, 0, 0, TAU);
@@ -647,6 +680,23 @@ export class Renderer {
       ctx.strokeStyle = rgba('#c9b8ff', 0.35 + 0.5 * k);
       ctx.lineWidth = 1.5;
       circle(ctx, e.x, e.y + bob, r * 1.32 * scale);
+      ctx.stroke();
+    }
+    if (e.statuses && (e.statuses.crippled ?? 0) > this.game.time) {
+      // Crippled: a broken-chevron mark beside the enemy
+      const cx = e.x + r * 0.95;
+      const cy = e.y - r * 0.2 + bob;
+      ctx.fillStyle = '#2a1840';
+      ctx.fillRect(cx - 3.5, cy - 3.5, 7, 7);
+      ctx.strokeStyle = '#b48cf0';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(cx - 2.2, cy - 1.6);
+      ctx.lineTo(cx, cy + 0.6);
+      ctx.lineTo(cx + 2.2, cy - 1.6);
+      ctx.moveTo(cx - 2.2, cy + 0.6);
+      ctx.lineTo(cx, cy + 2.8);
+      ctx.lineTo(cx + 2.2, cy + 0.6);
       ctx.stroke();
     }
     if (wounded) {
@@ -745,6 +795,76 @@ export class Renderer {
           ctx.beginPath();
           ctx.ellipse(0, 0, 3.6, 1.8, 0, 0, TAU);
           ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'drone':
+        case 'explosive-drone': {
+          // a quadcopter flying low: shadow on the ground, body above, blurred rotors
+          const ex = p.kind === 'explosive-drone';
+          const hover = 10 + Math.sin(this.time * 9 + p.sx) * 1.5;
+          const a = Math.atan2(p.y - p.py, p.x - p.px);
+          const sz = ex ? 1.35 : 1;
+          ctx.fillStyle = 'rgba(20,14,24,0.25)';
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y, 5 * sz, 2.4 * sz, 0, 0, TAU);
+          ctx.fill();
+          ctx.save();
+          ctx.translate(p.x, p.y - hover);
+          ctx.rotate(a);
+          ctx.scale(sz, sz);
+          ctx.strokeStyle = '#1d1f22';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(-5, -5);
+          ctx.lineTo(5, 5);
+          ctx.moveTo(-5, 5);
+          ctx.lineTo(5, -5);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(200,205,210,0.35)';
+          for (const [rx, ry] of [[-5, -5], [5, 5], [-5, 5], [5, -5]]) {
+            ctx.beginPath();
+            ctx.ellipse(rx, ry, 3.4, 3.4 * (0.6 + 0.4 * Math.abs(Math.sin(this.time * 40 + rx))), 0, 0, TAU);
+            ctx.fill();
+          }
+          ctx.fillStyle = ex ? '#2a2a2a' : '#4b5560';
+          ctx.beginPath();
+          ctx.roundRect(-3.6, -2.6, 7.2, 5.2, 1.5);
+          ctx.fill();
+          if (ex) {
+            // hazard band + warhead: reads instantly as the dangerous one
+            ctx.fillStyle = '#d9a12a';
+            ctx.fillRect(-3.6, -0.9, 7.2, 1.8);
+            ctx.fillStyle = '#c8402c';
+            ctx.beginPath();
+            ctx.arc(4.4, 0, 2, -Math.PI / 2, Math.PI / 2);
+            ctx.fill();
+          } else {
+            ctx.fillStyle = '#9fd0e8';
+            ctx.fillRect(1.6, -1, 1.6, 2);
+          }
+          ctx.restore();
+          break;
+        }
+        case 'artillery':
+        case 'siege': {
+          // a heavy round on a tall arc; the shadow grows as it comes down
+          const big = p.kind === 'siege';
+          const hgt = 4 * (big ? 90 : 70) * k * (1 - k);
+          const a = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+          ctx.fillStyle = `rgba(20,14,24,${0.15 + 0.2 * k})`;
+          ctx.beginPath();
+          ctx.ellipse(p.tx, p.ty, (big ? 10 : 6) * (0.5 + k), (big ? 5 : 3) * (0.5 + k), 0, 0, TAU);
+          ctx.fill();
+          ctx.save();
+          ctx.translate(p.x, p.y - hgt);
+          ctx.rotate(a + (k - 0.5) * 1.6);
+          ctx.fillStyle = big ? '#23261d' : '#3a3d30';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, big ? 6 : 4.4, big ? 3 : 2.2, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#a8865a';
+          ctx.fillRect(big ? -6 : -4.4, -0.8, 2, 1.6);
           ctx.restore();
           break;
         }

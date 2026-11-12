@@ -13,8 +13,11 @@ import { buildSpawnSchedule } from '../waves/spawnSchedule.js';
 import { getTrait } from '../waves/traits.js';
 import { getEnemyCategory } from '../enemies/enemyCategories.js';
 import { getUnit, listUnits } from '../units/unitRegistry.js';
-import { applyStatus, statusSpeedMultiplier, computeAuras, HAZARD_TICK } from './effects.js';
+import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier, computeAuras, applyModifiers, HAZARD_TICK } from './effects.js';
+import { WeatherSystem, WEATHER_SETTINGS } from './weather.js';
 import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
+
+const isDrone = (p) => p.kind === 'drone' || p.kind === 'explosive-drone';
 
 const TARGETING = {
   first: (e) => e.d - e.route.length, // furthest along its route
@@ -26,7 +29,8 @@ export class Game {
   constructor(options = {}) {
     this.emitter = new Emitter();
     this.hash = new SpatialHash(WORLD_W, WORLD_H, GAME_CONFIG.spatialCellSize);
-    this.autoStart = false;
+    this.autoSkip = false;
+    this.weatherEnabled = options.weatherEnabled ?? true;
     this.newRun(options);
   }
 
@@ -59,9 +63,10 @@ export class Game {
     this.director = new WaveDirector(rng.int(0, 2 ** 31 - 1), { entranceCount: this.map.routes.length });
     this.spawnRng = rng.fork();
     this.fxRng = rng.fork();
+    this.combatRng = rng.fork();
 
     this.phase = 'build';
-    this.wave = 0;
+    this.wave = 0; // highest wave number started
     this.time = 0;
     this.coins = GAME_CONFIG.startingCoins;
     this.towerMaxHp = GAME_CONFIG.towerMaxHp;
@@ -73,19 +78,25 @@ export class Game {
     this.hazards = [];
     this.hazardTimer = 0;
     this.tokensEarned = 0;
-    this.combatRng = rng.fork();
     this.deployed = new Map(); // defId -> number of copies on the field
     this.unitByTile = new Array(COLS * ROWS).fill(null);
     this.enemySeq = 0;
+    // Waves: any number can run at once. `queue` holds called waves that are
+    // released one by one (staggered) into `activeWaves`.
+    this.activeWaves = [];
+    this.queue = [];
+    this.queueTimer = 0;
     this.currentPlan = null;
     this.nextPlan = this.director.next();
-    this.schedule = [];
-    this.scheduleIdx = 0;
-    this.waveTime = 0;
-    this.autoTimer = GAME_CONFIG.autoStartDelay;
     this.cinematic = null;
     this.boss = null;
-    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0 };
+    this.coinMult = 1;
+    this.weather = new WeatherSystem(rng.fork(), { enabled: this.weatherEnabled });
+    this.weather.onChange = (w) => {
+      this.refreshAll();
+      this.emit('weather', w);
+    };
+    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0, wavesCleared: 0, lightning: 0, dronesLaunched: 0 };
     this.emit('runStart', this);
   }
 
@@ -102,33 +113,82 @@ export class Game {
     return this.loadout.some((d) => d.id === defId);
   }
 
+  setWeatherEnabled(on) {
+    this.weatherEnabled = !!on;
+    this.weather.setEnabled(on);
+  }
+
   // ------------------------------------------------------------------ waves
 
+  /** Calls the next wave. Waves can be called at any time and run concurrently. */
   startNextWave() {
-    if (this.phase !== 'build') return false;
-    this.wave += 1;
-    this.currentPlan = this.nextPlan;
-    this.nextPlan = this.director.next();
-    this.schedule = buildSpawnSchedule(this.currentPlan, this.map, this.spawnRng);
-    this.scheduleIdx = 0;
-    this.waveTime = 0;
+    if (this.phase === 'gameover') return false;
+    return this.callWaves(1) > 0;
+  }
+
+  /**
+   * Calls the next `n` waves. The first starts immediately (if nothing is
+   * waiting); the rest are released `waveStagger` seconds apart so a call of
+   * 100 waves never spawns everything in one frame.
+   */
+  callWaves(n = 1) {
+    if (this.phase === 'gameover') return 0;
+    const count = Math.max(0, Math.min(GAME_CONFIG.maxWaveCall, Math.floor(n)));
+    for (let i = 0; i < count; i++) {
+      this.queue.push(this.nextPlan);
+      this.nextPlan = this.director.next();
+    }
+    if (count && this.queueTimer <= 0) this.releaseQueuedWave();
+    if (count) this.emit('wavesCalled', { count, queued: this.queue.length });
+    return count;
+  }
+
+  releaseQueuedWave() {
+    const plan = this.queue.shift();
+    if (!plan) return null;
+    const wave = { number: plan.wave, plan, schedule: buildSpawnSchedule(plan, this.map, this.spawnRng), idx: 0, t: 0, alive: 0 };
+    this.activeWaves.push(wave);
+    this.wave = Math.max(this.wave, plan.wave);
+    this.currentPlan = plan;
     this.phase = 'wave';
-    this.emit('waveStart', this.currentPlan);
-    return true;
+    this.queueTimer = GAME_CONFIG.waveStagger;
+    this.emit('waveStart', plan);
+    return wave;
   }
 
+  /** Wave numbers currently in progress / waiting to start. */
+  activeWaveNumbers() {
+    return this.activeWaves.map((w) => w.number);
+  }
+
+  queuedWaveNumbers() {
+    return this.queue.map((p) => p.wave);
+  }
+
+  /** Enemies still to come or alive across all active and queued waves. */
   get waveRemaining() {
-    return this.schedule.length - this.scheduleIdx + this.enemies.length;
+    let n = 0;
+    for (const w of this.activeWaves) n += w.schedule.length - w.idx + w.alive;
+    for (const p of this.queue) n += p.total;
+    return n;
   }
 
-  spawnEnemy(ev) {
+  get waveTotal() {
+    let n = 0;
+    for (const w of this.activeWaves) n += w.plan.total;
+    for (const p of this.queue) n += p.total;
+    return n;
+  }
+
+  spawnEnemy(ev, wave = this.activeWaves[this.activeWaves.length - 1]) {
     const cat = getEnemyCategory(ev.category);
     const v = ev.variant ?? {};
-    const s = this.currentPlan.scaling;
+    const s = wave.plan.scaling;
     const route = this.map.routes[ev.route];
     const p0 = route.points[0];
     const e = {
       id: ++this.enemySeq,
+      wave,
       category: cat.id,
       cat,
       variant: ev.variant ?? null,
@@ -176,10 +236,27 @@ export class Game {
     }
     if (e.isBoss) this.boss = e;
     v.onSpawn?.(e, this);
+    wave.alive++;
     this.enemies.push(e);
     this.emit('spawn', e);
-    if (ev.cinematic) this.emit('bossIntro', { enemy: e, plan: this.currentPlan });
+    if (ev.cinematic) this.emit('bossIntro', { enemy: e, plan: wave.plan });
     return e;
+  }
+
+  updateWaves(dt) {
+    // release staggered queued waves
+    if (this.queueTimer > 0) this.queueTimer -= dt;
+    while (this.queue.length && this.queueTimer <= 0) this.releaseQueuedWave();
+    // spawn from every active wave's own schedule
+    for (const w of this.activeWaves) {
+      w.t += dt;
+      while (w.idx < w.schedule.length && w.schedule[w.idx].t <= w.t) this.spawnEnemy(w.schedule[w.idx++], w);
+    }
+    // Auto Skip: as soon as the newest wave has finished spawning, call the next one.
+    if (this.autoSkip && !this.queue.length) {
+      const newest = this.activeWaves[this.activeWaves.length - 1];
+      if (!newest || newest.idx >= newest.schedule.length) this.callWaves(1);
+    }
   }
 
   // ------------------------------------------------------------------ update
@@ -188,41 +265,35 @@ export class Game {
     if (this.phase === 'gameover') return;
     this.time += dt;
 
-    if (this.phase === 'build' && this.autoStart) {
-      this.autoTimer -= dt;
-      if (this.autoTimer <= 0) this.startNextWave();
-    }
+    this.updateWaves(dt);
 
-    if (this.phase === 'wave') {
-      this.waveTime += dt;
-      while (this.scheduleIdx < this.schedule.length && this.schedule[this.scheduleIdx].t <= this.waveTime) {
-        this.spawnEnemy(this.schedule[this.scheduleIdx++]);
-      }
-    }
-
-    if (this.cinematic) {
-      const c = this.cinematic;
-      c.t += dt;
-      c.enemy.intro = Math.min(1, c.t / c.duration);
-      if (c.t >= c.duration) {
-        c.enemy.invulnerable = false;
-        c.enemy.intro = 1;
-        this.cinematic = null;
-        this.emit('bossArrived', c.enemy);
-      }
-    }
+    const strikes = this.weather.update(dt);
 
     this.updateEnemies(dt);
     this.hash.clear();
     for (const e of this.enemies) if (e.alive && e.intro >= 1) this.hash.insert(e);
+    for (let i = 0; i < strikes; i++) this.lightningStrike();
     this.updateUnits(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
     this.compact();
+    this.checkWaves();
+  }
 
-    if (this.phase === 'wave' && this.scheduleIdx >= this.schedule.length && this.enemies.length === 0) {
-      this.completeWave();
+  checkWaves() {
+    if (!this.activeWaves.length) return;
+    let w = 0;
+    for (let i = 0; i < this.activeWaves.length; i++) {
+      const wave = this.activeWaves[i];
+      if (wave.idx >= wave.schedule.length && wave.alive <= 0) {
+        this.completeWave(wave);
+        if (this.phase === 'gameover') return;
+      } else {
+        this.activeWaves[w++] = wave;
+      }
     }
+    this.activeWaves.length = w;
+    if (!this.activeWaves.length && !this.queue.length && this.phase === 'wave') this.phase = 'build';
   }
 
   updateEnemies(dt) {
@@ -231,7 +302,17 @@ export class Game {
       if (!e.alive) continue;
       e.age += dt;
       if (e.flash > 0) e.flash -= dt;
-      if (e.intro < 1) continue; // boss emerging – holds position
+      if (e.intro < 1) {
+        // Boss emerging: holds position, invulnerable, until its intro completes.
+        e.intro = Math.min(1, e.intro + dt / GAME_CONFIG.bossIntroDuration);
+        if (this.cinematic?.enemy === e) this.cinematic.t = e.intro * this.cinematic.duration;
+        if (e.intro >= 1) {
+          e.invulnerable = false;
+          if (this.cinematic?.enemy === e) this.cinematic = null;
+          this.emit('bossArrived', e);
+        }
+        continue;
+      }
       if (e.regen > 0 && e.hp < e.maxHp && this.time - e.lastHit > 1.5) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regen * dt);
       e.variant?.onUpdate?.(e, dt, this);
       e.d += e.speed * (e.statuses ? statusSpeedMultiplier(e, this.time) : 1) * dt;
@@ -250,25 +331,47 @@ export class Game {
     }
   }
 
-  leak(e) {
+  removeEnemy(e) {
     e.alive = false;
+    if (e.wave) e.wave.alive--;
+    if (this.boss === e) this.boss = this.enemies.find((o) => o.alive && o.isBoss && o !== e) ?? null;
+  }
+
+  leak(e) {
+    this.removeEnemy(e);
     this.towerHp = Math.max(0, this.towerHp - e.towerDamage);
     this.stats.leaks++;
-    if (this.boss === e) this.boss = null;
     this.emit('leak', e);
     if (this.towerHp <= 0) this.gameOver();
+  }
+
+  /** Thunderstorm: strike a random enemy for small area damage + 7% of its max HP. */
+  lightningStrike() {
+    const candidates = this.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+    if (!candidates.length) return null;
+    const target = candidates[Math.floor(this.combatRng.next() * candidates.length)];
+    const S = WEATHER_SETTINGS;
+    const scale = (target.wave?.plan.scaling.hp ?? 1);
+    const base = S.lightningBaseDamage * scale;
+    const { x, y } = target;
+    const hit = [];
+    this.hash.each(x, y, S.lightningRadius, (e) => hit.push(e));
+    if (!hit.includes(target)) hit.push(target);
+    for (const e of hit) this.damageEnemy(e, base + (e === target ? target.maxHp * S.lightningMaxHpFraction : 0), null);
+    this.stats.lightning++;
+    this.emit('lightning', { x, y, radius: S.lightningRadius, target });
+    return target;
   }
 
   updateUnits(dt) {
     for (const u of this.units) {
       if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 6);
       u.def.onUpdate?.(u, dt, this);
+      if (u.def.summon) this.updateSummon(u, dt);
       u.cooldown -= dt;
       if (u.cooldown > 0) continue;
-      const score = TARGETING[u.def.targeting] ?? TARGETING.first;
-      const target = u.def.targeting === 'closest'
-        ? this.hash.best(u.x, u.y, u.stats.range, (e) => -((e.x - u.x) ** 2 + (e.y - u.y) ** 2))
-        : this.hash.best(u.x, u.y, u.stats.range, score);
+      const target = this.findTarget(u, u.stats.range);
+      u.hasTarget = !!target;
       if (!target) {
         u.cooldown = 0.1;
         continue;
@@ -283,26 +386,67 @@ export class Game {
     }
   }
 
-  fireProjectile(u, target) {
+  findTarget(u, range) {
+    if (u.def.targeting === 'closest') return this.hash.best(u.x, u.y, range, (e) => -((e.x - u.x) ** 2 + (e.y - u.y) ** 2));
+    return this.hash.best(u.x, u.y, range, TARGETING[u.def.targeting] ?? TARGETING.first);
+  }
+
+  /** Secondary attack: periodically launches summoned drones at an enemy in range. */
+  updateSummon(u, dt) {
+    const s = u.def.summon;
+    u.summonTimer = (u.summonTimer ?? s.every) - dt;
+    if (u.summonTimer > 0) return;
+    const target = this.findTarget(u, u.stats.range);
+    if (!target) {
+      u.summonTimer = 0.2;
+      return;
+    }
+    u.summonTimer = s.every;
+    u.lastSummon = this.time;
+    this.fireProjectile(u, target, {
+      kind: s.kind,
+      speed: s.speed,
+      damage: u.stats.damage * s.damageFactor,
+      splash: s.splash,
+      explosive: s.explosive,
+      onHit: s.onHit ?? null,
+      summoned: true,
+    });
+  }
+
+  /**
+   * Fires a projectile. `spec` overrides the unit's own projectile for
+   * secondary attacks (summoned drones). Drones may roll to become explosive.
+   */
+  fireProjectile(u, target, spec = null) {
+    const proj = u.def.projectile ?? {};
     const p = this.projectilePool.pop() ?? {};
     p.x = u.x + Math.cos(u.angle) * 6;
     p.y = u.y + Math.sin(u.angle) * 6;
     p.sx = p.x;
     p.sy = p.y;
-    p.kind = u.def.projectile?.kind ?? 'bolt';
+    p.kind = spec?.kind ?? proj.kind ?? 'bolt';
     p.px = p.x;
     p.py = p.y;
     p.target = target;
     p.tx = target.x;
     p.ty = target.y;
-    p.speed = u.stats.projectileSpeed;
-    p.damage = u.stats.damage;
-    p.splash = u.stats.splash;
-    p.color = u.def.projectile?.color ?? '#ffffff';
+    p.speed = spec?.speed ?? u.stats.projectileSpeed;
+    p.damage = spec?.damage ?? u.stats.damage;
+    p.splash = spec?.splash ?? u.stats.splash;
+    p.onHit = spec ? spec.onHit : (u.def.onHit ?? null);
+    p.color = proj.color ?? '#ffffff';
     p.tier = u.tier;
     p.source = u;
-    p.life = 3;
+    p.life = isDrone(p) ? 6 : 3;
     p.alive = true;
+    const explosive = spec ? spec.explosive : proj.explosive;
+    if (explosive && this.combatRng.next() < (explosive.chance ?? 1)) {
+      p.kind = 'explosive-drone';
+      p.damage *= explosive.damageMult ?? 1;
+      p.splash *= explosive.splashMult ?? 1;
+    }
+    if (isDrone(p)) this.stats.dronesLaunched++;
     this.projectiles.push(p);
     this.emit('fire', p);
     return p;
@@ -315,8 +459,9 @@ export class Game {
       if (p.target && p.target.alive) {
         p.tx = p.target.x;
         p.ty = p.target.y;
-      } else {
-        p.target = null;
+      } else if (p.target) {
+        // Drones re-acquire a new target when theirs dies; shells land where aimed.
+        p.target = isDrone(p) ? this.hash.best(p.x, p.y, 160, TARGETING.first) : null;
       }
       const dx = p.tx - p.x;
       const dy = p.ty - p.y;
@@ -339,16 +484,17 @@ export class Game {
 
   impact(p) {
     const def = p.source?.def;
+    const onHit = p.onHit !== undefined ? p.onHit : def?.onHit;
     const hit = (e) => {
       if (!e.alive || e.invulnerable) return;
       this.damageEnemy(e, p.damage, p.source);
-      if (def?.onHit && e.alive) {
-        for (const h of def.onHit) if (this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time);
+      if (onHit && e.alive) {
+        for (const h of onHit) if (h.chance >= 1 || this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time);
       }
     };
     if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
     else if (p.target) hit(p.target);
-    if (def?.impactHazard) this.addHazard(p.x, p.y, def.impactHazard, p.damage, p.source);
+    if (def?.impactHazard && !isDrone(p)) this.addHazard(p.x, p.y, def.impactHazard, p.damage, p.source);
     this.emit('impact', p);
   }
 
@@ -386,6 +532,7 @@ export class Game {
   damageEnemy(e, amount, source = null) {
     if (!e.alive || e.invulnerable) return 0;
     let dmg = amount * (1 - e.armor);
+    if (e.statuses) dmg *= statusDamageTakenMultiplier(e, this.time);
     if (e.shield > 0) {
       const absorbed = Math.min(e.shield, dmg);
       e.shield -= absorbed;
@@ -401,16 +548,22 @@ export class Game {
     return dealt;
   }
 
+  /** All coin income goes through here so weather and economy buffs apply once. */
+  gainCoins(amount) {
+    const gained = Math.round(amount * this.coinMult);
+    this.coins += gained;
+    return gained;
+  }
+
   killEnemy(e, source) {
-    e.alive = false;
-    this.coins += e.reward;
+    this.removeEnemy(e);
+    this.gainCoins(e.reward);
     this.stats.kills++;
     if (source) source.kills++;
     e.variant?.onDeath?.(e, this);
     this.emit('death', e);
     if (e.isBoss) {
       this.stats.bossesDefeated++;
-      if (this.boss === e) this.boss = null;
       this.emit('bossDefeated', e);
     }
   }
@@ -426,21 +579,21 @@ export class Game {
       else {
         p.target = null;
         p.source = null;
+        p.onHit = null;
         this.projectilePool.push(p);
       }
     }
     this.projectiles.length = w;
   }
 
-  completeWave() {
-    const plan = this.currentPlan;
-    this.coins += plan.reward;
+  completeWave(wave) {
+    const plan = wave.plan;
+    const coins = this.gainCoins(plan.reward);
     // Tokens are only granted for fully completed waves.
     const tokens = GAME_CONFIG.tokensPerWave;
     this.tokensEarned += tokens;
-    this.phase = 'build';
-    this.autoTimer = GAME_CONFIG.autoStartDelay;
-    this.emit('waveClear', { wave: this.wave, reward: plan.reward, tokens, plan });
+    this.stats.wavesCleared++;
+    this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, plan });
   }
 
   gameOver() {
@@ -468,23 +621,39 @@ export class Game {
     return { deployed: this.deployedCount(def.id) };
   }
 
-  /** Recomputes effective stats for one unit (level stats + passive). */
+  /** Recomputes effective stats for one unit (level stats + passive + buffs + weather). */
   refreshUnit(u) {
-    // Auras: each distinct aura id applies once, however many sources overlap.
     Object.assign(u.stats, this.effectiveStats(u));
   }
 
-  auraDefs() {
-    if (!this._auraDefs) {
-      this._auraDefs = new Map();
-      for (const d of listUnits()) if (d.aura) this._auraDefs.set(d.aura.id, d.aura);
+  buffDefs() {
+    if (!this._buffDefs) {
+      this._buffDefs = new Map();
+      for (const d of listUnits()) for (const b of d.buffs ?? []) this._buffDefs.set(b.id, b);
     }
-    return this._auraDefs;
+    return this._buffDefs;
   }
 
-  /** Called when units appear or disappear (never per frame): re-resolve aura coverage. */
+  /** Recomputes the battle-wide coin multiplier: weather × each distinct economy buff once. */
+  refreshEconomy() {
+    const ids = new Map();
+    for (const u of this.units) if (u.def.economy) ids.set(u.def.economy.id, u.def.economy.coinMult);
+    let m = this.weather?.current?.coinMult ?? 1;
+    for (const v of ids.values()) m *= v;
+    this.coinMult = m;
+    this.economyIds = [...ids.keys()];
+  }
+
+  /** Called when units appear or disappear (never per frame): re-resolve buff coverage. */
   refreshAuras() {
     for (const u of computeAuras(this.units)) this.refreshUnit(u);
+    this.refreshEconomy();
+  }
+
+  refreshAll() {
+    for (const u of this.units) this.refreshUnit(u);
+    this.refreshEconomy();
+    this.emit('statsChanged', null);
   }
 
   /**
@@ -507,7 +676,8 @@ export class Game {
 
   /**
    * Buys and places one copy of a battle-plan unit. There is no cap on copies:
-   * deployment is limited only by buildable tiles and coins.
+   * deployment is limited only by buildable tiles and coins. Coins are only
+   * deducted when every check passes.
    */
   deploy(defId, col, row) {
     if (this.canDeploy(defId, col, row)) return null;
@@ -555,13 +725,16 @@ export class Game {
     return refund;
   }
 
-  /** Effective stats for a unit at a level: level table + passive + auras. */
+  /**
+   * Effective stats for a unit at a level, derived from scratch every time:
+   * level table → passive → each distinct buff id once → current weather.
+   * Nothing here mutates base stats, so buffs can never accumulate.
+   */
   effectiveStats(u, level = u.level) {
     const s = applyPassive(u.def, levelStats(u.def, level), this.passiveContext(u.def));
-    for (const id of u.auras ?? []) {
-      const aura = this.auraDefs().get(id);
-      if (aura?.cooldownMult) s.rate /= aura.cooldownMult;
-    }
+    const defs = this.buffDefs();
+    for (const id of u.auras ?? []) applyModifiers(s, defs.get(id));
+    applyModifiers(s, this.weather?.current);
     return s;
   }
 

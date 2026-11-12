@@ -9,6 +9,9 @@ export const GAME_CONFIG = Object.freeze({
   startingCoins: 100,
   sellRefund: 0.7,
   tokensPerWave: 100,
+  // Multi-wave: called waves start this many seconds apart; one call can queue up to maxWaveCall waves.
+  waveStagger: 0.35,
+  maxWaveCall: 1000,
   towerMaxHp: 100,
   autoStartDelay: 5,
   fixedStep: 1 / 60,

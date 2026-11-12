@@ -1,7 +1,7 @@
 // SUMMONING page: banner, pool odds, x1/x5/x10/x25 with confirmation, and the
 // reveal sequence (skippable) followed by a results summary.
 
-import { getBanner, MILITARY_CIRCLE, summon, summonCost } from '../units/summoning.js';
+import { getBanner, listBanners, MILITARY_CIRCLE, summon, summonCost, duplicateCompensation, isRare } from '../units/summoning.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
 import { SummonStage, RevealSequence } from '../render/summonFx.js';
@@ -12,7 +12,8 @@ import { esc } from './format.js';
 import { portrait } from './battlePlans.js';
 
 const $ = (id) => document.getElementById(id);
-const pct = (c) => `${Math.round(c * 1000) / 10}%`;
+// keep sub-percent odds exact (0.5%, 7.5%)
+const pct = (c) => `${Math.round(c * 10000) / 100}%`;
 const tokenIcon = '<svg class="ico token"><use href="#i-token" /></svg>';
 
 export class SummoningView {
@@ -23,6 +24,7 @@ export class SummoningView {
     this.rng = createRng();
     this.pending = 0;
     this.stage = new SummonStage($('summon-stage'));
+    this.stage.banner = this.banner;
     this.el = {
       page: $('screen-summon'),
       name: $('banner-name'),
@@ -41,6 +43,7 @@ export class SummoningView {
       skip: $('btn-reveal-skip'),
       done: $('btn-reveal-done'),
       mute: $('btn-mute'),
+      tabs: $('banner-tabs'),
     };
     sfx.setMuted(!!profile.data.muted);
     this.bind();
@@ -48,6 +51,13 @@ export class SummoningView {
 
   bind() {
     const { el } = this;
+    el.tabs.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-banner]');
+      if (!b) return;
+      this.banner = getBanner(b.dataset.banner);
+      this.stage.banner = this.banner;
+      this.render();
+    });
     el.buttons.addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-count]');
       if (b && !b.disabled) this.askConfirm(Number(b.dataset.count));
@@ -96,12 +106,16 @@ export class SummoningView {
     el.name.textContent = banner.name;
     el.tagline.textContent = banner.tagline;
     el.price.textContent = banner.price;
+    $('pool-note').textContent = `Summoned units are unlocked permanently and appear in Battle Plans. Duplicates pay back ${duplicateCompensation(banner)} Tokens each (30% of a summon).`;
+    el.tabs.innerHTML = listBanners()
+      .map((b) => `<button class="banner-tab ${b.id === banner.id ? 'active' : ''}" role="tab" aria-selected="${b.id === banner.id}" data-banner="${esc(b.id)}">${esc(b.name)}<span class="bt-price">${b.price} Tokens</span></button>`)
+      .join('');
     el.pool.innerHTML = banner.pool
       .map((p) => {
         const def = getUnit(p.unit);
         const tier = getTier(def.tier);
         const owned = profile.ownedCount(p.unit);
-        return `<li class="pool-item" style="--c:${tier.color}">
+        return `<li class="pool-item ${isRare(p.chance) ? 'rare' : ''}" style="--c:${tier.color}">
           <img alt="" src="${portrait(def, 104)}" />
           <div><div class="pi-name">${esc(def.name)}</div><div class="pi-sub">${esc(tier.label)} · ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div></div>
           <div class="pi-chance">${pct(p.chance)}<span>Chance</span></div>
@@ -172,6 +186,7 @@ export class SummoningView {
     this.stage.stop();
     this.seq = new RevealSequence({
       canvas: el.revealCanvas,
+      banner: this.banner,
       results,
       onCard: (r, i) => this.showCard(r, i),
       onDone: () => this.showSummary(),
@@ -189,10 +204,12 @@ export class SummoningView {
     el.card.style.animation = 'none';
     void el.card.offsetWidth;
     el.card.style.animation = '';
+    el.card.classList.toggle('rare', !!r.rare);
     el.card.innerHTML = `
       <span class="rc-tier" style="--c:${tier.color}">${esc(tier.label)}</span>
-      <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : '<span class="rc-dupe">Duplicate</span>'}</div>
-      <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)}`}</div>`;
+      <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
+      ${r.rare ? `<div class="rc-rare">Rare asset · ${pct(r.chance)}</div>` : ''}
+      <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)} · duplicate refunded`}</div>`;
     if (this.results.length === 1) {
       el.skip.hidden = true;
       el.done.hidden = false;
@@ -219,16 +236,20 @@ export class SummoningView {
       if (r.isNew) fresh++;
     }
     const sorted = [...this.results].sort((a, b) => b.tier - a.tier);
+    const comp = this.results.reduce((sum, r) => sum + r.compensation, 0);
+    const dupes = this.results.filter((r) => !r.isNew).length;
     el.summary.innerHTML = `
       <h2>Requisition complete</h2>
+      ${comp ? `<div class="rs-comp-total">Duplicate compensation: +${formatNumber(comp)} Tokens (${dupes} × ${this.results.find((r) => !r.isNew).compensation})</div>` : ''}
       <div class="rs-tally">${[...tally.entries()].sort((a, b) => getUnit(b[0]).tier - getUnit(a[0]).tier).map(([id, n]) => `<span style="color:${getTier(getUnit(id).tier).color}">${esc(getUnit(id).name)} ×${n}</span>`).join('')}${fresh ? `<span>${fresh} new</span>` : ''}</div>
       <div class="rs-grid">${sorted
         .map((r, i) => {
           const def = getUnit(r.unit);
           const tier = getTier(r.tier);
-          return `<div class="rs-item" style="--c:${tier.color}; animation-delay:${Math.min(i, 30) * 25}ms">
+          return `<div class="rs-item ${r.rare ? 'rare' : ''}" style="--c:${tier.color}; animation-delay:${Math.min(i, 30) * 25}ms">
             ${r.isNew ? '<span class="rc-new">New</span>' : ''}
-            <img alt="" src="${portrait(def, 160)}" /><div class="rs-name">${esc(def.name)}</div><div class="rs-tier">${esc(tier.label)}</div></div>`;
+            <img alt="" src="${portrait(def, 160)}" /><div class="rs-name">${esc(def.name)}</div><div class="rs-tier">${esc(tier.label)}</div>
+            ${r.isNew ? '' : `<div class="rs-comp">+${r.compensation} Tokens</div>`}</div>`;
         })
         .join('')}</div>`;
     el.summary.hidden = false;

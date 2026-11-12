@@ -8,6 +8,7 @@ import { BattlePlansView } from './ui/battlePlans.js';
 import { SummoningView } from './ui/summoning.js';
 import { chooseBattlefield } from './maps/rotation.js';
 import { formatNumber } from './core/math.js';
+import { AudioDirector } from './audio/director.js';
 import { registerRoster, STARTER_UNITS } from './units/roster.js';
 import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
@@ -34,6 +35,9 @@ const settings = { speed: 1, paused: false, effects: params.get('fx') === '0' ? 
 
 const game = new Game({ seed: randomSeed(), loadout: profile.plan.units });
 const renderer = new Renderer(canvas, { effects: settings.effects });
+const audio = new AudioDirector({ muted: !!profile.data.muted });
+audio.attach(game);
+game.setWeatherEnabled(profile.data.weatherEnabled ?? true);
 const ui = renderer.ui;
 
 function setPaused(p) {
@@ -53,6 +57,9 @@ function startBattle({ units }) {
   setPaused(false);
   hud.hideGameOver();
   hud.showRetreat(false);
+  hud.setWeatherEnabled(game.weatherEnabled);
+  hud.setSound(!profile.data.muted);
+  audio.startBattle(game);
   requestAnimationFrame(() => renderer.resize());
 }
 
@@ -82,6 +89,7 @@ function updateWallet() {
 
 function toPlans() {
   settings.inBattle = false;
+  audio.stopBattle();
   hud.hideGameOver();
   hud.showRetreat(false);
   appEl.hidden = true;
@@ -93,9 +101,25 @@ function toPlans() {
 
 const actions = {
   nextWave: () => settings.inBattle && game.startNextWave(),
-  setAuto(on) {
-    game.autoStart = on;
-    game.autoTimer = Math.min(game.autoTimer, GAME_CONFIG.autoStartDelay);
+  setAutoSkip(on) {
+    game.autoSkip = on;
+  },
+  callWaves(n) {
+    if (!settings.inBattle) return;
+    const called = game.callWaves(n);
+    if (called > 1) hud.toast(`Called ${called} waves (${game.queuedWaveNumbers().length} queued)`, '#e3a33b');
+  },
+  toggleWeather() {
+    profile.data.weatherEnabled = !game.weatherEnabled;
+    profile.save();
+    game.setWeatherEnabled(profile.data.weatherEnabled);
+    hud.setWeatherEnabled(game.weatherEnabled);
+  },
+  toggleSound() {
+    profile.data.muted = !profile.data.muted;
+    profile.save();
+    audio.setMuted(profile.data.muted);
+    hud.setSound(!profile.data.muted);
   },
   togglePause() {
     if (settings.inBattle && game.phase !== 'gameover') setPaused(!settings.paused);
@@ -184,9 +208,16 @@ if (!profile.storageOk) {
 }
 
 // ----------------------------------------------------------------- input
+// Two-tap deployment: tap a unit card (selects, costs nothing), then tap open
+// ground to deploy one copy. Only a clean tap (no drag, short press) counts,
+// coins are only spent when every check passes, and a second tap arriving
+// within DEPLOY_GUARD_MS of a purchase is ignored to stop accidental double-buys.
 
-let dragging = false;
-let lastPlaced = null;
+const TAP_MAX_MOVE = 10;
+const TAP_MAX_MS = 600;
+const DEPLOY_GUARD_MS = 200;
+let press = null;
+let lastDeployAt = 0;
 let lastWarn = 0;
 
 function tileFromEvent(ev) {
@@ -194,43 +225,48 @@ function tileFromEvent(ev) {
   return { col: Math.floor(p.x / TILE), row: Math.floor(p.y / TILE) };
 }
 
-function tryPlace(t) {
-  if (!ui.placingDef) return;
-  const key = `${t.col},${t.row}`;
-  if (key === lastPlaced) return;
-  lastPlaced = key;
+function handleTap(t) {
+  if (!ui.placingDef) {
+    ui.selected = game.unitAt(t.col, t.row);
+    return;
+  }
+  const now = performance.now();
+  if (now - lastDeployAt < DEPLOY_GUARD_MS) return;
   const reason = game.canDeploy(ui.placingDef.id, t.col, t.row);
-  if (!reason) game.deploy(ui.placingDef.id, t.col, t.row);
-  else if (reason === 'coins' && performance.now() - lastWarn > 1200) {
-    lastWarn = performance.now();
+  if (!reason) {
+    game.deploy(ui.placingDef.id, t.col, t.row);
+    lastDeployAt = now;
+  } else if (reason === 'blocked' && game.unitAt(t.col, t.row)) {
+    // tapping an existing unit while placing opens it instead of buying anything
+    ui.selected = game.unitAt(t.col, t.row);
+    ui.placingDef = null;
+  } else if (reason === 'coins' && now - lastWarn > 1200) {
+    lastWarn = now;
     hud.toast(`Not enough coins — ${ui.placingDef.name} costs ${ui.placingDef.price}`, '#d9534a');
   }
 }
 
 canvas.addEventListener('pointermove', (ev) => {
   ui.hover = tileFromEvent(ev);
-  if (dragging) tryPlace(ui.hover);
+  if (press && Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > TAP_MAX_MOVE) press.moved = true;
 });
 canvas.addEventListener('pointerleave', () => {
   ui.hover = null;
 });
 canvas.addEventListener('pointerdown', (ev) => {
   if (!settings.inBattle || ev.button === 2) return;
-  const t = tileFromEvent(ev);
-  ui.hover = t;
-  if (ui.placingDef) {
-    // Placement mode stays active: click or drag to deploy as many copies as coins allows.
-    dragging = true;
-    lastPlaced = null;
-    canvas.setPointerCapture(ev.pointerId);
-    tryPlace(t);
-    return;
-  }
-  ui.selected = game.unitAt(t.col, t.row);
+  audio.unlock();
+  ui.hover = tileFromEvent(ev);
+  press = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, t: performance.now(), moved: false };
 });
-window.addEventListener('pointerup', () => {
-  dragging = false;
-  lastPlaced = null;
+canvas.addEventListener('pointerup', (ev) => {
+  const p = press;
+  press = null;
+  if (!p || p.id !== ev.pointerId || p.moved || performance.now() - p.t > TAP_MAX_MS) return;
+  handleTap(tileFromEvent(ev));
+});
+canvas.addEventListener('pointercancel', () => {
+  press = null;
 });
 canvas.addEventListener('contextmenu', (ev) => {
   ev.preventDefault();

@@ -48,13 +48,32 @@ No two units share an attack template:
 | **Gunnerman** | Vibrates between two recoil frames while the gun runs, ejecting brass | Heavy breathing |
 | **Grenade Launcher** | Big kick-back and a smoke puff; the grenade takes a high arc with its shadow tracking the ground | Shifts weight |
 | **Tank** | Turret tracks the target independently of the hull; barrel recoils on each shot, with exhaust smoke at the muzzle | Engine shimmy |
+| **Special Forces** | Fast double-tap with a compact carbine, then a short settle | Low crouch, scanning |
+| **Drone** | Launch rack cycles through three frames as each drone lifts off; explosive drones carry a hazard band | Rotors idle on the pad |
+| **Commander** | Raises the scope (anticipation), fires a long tracer, lowers it (recovery) | Binoculars sweep |
+| **Colonel** | Crisp pistol shot with a pointed arm | Hands behind the back |
+| **General** | Baton raised before the artillery lands; shells fly a high arc | Steady, upright |
+| **Fortress** | Hangar hatch opens to release a drone; the main barrel glows as it charges, then recoils hard | Turret slowly traverses |
 
 ## Impacts and status
 
 - Feedback scales with the weapon: dust for pebbles, a spark for bullets, and a flat, hard-edged burst plus scorch decal for explosives. Burst size matches the real blast radius. Scorch marks fade within seconds.
 - Enemies flinch when hit and move with distinct gaits: minions hop, regulars march, elites stomp, bosses lumber.
 - **Wounded** enemies limp and carry a field-dressing mark. **Burning** enemies show small flames.
-- Fire is a light source, so flames may glow softly. Nothing else does.
+- **Crippled** enemies limp harder and carry a red cracked mark.
+- Fire and lightning are light sources, so they may glow softly. Nothing else does.
+- Drones are tiny quadcopters with a shadow; Explosive Drones end in a larger, hotter burst.
+- In crowds of more than 900 enemies, rank-and-file enemies drop to a simplified sprite so the frame rate holds. Elites and bosses always keep full detail.
+
+## Weather
+
+Weather fades in and out over about 1.5 s and is kept low-contrast so units and enemies stay readable.
+
+- **Rainy:** slanted rain, puddle ripples, slightly cooler light.
+- **Windy:** long air streaks and tumbling leaves and grit.
+- **Thunderstorm:** heavier rain, darker sky, sheet-lightning flashes, and a forked bolt plus scorch mark for each strike.
+- **Aurora:** three slow ribbons of green, blue and violet light across the top of the map.
+- **Nova:** warm rays from one corner and drifting motes.
 
 ## Summoning presentation
 
@@ -62,3 +81,9 @@ The motif is a stencilled requisition circle on a concrete slab under one hangin
 
 - **Rarity:** shown by how many ring locks you hear, how high the perimeter lamps climb through the tier colours, how hard the crate lands, and how full the sting is. Bloom is never used.
 - **Sound:** synthesized on the fly: mechanical clicks, a rising hum, a whoosh, a thud and a short chord.
+- **Circles:** each banner has its own style. The Advanced Circle has a double ring, chevrons and a darker steel palette.
+- **Rare results (1% or less):** the reveal slows down. The lamp goes dark, a red beacon turns, a CLASSIFIED stamp slams onto the slab, and a hazard-striped armoured crate drops with a long alarm. The outcome itself is decided before the animation starts and is never altered.
+
+## Audio mix
+
+Gunfire is short and dry, explosions are low thumps, and lightning is a sharp crack with a rolling tail. Realm ambience and weather loops sit well below combat. A per-kind rate limit and a voice budget keep thousands of enemies from turning into noise.

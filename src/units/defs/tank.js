@@ -1,7 +1,7 @@
 // TANK — Tier 5. Heavy shells with a small blast that leave burning ground.
 // Passive aura: allied units within a small radius attack 10% faster
 // (cooldown × 0.9). Overlapping Tank auras do not stack.
-export const TANK_AURA = { id: 'tank-command', radius: 80, cooldownMult: 0.9 };
+export const TANK_AURA = { id: 'tank-command', label: 'Command Presence', radius: 80, cooldownMult: 0.9 };
 
 export default {
   id: 'tank',
@@ -22,7 +22,7 @@ export default {
   ],
   // Flames: 3 s of burning ground, low damage per second (8% of shell damage).
   impactHazard: { kind: 'fire', radius: 28, duration: 3, dpsFactor: 0.08 },
-  aura: TANK_AURA,
+  buffs: [TANK_AURA],
   passive: {
     id: 'command-presence',
     name: 'Command Presence',

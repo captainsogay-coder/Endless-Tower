@@ -10,11 +10,17 @@
 import { getTier } from '../units/tiers.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { unitPortrait } from './unitArt.js';
-import { makeCanvas } from './canvas.js';
+import { makeCanvas, circle } from './canvas.js';
 import * as sfx from '../audio/sfx.js';
 
 const TAU = Math.PI * 2;
 const PAINT = '#c8b07c'; // faded stencil paint
+// Per-circle floor art: paint colour, stencil text, extra ring.
+const CIRCLE_STYLES = {
+  'military-circle': { paint: PAINT, text: 'REQUISITION · ENDLESS TOWER · FORWARD COMMAND · ', doubleRing: false, chevrons: 4 },
+  'advanced-military-circle': { paint: '#c4574a', accent: '#d6b048', text: 'SPECIAL ASSETS · ADVANCED REQUISITION · RESTRICTED · ', doubleRing: true, chevrons: 6 },
+};
+export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
 const STEEL = '#9aa1aa';
 const LAMPS = 16;
 const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
@@ -96,11 +102,18 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.fillRect(0, 0, w, h);
   }
 
+  const st = s.style ?? CIRCLE_STYLES['military-circle'];
   ctx.save();
   ctx.translate(cx + (s.shakeX ?? 0), cy + (s.shakeY ?? 0));
   ctx.globalAlpha = 0.55 + 0.35 * light;
-  ctx.strokeStyle = PAINT;
-  ctx.fillStyle = PAINT;
+  ctx.strokeStyle = st.paint;
+  ctx.fillStyle = st.paint;
+  if (st.doubleRing) {
+    ctx.lineWidth = R * 0.012;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 1.035, 0, TAU);
+    ctx.stroke();
+  }
   // outer ring + rotating tick bezel
   ctx.lineWidth = R * 0.028;
   ctx.beginPath();
@@ -118,7 +131,7 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.rotate(TAU / 72);
   }
   ctx.restore();
-  stencilText(ctx, 'REQUISITION · ENDLESS TOWER · FORWARD COMMAND · ', R * 0.8, -(s.rotOuter ?? 0) * 0.5, R * 0.07);
+  stencilText(ctx, st.text, R * 0.8, -(s.rotOuter ?? 0) * 0.5, R * 0.07);
   // inner dashed ring
   ctx.lineWidth = R * 0.014;
   ctx.setLineDash([R * 0.05, R * 0.035]);
@@ -130,7 +143,7 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
   // four chevrons pointing in
   ctx.save();
   ctx.rotate(s.rotInner ?? 0);
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < st.chevrons; i++) {
     ctx.beginPath();
     ctx.moveTo(-R * 0.08, -R * 0.6);
     ctx.lineTo(0, -R * 0.5);
@@ -140,7 +153,7 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.lineTo(-R * 0.08, -R * 0.55);
     ctx.closePath();
     ctx.fill();
-    ctx.rotate(TAU / 4);
+    ctx.rotate(TAU / st.chevrons);
   }
   ctx.restore();
   // centre: star in a disc
@@ -148,9 +161,31 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
   ctx.beginPath();
   ctx.arc(0, 0, R * 0.26, 0, TAU);
   ctx.stroke();
+  if (st.accent) ctx.fillStyle = st.accent;
   star(ctx, R * 0.2);
   ctx.fill();
+  if (st.accent) {
+    // rank bars above the star on the advanced circle
+    for (let i = 0; i < 2; i++) ctx.fillRect(-R * 0.09, -R * 0.36 - i * R * 0.05, R * 0.18, R * 0.025);
+  }
   ctx.globalAlpha = 1;
+  if (s.stamp > 0) {
+    // CLASSIFIED stamp slammed across the circle (rare results)
+    const k = Math.min(1, s.stamp);
+    ctx.save();
+    ctx.rotate(-0.18);
+    ctx.scale(1 + (1 - k) * 0.6, 1 + (1 - k) * 0.6);
+    ctx.globalAlpha = k * 0.9;
+    ctx.strokeStyle = '#d9533f';
+    ctx.lineWidth = R * 0.025;
+    ctx.strokeRect(-R * 0.62, -R * 0.13, R * 1.24, R * 0.26);
+    ctx.fillStyle = '#d9533f';
+    ctx.font = `800 ${R * 0.17}px "Barlow Condensed", "Arial Narrow", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CLASSIFIED', 0, R * 0.01);
+    ctx.restore();
+  }
 
   // radar sweep (only while charging)
   if (s.sweep != null) {
@@ -166,6 +201,21 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     }
   }
 
+  if (s.beacon != null) {
+    // rotating red emergency beacon: a single sweeping wedge of light
+    const g = ctx.createConicGradient ? ctx.createConicGradient(s.beacon, 0, 0) : null;
+    if (g) {
+      g.addColorStop(0, 'rgba(210,50,35,0.28)');
+      g.addColorStop(0.08, 'rgba(210,50,35,0)');
+      g.addColorStop(0.5, 'rgba(210,50,35,0)');
+      g.addColorStop(0.58, 'rgba(210,50,35,0.28)');
+      g.addColorStop(0.581, 'rgba(210,50,35,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 2.4, 0, TAU);
+      ctx.fill();
+    }
+  }
   // perimeter lamps: housing + lens (lit lenses are real light sources)
   const lamps = s.lamps ?? [];
   for (let i = 0; i < LAMPS; i++) {
@@ -202,7 +252,7 @@ function hexA(hex, a) {
 }
 
 /** Supply crate seen from above; `open` 0..1 folds the four lids outward. */
-export function paintCrate(ctx, x, y, size, open, stripe, img) {
+export function paintCrate(ctx, x, y, size, open, stripe, img, armored = false) {
   const s = size / 2;
   ctx.save();
   ctx.translate(x, y);
@@ -253,7 +303,36 @@ export function paintCrate(ctx, x, y, size, open, stripe, img) {
     }
     ctx.restore();
   };
-  if (open < 0.02) {
+  if (open < 0.02 && armored) {
+    // armoured steel container with hazard edging (rare results only)
+    ctx.fillStyle = '#3b4046';
+    ctx.fillRect(-s, -s, size, size);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-s, -s, size, size);
+    ctx.rect(-s * 0.84, -s * 0.84, size * 0.84, size * 0.84);
+    ctx.clip('evenodd');
+    for (let i = -8; i < 8; i++) {
+      ctx.fillStyle = i % 2 ? '#d9a12a' : '#1c1d1f';
+      ctx.beginPath();
+      ctx.moveTo(-s + i * size * 0.14, -s);
+      ctx.lineTo(-s + (i + 1) * size * 0.14, -s);
+      ctx.lineTo(-s + (i + 1) * size * 0.14 + size, s);
+      ctx.lineTo(-s + i * size * 0.14 + size, s);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#121315';
+    ctx.lineWidth = Math.max(1.5, size * 0.025);
+    ctx.strokeRect(-s, -s, size, size);
+    ctx.fillStyle = stripe;
+    ctx.save();
+    star(ctx, s * 0.36);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#9aa1aa';
+    for (const [px, py] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) circle(ctx, px * s, py * s, size * 0.025), ctx.fill();
+  } else if (open < 0.02) {
     // closed crate: planks, steel corners, stencilled star and rarity stripe
     ctx.fillStyle = '#7a6140';
     ctx.fillRect(-s, -s, size, size);
@@ -330,7 +409,7 @@ export class SummonStage {
     const lamps = [];
     const lit = Math.floor(this.t * 2) % LAMPS;
     for (let i = 0; i < LAMPS; i++) lamps.push(i === lit || i === (lit + LAMPS / 2) % LAMPS ? STEEL : null);
-    paintCircle(ctx, w, h, w / 2, h * 0.56, R, { rotOuter: this.t * 0.05, rotInner: -this.t * 0.08, lamps, light: 0.9 });
+    paintCircle(ctx, w, h, w / 2, h * 0.56, R, { rotOuter: this.t * 0.05, rotInner: -this.t * 0.08, lamps, light: 0.9, style: circleStyle(this.banner?.id) });
   }
 }
 
@@ -352,7 +431,8 @@ function portraitImage(def) {
  * Calls onCard(result, index) when a unit is revealed and onDone() at the end.
  */
 export class RevealSequence {
-  constructor({ canvas, results, onCard, onDone }) {
+  constructor({ canvas, results, onCard, onDone, banner }) {
+    this.style = circleStyle(banner?.id);
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.results = results;
@@ -366,6 +446,8 @@ export class RevealSequence {
     this.cues = new Set();
     for (const r of results) portraitImage(getUnit(r.unit));
     this.timing = this.multi ? { lock: 0.4, charge: 0.45, drop: 0.3, open: 0.3, dwell: 0.9 } : { lock: 0.9, charge: 1.0, drop: 0.45, open: 0.5, dwell: Infinity };
+    // rare results always get the long, distinct sequence – even inside a multi-summon
+    this.rareTiming = { lock: 1.2, charge: 1.9, drop: 0.6, open: 0.7, dwell: this.multi ? 2.2 : Infinity };
   }
 
   get current() {
@@ -378,7 +460,14 @@ export class RevealSequence {
       if (this.done) return;
       this.step(Math.min(0.05, (now - last) / 1000));
       last = now;
-      this.draw();
+      try {
+        this.draw();
+      } catch (err) {
+        // A drawing problem must never strand the player mid-reveal: skip to the results.
+        console.error(err);
+        this.finish();
+        return;
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -409,9 +498,13 @@ export class RevealSequence {
     fn();
   }
 
+  timingFor(r) {
+    return r.rare ? this.rareTiming : this.timing;
+  }
+
   step(dt) {
     this.t += dt;
-    const T = this.timing;
+    const T = this.timingFor(this.current);
     const r = this.current;
     const tier = r.tier;
     const locks = 2 + Math.min(5, tier);
@@ -425,11 +518,11 @@ export class RevealSequence {
       if (this.t >= at) this.cue(`lock${k}`, () => sfx.click(1 + k * 0.08));
     }
     if (this.t >= tLock * 0.5) this.cue('hum', () => sfx.hum(T.charge + tLock * 0.5, tier / 5));
-    if (tier >= 5 && this.t >= tLock) this.cue('alarm', () => sfx.alarm());
+    if ((tier >= 5 || r.rare) && this.t >= tLock) this.cue('alarm', () => sfx.alarm(r.rare));
     if (this.t >= tCharge) this.cue('whoosh', () => sfx.whoosh(T.drop));
     if (this.t >= tDrop) this.cue('thud', () => sfx.thud(Math.min(2, tier / 2.5)));
     if (this.t >= tOpen) {
-      this.cue('sting', () => sfx.sting(tier));
+      this.cue('sting', () => sfx.sting(tier, r.rare));
       if (!this.cardShown) {
         this.cardShown = true;
         this.onCard?.(r, this.i);
@@ -450,7 +543,7 @@ export class RevealSequence {
     }
     const ctx = this.ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const T = this.timing;
+    const T = this.timingFor(this.current);
     const r = this.current;
     const def = getUnit(r.unit);
     const tier = r.tier;
@@ -471,7 +564,14 @@ export class RevealSequence {
     const litCount = Math.round(progress * LAMPS);
     const stage = Math.min(ladder.length - 1, Math.floor(progress * ladder.length));
     const lamps = [];
-    for (let i = 0; i < LAMPS; i++) lamps.push(i < litCount ? (t >= tCharge ? tierColor : ladder[stage]) : null);
+    // Rare: lamps black out and a red beacon sweeps, then every lamp slams on in the tier colour.
+    const rare = !!r.rare;
+    const blackout = rare && t > tLock * 0.6 && t < tLock + T.charge * 0.7;
+    for (let i = 0; i < LAMPS; i++) {
+      if (rare) lamps.push(blackout ? null : t >= tLock + T.charge * 0.7 ? tierColor : i < litCount ? ladder[0] : null);
+      else lamps.push(i < litCount ? (t >= tCharge ? tierColor : ladder[stage]) : null);
+    }
+    if (rare && t >= tLock + T.charge * 0.7) this.cue('slam', () => sfx.thud(0.6));
 
     // landing shake scales with rarity
     let shakeX = 0;
@@ -487,8 +587,11 @@ export class RevealSequence {
       rotOuter: lockStep * (TAU / 24) + (t < tCharge ? Math.sin(t * 30) * 0.004 : 0),
       rotInner: -lockStep * (TAU / 16),
       lamps,
-      light: t < tLock ? 0.5 + 0.5 * (1 - ease(t / tLock)) * 0.4 : t < tDrop ? 0.4 : 0.4 + 0.6 * ease((t - tDrop) / 0.4),
-      sweep: t > tLock * 0.5 && t < tDrop ? t * (4 + tier) : null,
+      light: blackout ? 0.12 : t < tLock ? 0.5 + 0.5 * (1 - ease(t / tLock)) * 0.4 : t < tDrop ? 0.4 : 0.4 + 0.6 * ease((t - tDrop) / 0.4),
+      sweep: !rare && t > tLock * 0.5 && t < tDrop ? t * (4 + tier) : null,
+      beacon: blackout ? t * 5 : null,
+      stamp: rare && t >= tLock + T.charge * 0.7 ? (t - (tLock + T.charge * 0.7)) / 0.25 : 0,
+      style: this.style,
       sweepColor: ladder[stage],
       strobe: tier >= 5 && t > tLock && t < tDrop ? 0.5 + 0.5 * Math.sin(t * 18) : 0,
       shakeX,
@@ -509,7 +612,7 @@ export class RevealSequence {
       ctx.translate(cx + shakeX, cy + shakeY - (1 - fall) * h * 0.25);
       ctx.scale(scale, scale);
       const open = t >= tDrop ? ease((t - tDrop) / T.open) : 0;
-      paintCrate(ctx, 0, 0, size, open, tierColor, portraitImage(def));
+      paintCrate(ctx, 0, 0, size, open, tierColor, portraitImage(def), rare);
       ctx.restore();
       // dust ring on landing
       if (t >= tDrop && t < tDrop + 0.6) {
