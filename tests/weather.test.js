@@ -54,7 +54,7 @@ test('weather buffs apply to derived stats only and vanish afterwards', () => {
   g.coins = 1e6;
   const u = g.deploy('cadet', ...findTile(g));
   const base = { ...levelStats(getUnit('cadet'), 0) };
-  const expect = { nova: [1.2, 1 / 0.7, 1], windy: [1.05, 1 / 0.95, 1.1], thunderstorm: [1.2, 1, 1.1], rainy: [1, 1 / 0.9, 1], aurora: [1, 1, 1] };
+  const expect = { nova: [1.3, 1 / 0.6, 1], windy: [1.15, 1 / 0.9, 1.2], thunderstorm: [1.25, 1, 1.15], rainy: [1, 1 / 0.8, 1], aurora: [1, 1, 1] };
   for (const [id, [dm, rm, gm]] of Object.entries(expect)) {
     g.weather.start(id);
     assert.ok(Math.abs(u.stats.damage - base.damage * dm) < 1e-9, `${id} damage`);
@@ -68,9 +68,9 @@ test('weather buffs apply to derived stats only and vanish afterwards', () => {
   assert.deepEqual(levelStats(getUnit('cadet'), 0), base, 'definition untouched');
 });
 
-test('coin gain: Rainy +5%, Aurora +20%, applied to kills and wave rewards', () => {
+test('coin gain: Rainy +10%, Aurora +35%, applied to kills and wave rewards', () => {
   const g = new Game({ seed: 4, loadout: ['dude'] });
-  for (const [id, m] of [['rainy', 1.05], ['aurora', 1.2], ['nova', 1]]) {
+  for (const [id, m] of [['rainy', 1.1], ['aurora', 1.35], ['nova', 1]]) {
     g.weather.start(id);
     const c0 = g.coins;
     g.gainCoins(100);
@@ -78,7 +78,7 @@ test('coin gain: Rainy +5%, Aurora +20%, applied to kills and wave rewards', () 
   }
 });
 
-test('thunderstorm strikes a random enemy every 3 s for small AOE damage + 7% max HP', () => {
+test('thunderstorm strikes a random enemy every 3 s for AOE damage of 7% max HP', () => {
   const g = new Game({ seed: 6, loadout: ['dude'], weatherEnabled: false });
   g.towerMaxHp = g.towerHp = 1e9;
   g.startNextWave();

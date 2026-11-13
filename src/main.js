@@ -12,6 +12,7 @@ import { AudioDirector } from './audio/director.js';
 import { registerRoster, STARTER_UNITS } from './units/roster.js';
 import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
+import './render/castArt.js';
 
 registerRoster();
 
@@ -27,6 +28,7 @@ if (!profile.plan.units.length && !profile.data.battles) {
 }
 
 if (LOCAL && params.get('tokens')) profile.earn('tokens', Number(params.get('tokens')));
+if (LOCAL && params.get('gems')) profile.earn('gems', Number(params.get('gems')));
 
 const canvas = document.getElementById('game');
 const appEl = document.getElementById('app');
@@ -74,17 +76,19 @@ function showPage(page) {
   updateWallet();
 }
 
-let lastTokens = null;
+const lastBalance = {};
 function updateWallet() {
-  const n = profile.balance('tokens');
-  const el = document.getElementById('wallet-tokens');
-  el.textContent = formatNumber(n);
-  if (lastTokens !== null && n !== lastTokens) {
-    el.parentElement.classList.remove('bump');
-    void el.offsetWidth;
-    el.parentElement.classList.add('bump');
+  for (const cur of ['tokens', 'gems']) {
+    const n = profile.balance(cur);
+    const el = document.getElementById(`wallet-${cur}`);
+    el.textContent = formatNumber(n);
+    if (lastBalance[cur] !== undefined && n !== lastBalance[cur]) {
+      el.parentElement.classList.remove('bump');
+      void el.offsetWidth;
+      el.parentElement.classList.add('bump');
+    }
+    lastBalance[cur] = n;
   }
-  lastTokens = n;
 }
 
 function toPlans() {
@@ -187,6 +191,7 @@ game.on('waveStart', (plan) => hud.onWaveStart(plan, game));
 game.on('waveClear', (d) => {
   // Tokens are persisted the moment a wave is completed.
   profile.earn('tokens', d.tokens);
+  if (d.gems) profile.earn('gems', d.gems);
   profile.recordWaveCleared();
   profile.save();
   hud.onWaveClear(d, game);

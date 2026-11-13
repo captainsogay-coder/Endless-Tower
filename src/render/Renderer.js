@@ -12,6 +12,7 @@ import { buildEnemySprites } from './enemySprites.js';
 import { drawUnit, unitSprite } from './unitArt.js';
 import { Effects } from './fx.js';
 import { WeatherFx } from './weatherFx.js';
+import { CastFx, BLAST_PALETTES } from './castFx.js';
 import { circle, drawGlow } from './canvas.js';
 import { rgba, shade } from '../core/color.js';
 import { getTrait } from '../waves/traits.js';
@@ -40,6 +41,7 @@ export class Renderer {
     this.blasts = []; // flat, short-lived explosion shapes
     this.decals = []; // scorch marks on the ground
     this.weatherFx = new WeatherFx();
+    this.castFx = new CastFx(this);
     this.unsub = [];
   }
 
@@ -55,12 +57,14 @@ export class Renderer {
       this.fx = new Effects();
       this.blasts = [];
       this.decals = [];
+      this.castFx.reset();
       this.ui.selected = null;
       this.ui.placingDef = null;
       this.resize();
     };
     rebuild();
     on('runStart', rebuild);
+    this.castFx.attach(game, on);
     on('spawn', (e) => {
       this.breachPulse[e.routeIndex] = Math.min(1, (this.breachPulse[e.routeIndex] ?? 0) + (e.isBoss ? 1 : 0.3));
     });
@@ -116,6 +120,7 @@ export class Renderer {
 
   /** Impact feedback scales with the weapon: dust for pebbles, sparks for bullets, blasts for explosives. */
   onImpact(p) {
+    if (this.castFx.onImpact(p)) return;
     const d = this.fx.density;
     switch (p.kind) {
       case 'pebble':
@@ -231,6 +236,7 @@ export class Renderer {
     this.weatherFx.drawUnder(ctx);
     this.drawDecals(ctx, gameDt);
     this.drawHazards(ctx, t);
+    this.castFx.drawUnder(ctx, gameDt);
     this.drawBreaches(ctx, t);
     if (this.ui.placingDef) this.drawPlacementGrid(ctx);
     this.drawTower(ctx, t);
@@ -239,6 +245,7 @@ export class Renderer {
     this.drawActors(ctx, t);
     this.drawProjectiles(ctx);
     this.drawBlasts(ctx, gameDt);
+    this.castFx.drawOver(ctx, gameDt);
     this.drawPlacementGhost(ctx);
     this.fx.draw(ctx);
     scene.drawOver(ctx);
@@ -275,6 +282,23 @@ export class Renderer {
     if (!hz.length) return;
     for (const h of hz) {
       const life = Math.min(1, h.ttl / h.max, (h.max - h.ttl) * 6 + 0.2);
+      if (h.kind === 'energy') {
+        // arcade energy zone: a humming teal disc with drifting rings
+        ctx.fillStyle = `rgba(20,70,60,${0.35 * life})`;
+        ctx.beginPath();
+        ctx.ellipse(h.x, h.y, h.radius, h.radius * 0.7, 0, 0, TAU);
+        ctx.fill();
+        drawGlow(ctx, '#7af0d2', h.x, h.y, h.radius, 0.16 * life);
+        ctx.strokeStyle = `rgba(159,245,221,${0.5 * life})`;
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 3; i++) {
+          const q = (i / 3 + t * 0.6) % 1;
+          ctx.beginPath();
+          ctx.ellipse(h.x, h.y, h.radius * q, h.radius * q * 0.7, 0, 0, TAU);
+          ctx.stroke();
+        }
+        continue;
+      }
       ctx.fillStyle = `rgba(40,18,10,${0.35 * life})`;
       ctx.beginPath();
       ctx.ellipse(h.x, h.y, h.radius, h.radius * 0.7, 0, 0, TAU);
@@ -334,7 +358,7 @@ export class Renderer {
       };
       ctx.globalAlpha = 1 - Math.max(0, k - 0.4) / 0.6;
       if (k < 0.15) drawGlow(ctx, '#ffd38a', b.x, b.y, b.r * 1.2, 0.35);
-      const pal = b.palette === 'lightning' ? ['#cfd8ff', '#ffffff'] : b.palette === 'hot' ? ['#d9432c', '#ffcf6a'] : ['#e8742c', '#ffd57a'];
+      const pal = b.palette === 'lightning' ? ['#cfd8ff', '#ffffff'] : BLAST_PALETTES[b.palette] ?? ['#e8742c', '#ffd57a'];
       shape(r, k < 0.55 ? pal[0] : '#6d5e52');
       shape(r * 0.62, k < 0.4 ? pal[1] : '#8b7d70');
       ctx.globalAlpha = 1;
@@ -375,34 +399,55 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  /**
+   * Range ring. Uses exactly the range combat targeting uses: the selected
+   * unit's live effective stats, or – while placing – the stats a new copy
+   * would have on the hovered tile (buffs there, weather, passives).
+   */
   drawRangePreview(ctx) {
     const { ui, game } = this;
     let x;
     let y;
     let range;
+    let source = null;
     if (ui.placingDef && ui.hover && game.canPlace(ui.hover.col, ui.hover.row)) {
       x = ui.hover.col * TILE + TILE / 2;
       y = ui.hover.row * TILE + TILE / 2;
-      range = ui.placingDef.levels[0].range;
+      range = game.previewStats(ui.placingDef.id, ui.hover.col, ui.hover.row)?.range ?? ui.placingDef.levels[0].range;
     } else if (ui.selected?.placed) {
-      ({ x, y } = ui.selected);
-      range = ui.selected.stats.range;
+      source = ui.selected;
+      ({ x, y } = source);
+      range = source.stats.range;
     } else {
       return;
     }
-    ctx.fillStyle = 'rgba(255,248,230,0.08)';
-    ctx.strokeStyle = 'rgba(255,248,230,0.7)';
-    ctx.lineWidth = 1.25;
+    // soft fill, a dark under-stroke for contrast on bright ground, a light ring on top
+    ctx.fillStyle = 'rgba(255,248,230,0.07)';
     circle(ctx, x, y, range);
     ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(12,14,18,0.35)';
     ctx.stroke();
-    const def = ui.placingDef ?? ui.selected?.def;
-    // finite buff radii (map-wide buffs are shown in the unit panel instead)
+    ctx.lineWidth = 1.25;
+    ctx.strokeStyle = 'rgba(255,248,230,0.85)';
+    ctx.stroke();
+    // tick marks every 45° make the ring readable over busy terrain
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      ctx.moveTo(x + Math.cos(a) * (range - 4), y + Math.sin(a) * (range - 4));
+      ctx.lineTo(x + Math.cos(a) * range, y + Math.sin(a) * range);
+    }
+    ctx.stroke();
+    const def = ui.placingDef ?? source?.def;
+    // finite buff radii (map-wide buffs are listed in the unit panel instead)
     for (const b of def?.buffs ?? []) {
-      if (!Number.isFinite(b.radius)) continue;
+      const r = b.radius === 'range' ? range : b.radius;
+      if (!Number.isFinite(r) || r === range) continue;
       ctx.strokeStyle = 'rgba(227,163,59,0.85)';
+      ctx.lineWidth = 1.25;
       ctx.setLineDash([4, 4]);
-      circle(ctx, x, y, b.radius);
+      circle(ctx, x, y, r);
       ctx.stroke();
       ctx.setLineDash([]);
     }
@@ -549,6 +594,7 @@ export class Renderer {
         (u.def.render ?? drawUnit)(ctx, u, t);
       }
     }
+    this.castFx.drawAllies(ctx, t);
     const sel = this.ui.selected;
     if (sel?.placed) {
       ctx.strokeStyle = '#f2efe6';
@@ -682,6 +728,7 @@ export class Renderer {
       circle(ctx, e.x, e.y + bob, r * 1.32 * scale);
       ctx.stroke();
     }
+    this.castFx.drawEnemyMarks(ctx, e, r, bob, this.game.time);
     if (e.statuses && (e.statuses.crippled ?? 0) > this.game.time) {
       // Crippled: a broken-chevron mark beside the enemy
       const cx = e.x + r * 0.95;
@@ -746,6 +793,7 @@ export class Renderer {
       const done = Math.hypot(p.x - p.sx, p.y - p.sy);
       const left = Math.hypot(p.tx - p.x, p.ty - p.y);
       const k = done / Math.max(1, done + left);
+      if (this.castFx.drawProjectile(ctx, p, k)) continue;
       switch (p.kind) {
         case 'pebble': {
           // a lobbed stone: shadow on the ground, stone on a shallow arc

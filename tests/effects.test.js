@@ -132,7 +132,7 @@ test('exactly 100 Tokens per completed wave; none for a wave in progress or lost
   assert.equal(g.tokensEarned, 300);
 });
 
-test('Coins and Tokens are separate: coins live in the battle, tokens in the profile', () => {
+test('Coins, Tokens and Gems are separate: coins live in the battle, tokens and gems in the profile', () => {
   const p = new Profile({ storage: memoryStorage(), starterUnits: ['dude'] });
   const g = new Game({ seed: 8, loadout: ['dude'] });
   p.earn('tokens', 100);
@@ -144,5 +144,8 @@ test('Coins and Tokens are separate: coins live in the battle, tokens in the pro
   assert.ok(g.coins < coins);
   assert.equal(p.spend('tokens', 101), false);
   assert.equal(p.balance('tokens'), 100);
-  assert.equal(p.data.wallet.gems, undefined, 'no gem balance exists');
+  assert.equal(p.balance('gems'), 0, 'gems start at zero and are separate');
+  p.earn('gems', 50);
+  assert.equal(p.balance('tokens'), 100, 'earning gems never touches tokens');
+  assert.equal(p.spend('gems', 51), false);
 });

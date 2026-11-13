@@ -20,7 +20,8 @@ export function validateUnitDef(def) {
     if (!def.passive.name || !def.passive.summary) errors.push('passive needs name and summary');
     if (def.passive.modify !== undefined && typeof def.passive.modify !== 'function') errors.push('passive.modify must be a function');
   }
-  for (const b of def.buffs ?? []) if (!(b.id && b.radius > 0)) errors.push('each buff needs an id and a radius > 0 (Infinity = map-wide)');
+  for (const b of def.buffs ?? []) if (!(b.id && (b.radius > 0 || b.radius === 'range'))) errors.push("each buff needs an id and a radius > 0 (Infinity = map-wide, 'range' = the unit's attack range)");
+  if (def.ability && !def.ability.id) errors.push('ability needs an id');
   if (def.economy && !(def.economy.id && def.economy.coinMult > 0)) errors.push('economy needs id and coinMult');
   if (def.summon && !(def.summon.every > 0 && def.summon.kind)) errors.push('summon needs every (s) and kind');
   return errors;
@@ -32,6 +33,14 @@ export function registerUnit(def) {
   units.set(def.id, Object.freeze({ targeting: 'first', ...def }));
   return units.get(def.id);
 }
+
+// Temporary combatants (e.g. Battalion soldiers) that are never summoned,
+// listed in Battle Plans or deployed by the player.
+const allyUnits = new Map();
+export function registerAllyDef(def) {
+  allyUnits.set(def.id, Object.freeze({ targeting: 'first', ...def }));
+}
+export const getAllyDef = (id) => allyUnits.get(id);
 
 export const unregisterUnit = (id) => units.delete(id);
 export const clearUnits = () => units.clear();

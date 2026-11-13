@@ -12,10 +12,13 @@ import { WaveDirector } from '../waves/waveDirector.js';
 import { buildSpawnSchedule } from '../waves/spawnSchedule.js';
 import { getTrait } from '../waves/traits.js';
 import { getEnemyCategory } from '../enemies/enemyCategories.js';
-import { getUnit, listUnits } from '../units/unitRegistry.js';
-import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier, computeAuras, applyModifiers, HAZARD_TICK } from './effects.js';
+import { getUnit, listUnits, getAllyDef } from '../units/unitRegistry.js';
+import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier, computeAuras, applyModifiers, scaledBuff, HAZARD_TICK } from './effects.js';
+import { abilityOf } from './abilities.js';
 import { WeatherSystem, WEATHER_SETTINGS } from './weather.js';
 import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
+
+let allySeq = 0;
 
 const isDrone = (p) => p.kind === 'drone' || p.kind === 'explosive-drone';
 
@@ -77,7 +80,14 @@ export class Game {
     this.projectilePool = [];
     this.hazards = [];
     this.hazardTimer = 0;
+    this.allies = []; // temporary combatants (summoned Outlaws, Battalion soldiers) – never "deployed"
+    this.timers = []; // delayed actions: bursts, bombs, aftershocks
+    this.fields = []; // gravity fields
+    // Battle-long bonuses (e.g. THE HOUSE's House Edge). Capped, reset every battle.
+    this.battleBonus = { damage: 0 };
+    this.houseKills = 0;
     this.tokensEarned = 0;
+    this.gemsEarned = 0;
     this.deployed = new Map(); // defId -> number of copies on the field
     this.unitByTile = new Array(COLS * ROWS).fill(null);
     this.enemySeq = 0;
@@ -96,7 +106,7 @@ export class Game {
       this.refreshAll();
       this.emit('weather', w);
     };
-    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0, wavesCleared: 0, lightning: 0, dronesLaunched: 0 };
+    this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0, wavesCleared: 0, lightning: 0, dronesLaunched: 0, bonusCoins: 0, alliesSummoned: 0 };
     this.emit('runStart', this);
   }
 
@@ -273,7 +283,10 @@ export class Game {
     this.hash.clear();
     for (const e of this.enemies) if (e.alive && e.intro >= 1) this.hash.insert(e);
     for (let i = 0; i < strikes; i++) this.lightningStrike();
+    this.updateTimers();
+    this.updateFields(dt);
     this.updateUnits(dt);
+    this.updateAllies(dt);
     this.updateProjectiles(dt);
     this.updateHazards(dt);
     this.compact();
@@ -315,6 +328,16 @@ export class Game {
       }
       if (e.regen > 0 && e.hp < e.maxHp && this.time - e.lastHit > 1.5) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regen * dt);
       e.variant?.onUpdate?.(e, dt, this);
+      if (e.gravity && e.gravity.until > this.time) {
+        // held by a gravity field: no progress along the road, drawn toward its centre
+        e.seg = sampleRoute(e.route, e.d, tmp, e.seg);
+        const g = Math.min(1, dt * 3);
+        e.ox += (e.gravity.x - tmp.x - e.ox) * g;
+        e.oy += (e.gravity.y - tmp.y - e.oy) * g;
+        e.x = tmp.x + e.ox;
+        e.y = tmp.y + e.oy;
+        continue;
+      }
       e.d += e.speed * (e.statuses ? statusSpeedMultiplier(e, this.time) : 1) * dt;
       if (e.d >= e.route.length) {
         this.leak(e);
@@ -345,7 +368,7 @@ export class Game {
     if (this.towerHp <= 0) this.gameOver();
   }
 
-  /** Thunderstorm: strike a random enemy for small area damage + 7% of its max HP. */
+  /** Thunderstorm: strike a random enemy; everything in the blast takes 7% of its max HP. */
   lightningStrike() {
     const candidates = this.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
     if (!candidates.length) return null;
@@ -357,7 +380,8 @@ export class Game {
     const hit = [];
     this.hash.each(x, y, S.lightningRadius, (e) => hit.push(e));
     if (!hit.includes(target)) hit.push(target);
-    for (const e of hit) this.damageEnemy(e, base + (e === target ? target.maxHp * S.lightningMaxHpFraction : 0), null);
+    // area damage: every enemy in the blast loses 7% of its own max HP (plus a small flat amount)
+    for (const e of hit) this.damageEnemy(e, base + e.maxHp * S.lightningMaxHpFraction, null);
     this.stats.lightning++;
     this.emit('lightning', { x, y, radius: S.lightningRadius, target });
     return target;
@@ -365,25 +389,160 @@ export class Game {
 
   updateUnits(dt) {
     for (const u of this.units) {
-      if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 6);
       u.def.onUpdate?.(u, dt, this);
       if (u.def.summon) this.updateSummon(u, dt);
-      u.cooldown -= dt;
-      if (u.cooldown > 0) continue;
-      const target = this.findTarget(u, u.stats.range);
-      u.hasTarget = !!target;
-      if (!target) {
-        u.cooldown = 0.1;
+      u.ability?.update?.(u, dt, this);
+      this.attack(u, dt);
+    }
+  }
+
+  /** Shared attack loop for deployed units and temporary allies. */
+  attack(u, dt) {
+    if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 6);
+    u.cooldown -= dt;
+    if (u.cooldown > 0) return;
+    const target = u.ability?.target ? u.ability.target(u, this) : this.findTarget(u, u.stats.range);
+    u.hasTarget = !!target;
+    if (!target) {
+      u.cooldown = 0.1;
+      return;
+    }
+    u.angle = Math.atan2(target.y - u.y, target.x - u.x);
+    if (Math.abs(target.x - u.x) > 2) u.facing = target.x > u.x ? 1 : -1;
+    u.cooldown = 1 / Math.max(0.01, u.stats.rate);
+    u.recoil = 1;
+    u.lastFire = this.time;
+    if (u.def.onFire) u.def.onFire(u, target, this);
+    else if (u.ability?.fire) u.ability.fire(u, target, this);
+    else this.fireProjectile(u, target);
+  }
+
+  // ------------------------------------------------------------------ allies, timers, fields
+
+  /**
+   * Summons a temporary combatant for `owner`. Allies fight with the stats of
+   * `def` at the owner's level (clamped), receive no buffs, can't be selected,
+   * sold or upgraded, and never count as deployed units for any passive.
+   */
+  spawnAlly(owner, defId, { life = 10, slot = 0, of = 1 } = {}) {
+    const def = getUnit(defId) ?? getAllyDef(defId);
+    if (!def) return null;
+    const level = Math.min(owner.level, maxLevel(def));
+    const ang = (slot / Math.max(1, of)) * Math.PI * 2 + (owner.uid % 7);
+    const a = createUnit(def);
+    Object.assign(a, {
+      uid: `ally-${++allySeq}`,
+      ally: true,
+      owner,
+      level,
+      stats: levelStats(def, level),
+      x: owner.x + Math.cos(ang) * TILE * 0.9,
+      y: owner.y + Math.sin(ang) * TILE * 0.6,
+      cooldown: 0.4,
+      life,
+      maxLife: life,
+      bornAt: this.time,
+      ability: abilityOf(def),
+      spent: 0,
+    });
+    a.ability?.init?.(a, this);
+    this.allies.push(a);
+    this.stats.alliesSummoned++;
+    this.emit('allySpawn', a);
+    return a;
+  }
+
+  alliesOf(owner) {
+    return this.allies.filter((a) => a.owner === owner);
+  }
+
+  updateAllies(dt) {
+    if (!this.allies.length) return;
+    let w = 0;
+    for (let i = 0; i < this.allies.length; i++) {
+      const a = this.allies[i];
+      a.life -= dt;
+      if (a.life <= 0 || !a.owner.placed) {
+        this.emit('allyGone', a);
         continue;
       }
-      u.angle = Math.atan2(target.y - u.y, target.x - u.x);
-      if (Math.abs(target.x - u.x) > 2) u.facing = target.x > u.x ? 1 : -1;
-      u.cooldown = 1 / Math.max(0.01, u.stats.rate);
-      u.recoil = 1;
-      u.lastFire = this.time;
-      if (u.def.onFire) u.def.onFire(u, target, this);
-      else this.fireProjectile(u, target);
+      this.attack(a, dt);
+      this.allies[w++] = a;
     }
+    this.allies.length = w;
+  }
+
+  /** Runs `fn` after `delay` seconds of game time (bursts, bombs, aftershocks). */
+  after(delay, fn) {
+    this.timers.push({ t: this.time + delay, fn });
+  }
+
+  updateTimers() {
+    if (!this.timers.length) return;
+    const due = [];
+    let w = 0;
+    for (let i = 0; i < this.timers.length; i++) {
+      const t = this.timers[i];
+      if (t.t <= this.time) due.push(t);
+      else this.timers[w++] = t;
+    }
+    this.timers.length = w;
+    for (const t of due) t.fn();
+  }
+
+  /** Gravity field: holds enemies inside and gathers them, then detonates. */
+  addField(f) {
+    const field = { ...f, t: 0 };
+    this.fields.push(field);
+    this.emit('field', field);
+    return field;
+  }
+
+  updateFields(dt) {
+    if (!this.fields.length) return;
+    let w = 0;
+    for (let i = 0; i < this.fields.length; i++) {
+      const f = this.fields[i];
+      f.t += dt;
+      if (f.t >= f.duration) {
+        this.explode(f.x, f.y, f.radius, f.damage, f.source, { kind: 'antimatter', onHit: f.onHit });
+        continue;
+      }
+      this.hash.each(f.x, f.y, f.radius, (e) => {
+        if (e.isBoss) return; // bosses resist the pull (they still take the blast)
+        e.gravity = { x: f.x, y: f.y, until: this.time + 0.15 };
+      });
+      this.fields[w++] = f;
+    }
+    this.fields.length = w;
+  }
+
+  /** Damage every enemy within `radius`. Used by bombs, barrages and fields. */
+  explode(x, y, radius, damage, source, { kind = 'blast', onHit = null, focusMult = 1 } = {}) {
+    let focus = null;
+    if (focusMult > 1) focus = this.hash.best(x, y, radius, (e) => e.hp + e.shield);
+    this.hash.each(x, y, radius, (e) => {
+      if (!e.alive || e.invulnerable) return;
+      this.damageEnemy(e, damage * (e === focus ? focusMult : 1), source);
+      if (onHit && e.alive) this.applyOnHit(e, onHit);
+    });
+    this.emit('blast', { x, y, radius, kind, focus: focus ? { x: focus.x, y: focus.y } : null });
+  }
+
+  applyStatusTo(e, id, opts) {
+    if (e.alive && !e.invulnerable) applyStatus(e, id, this.time, opts);
+  }
+
+  applyOnHit(e, onHit) {
+    for (const h of onHit) if (h.chance >= 1 || this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time, h);
+  }
+
+  /** Bonus coins from abilities (shown as a pop-up). Goes through the coin multiplier. */
+  grantCoins(amount, x, y, label = null) {
+    const gained = this.gainCoins(amount);
+    this.stats.bonusCoins += gained;
+    this.emit('bonusCoins', { amount: gained, x, y, label });
+    return gained;
   }
 
   findTarget(u, range) {
@@ -435,6 +594,8 @@ export class Game {
     p.damage = spec?.damage ?? u.stats.damage;
     p.splash = spec?.splash ?? u.stats.splash;
     p.onHit = spec ? spec.onHit : (u.def.onHit ?? null);
+    p.crit = !!spec?.crit;
+    p.stumble = !!spec?.stumble;
     p.color = proj.color ?? '#ffffff';
     p.tier = u.tier;
     p.source = u;
@@ -488,19 +649,22 @@ export class Game {
     const hit = (e) => {
       if (!e.alive || e.invulnerable) return;
       this.damageEnemy(e, p.damage, p.source);
-      if (onHit && e.alive) {
-        for (const h of onHit) if (h.chance >= 1 || this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time);
-      }
+      if (onHit && e.alive) this.applyOnHit(e, onHit);
     };
     if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
     else if (p.target) hit(p.target);
     if (def?.impactHazard && !isDrone(p)) this.addHazard(p.x, p.y, def.impactHazard, p.damage, p.source);
+    const a = def?.ability;
+    if (a?.aftershock && p.kind === def.projectile?.kind) {
+      const { x, y, splash, damage, source } = p;
+      this.after(a.aftershockDelay, () => this.explode(x, y, splash, damage * a.aftershock, source, { kind: 'aftershock' }));
+    }
     this.emit('impact', p);
   }
 
   /** Ground hazard such as flames: periodic damage to enemies standing in it. */
   addHazard(x, y, spec, baseDamage, source) {
-    const h = { x, y, kind: spec.kind, radius: spec.radius, ttl: spec.duration, max: spec.duration, dps: baseDamage * spec.dpsFactor, source };
+    const h = { x, y, kind: spec.kind, status: spec.status ?? 'burning', radius: spec.radius, ttl: spec.duration, max: spec.duration, dps: baseDamage * spec.dpsFactor, source };
     this.hazards.push(h);
     if (this.hazards.length > 400) this.hazards.shift();
     this.emit('hazard', h);
@@ -520,7 +684,7 @@ export class Game {
       if (tick) {
         this.hash.each(h.x, h.y, h.radius, (e) => {
           if (!e.alive || e.invulnerable) return;
-          applyStatus(e, 'burning', this.time);
+          applyStatus(e, h.status, this.time);
           this.damageEnemy(e, h.dps * HAZARD_TICK, h.source);
         });
       }
@@ -560,12 +724,26 @@ export class Game {
     this.gainCoins(e.reward);
     this.stats.kills++;
     if (source) source.kills++;
+    if (e.bounty && e.bounty.until > this.time) this.grantCoins(e.bounty.coins, e.x, e.y - 12, 'Bounty');
+    source?.ability?.onKill?.(source, e, this);
+    this.houseEdgeKill();
     e.variant?.onDeath?.(e, this);
     this.emit('death', e);
     if (e.isBoss) {
       this.stats.bossesDefeated++;
       this.emit('bossDefeated', e);
     }
+  }
+
+  /** THE HOUSE: every N kills while one is deployed, +1% damage to all allies for this battle (capped). */
+  houseEdgeKill() {
+    const house = this.house;
+    if (!house) return;
+    const a = house.def.ability;
+    if (++this.houseKills % a.killsPerEdge !== 0 || this.battleBonus.damage >= a.edgeCap - 1e-9) return;
+    this.battleBonus.damage = Math.min(a.edgeCap, Math.round((this.battleBonus.damage + 0.01) * 100) / 100);
+    this.refreshAll();
+    this.emit('houseEdge', this.battleBonus.damage);
   }
 
   compact() {
@@ -592,14 +770,16 @@ export class Game {
     // Tokens are only granted for fully completed waves.
     const tokens = GAME_CONFIG.tokensPerWave;
     this.tokensEarned += tokens;
+    const gems = plan.isBoss ? GAME_CONFIG.gemsPerBossWave : 0;
+    this.gemsEarned += gems;
     this.stats.wavesCleared++;
-    this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, plan });
+    this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, gems, plan });
   }
 
   gameOver() {
     if (this.phase === 'gameover') return;
     this.phase = 'gameover';
-    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome, tokens: this.tokensEarned });
+    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome, tokens: this.tokensEarned, gems: this.gemsEarned });
   }
 
   // ------------------------------------------------------------------ units
@@ -618,7 +798,7 @@ export class Game {
 
   /** Context handed to passives. Counts only units actually on the battlefield. */
   passiveContext(def) {
-    return { deployed: this.deployedCount(def.id) };
+    return { deployed: this.deployedCount(def.id), count: (id) => this.deployedCount(id) };
   }
 
   /** Recomputes effective stats for one unit (level stats + passive + buffs + weather). */
@@ -641,6 +821,7 @@ export class Game {
     let m = this.weather?.current?.coinMult ?? 1;
     for (const v of ids.values()) m *= v;
     this.coinMult = m;
+    this.house = this.units.find((u) => u.def.ability?.id === 'the-house') ?? null;
     this.economyIds = [...ids.keys()];
   }
 
@@ -652,8 +833,15 @@ export class Game {
 
   refreshAll() {
     for (const u of this.units) this.refreshUnit(u);
+    // buffs whose radius follows the source's range may now reach different units
+    for (const u of computeAuras(this.units)) this.refreshUnit(u);
     this.refreshEconomy();
     this.emit('statsChanged', null);
+  }
+
+  /** Units whose passive depends on how many of `defId` are deployed (e.g. Outlaw Leader ← Outlaws). */
+  refreshWatchers(defId) {
+    for (const u of this.units) if (u.def.passive?.watches?.includes(defId)) this.refreshUnit(u);
   }
 
   /**
@@ -697,9 +885,12 @@ export class Game {
     this.deployed.set(def.id, this.deployedCount(def.id) + 1);
     this.stats.unitsDeployed++;
     this.stats.peakUnits = Math.max(this.stats.peakUnits, this.units.length);
+    u.ability = abilityOf(def);
     if (def.passive?.modify) this.refreshType(def.id);
     else this.refreshUnit(u);
+    this.refreshWatchers(def.id);
     this.refreshAuras();
+    u.ability?.init?.(u, this);
     def.onPlace?.(u, this);
     this.emit('place', u);
     return u;
@@ -720,7 +911,9 @@ export class Game {
     this.coins += refund;
     this.deployed.set(u.def.id, Math.max(0, this.deployedCount(u.def.id) - 1));
     if (u.def.passive?.modify) this.refreshType(u.def.id);
+    this.refreshWatchers(u.def.id);
     this.refreshAuras();
+    u.ability?.remove?.(u, this);
     this.emit('sell', { unit: u, refund });
     return refund;
   }
@@ -733,7 +926,40 @@ export class Game {
   effectiveStats(u, level = u.level) {
     const s = applyPassive(u.def, levelStats(u.def, level), this.passiveContext(u.def));
     const defs = this.buffDefs();
-    for (const id of u.auras ?? []) applyModifiers(s, defs.get(id));
+    for (const id of u.auras ?? []) applyModifiers(s, scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0));
+    // capped self bonuses from abilities (streaks, jackpots, soldiers) and battle-long bonuses
+    const dmg = (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0);
+    if (dmg) s.damage *= 1 + dmg;
+    if (u.bonus?.rate) s.rate *= 1 + u.bonus.rate;
+    applyModifiers(s, this.weather?.current);
+    return s;
+  }
+
+  /**
+   * Stats a new copy of `defId` would have on (col, row): the same derivation as
+   * a deployed unit (level 0 → passive with one more copy → buffs reaching that
+   * tile → weather), so the placement preview ring matches combat exactly.
+   */
+  previewStats(defId, col, row) {
+    const def = getUnit(defId);
+    if (!def) return null;
+    const x = col * TILE + TILE / 2;
+    const y = row * TILE + TILE / 2;
+    const probe = { def, level: 0, x, y, auras: [], auraLevels: {} };
+    const best = new Map();
+    for (const s of this.units) {
+      for (const b of s.def.buffs ?? []) {
+        const r = b.radius === 'range' ? s.stats.range : b.radius;
+        if (r === Infinity || (s.x - x) ** 2 + (s.y - y) ** 2 <= r * r) if (!best.has(b.id) || s.level > best.get(b.id)) best.set(b.id, s.level);
+      }
+    }
+    probe.auras = [...best.keys()];
+    probe.auraLevels = Object.fromEntries(best);
+    const ctx = this.passiveContext(def);
+    const s = applyPassive(def, levelStats(def, 0), { ...ctx, deployed: ctx.deployed + 1 });
+    const defs = this.buffDefs();
+    for (const id of probe.auras) applyModifiers(s, scaledBuff(defs.get(id), probe.auraLevels[id]));
+    if (this.battleBonus?.damage) s.damage *= 1 + this.battleBonus.damage;
     applyModifiers(s, this.weather?.current);
     return s;
   }
@@ -765,6 +991,7 @@ export class Game {
     this.stats.upgrades++;
     this.stats.coinsSpent += cost;
     this.refreshUnit(u);
+    if (u.def.buffs) for (const o of computeAuras(this.units)) this.refreshUnit(o);
     this.emit('upgrade', u);
     return true;
   }

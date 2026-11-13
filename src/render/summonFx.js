@@ -16,9 +16,17 @@ import * as sfx from '../audio/sfx.js';
 const TAU = Math.PI * 2;
 const PAINT = '#c8b07c'; // faded stencil paint
 // Per-circle floor art: paint colour, stencil text, extra ring.
+// floorTint: colour washed over the slab; emblem: centre motif; stampText: rare stamp;
+// beacon: rgb of the sweeping light during a rare blackout.
 const CIRCLE_STYLES = {
   'military-circle': { paint: PAINT, text: 'REQUISITION · ENDLESS TOWER · FORWARD COMMAND · ', doubleRing: false, chevrons: 4 },
   'advanced-military-circle': { paint: '#c4574a', accent: '#d6b048', text: 'SPECIAL ASSETS · ADVANCED REQUISITION · RESTRICTED · ', doubleRing: true, chevrons: 6 },
+  // dusty boards and a sheriff's star, branded into the floor
+  'wild-west-circle': { paint: '#d9a066', accent: '#e8c255', text: 'WANTED · DEAD OR ALIVE · REWARD · FRONTIER · ', chevrons: 6, emblem: 'badge', floorTint: 'rgba(120,70,30,0.32)', planks: true, stampText: 'WANTED', beacon: '230,150,60' },
+  // green felt and a roulette wheel
+  'gambino-circle': { paint: '#d6b048', accent: '#b7353a', text: 'PLACE YOUR BETS · THE HOUSE ALWAYS WINS · ', doubleRing: true, chevrons: 8, emblem: 'roulette', floorTint: 'rgba(16,90,52,0.42)', stampText: 'JACKPOT', beacon: '230,190,70' },
+  // hazard-striped launch pad (arcade sci-fi)
+  'nuclear-war-circle': { paint: '#d9a12a', accent: '#2fb39a', text: 'ARCADE ARMAGEDDON · PREMIUM HARDWARE · LAUNCH CONTROL · ', doubleRing: true, chevrons: 3, emblem: 'atom', floorTint: 'rgba(20,50,40,0.3)', hazard: true, stampText: 'OMEGA CLEARANCE', beacon: '60,220,180' },
 };
 export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
 const STEEL = '#9aa1aa';
@@ -83,6 +91,23 @@ function star(ctx, r) {
  */
 export function paintCircle(ctx, w, h, cx, cy, R, s) {
   floor(ctx, w, h);
+  const st = s.style ?? CIRCLE_STYLES['military-circle'];
+  if (st.floorTint) {
+    ctx.fillStyle = st.floorTint;
+    ctx.fillRect(0, 0, w, h);
+  }
+  if (st.planks) {
+    // weathered floorboards
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = 2;
+    const gap = Math.max(18, R * 0.16);
+    for (let y = (cy % gap) - gap; y < h; y += gap) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+  }
   // overhead work lamp: a warm pool of light on the slab
   const light = s.light ?? 1;
   const pool = ctx.createRadialGradient(cx, cy - R * 0.1, R * 0.2, cx, cy, R * 2.1);
@@ -102,9 +127,25 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.fillRect(0, 0, w, h);
   }
 
-  const st = s.style ?? CIRCLE_STYLES['military-circle'];
   ctx.save();
   ctx.translate(cx + (s.shakeX ?? 0), cy + (s.shakeY ?? 0));
+  if (st.hazard) {
+    // hazard band around the pad
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.3 * light;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 1.2, 0, TAU);
+    ctx.arc(0, 0, R * 1.14, 0, TAU, true);
+    ctx.clip();
+    for (let i = 0; i < 48; i++) {
+      ctx.fillStyle = i % 2 ? '#d9a12a' : '#1c1d1f';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, R * 1.3, (i / 48) * TAU + (s.rotOuter ?? 0), ((i + 1) / 48) * TAU + (s.rotOuter ?? 0));
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   ctx.globalAlpha = 0.55 + 0.35 * light;
   ctx.strokeStyle = st.paint;
   ctx.fillStyle = st.paint;
@@ -162,9 +203,51 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
   ctx.arc(0, 0, R * 0.26, 0, TAU);
   ctx.stroke();
   if (st.accent) ctx.fillStyle = st.accent;
-  star(ctx, R * 0.2);
-  ctx.fill();
-  if (st.accent) {
+  if (st.emblem === 'roulette') {
+    ctx.save();
+    ctx.rotate((s.rotInner ?? 0) * 3);
+    for (let i = 0; i < 18; i++) {
+      ctx.fillStyle = i === 0 ? '#2f8a4a' : i % 2 ? '#b7353a' : '#16161a';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, R * 0.24, (i / 18) * TAU, ((i + 1) / 18) * TAU);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#d6b048';
+    circle(ctx, 0, 0, R * 0.07);
+    ctx.fill();
+    ctx.restore();
+  } else if (st.emblem === 'atom') {
+    ctx.strokeStyle = st.accent;
+    ctx.lineWidth = R * 0.018;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(0, 0, R * 0.21, R * 0.075, (s.rotInner ?? 0) + (i * Math.PI) / 3, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.fillStyle = st.accent;
+    circle(ctx, 0, 0, R * 0.045);
+    ctx.fill();
+  } else if (st.emblem === 'badge') {
+    // six-pointed sheriff star with ball tips
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 6;
+      const rr = i % 2 ? R * 0.1 : R * 0.21;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 3;
+      circle(ctx, Math.cos(a) * R * 0.22, Math.sin(a) * R * 0.22, R * 0.025);
+      ctx.fill();
+    }
+  } else {
+    star(ctx, R * 0.2);
+    ctx.fill();
+  }
+  if (st.accent && !st.emblem) {
     // rank bars above the star on the advanced circle
     for (let i = 0; i < 2; i++) ctx.fillRect(-R * 0.09, -R * 0.36 - i * R * 0.05, R * 0.18, R * 0.025);
   }
@@ -176,14 +259,16 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.rotate(-0.18);
     ctx.scale(1 + (1 - k) * 0.6, 1 + (1 - k) * 0.6);
     ctx.globalAlpha = k * 0.9;
-    ctx.strokeStyle = '#d9533f';
+    const stampCol = s.stampColor ?? '#d9533f';
+    ctx.strokeStyle = stampCol;
     ctx.lineWidth = R * 0.025;
     ctx.strokeRect(-R * 0.62, -R * 0.13, R * 1.24, R * 0.26);
-    ctx.fillStyle = '#d9533f';
+    ctx.fillStyle = stampCol;
     ctx.font = `800 ${R * 0.17}px "Barlow Condensed", "Arial Narrow", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('CLASSIFIED', 0, R * 0.01);
+    ctx.font = `800 ${R * (((s.stampText ?? st.stampText ?? 'CLASSIFIED').length > 11) ? 0.12 : 0.17)}px "Barlow Condensed", "Arial Narrow", sans-serif`;
+    ctx.fillText(s.stampText ?? st.stampText ?? 'CLASSIFIED', 0, R * 0.01);
     ctx.restore();
   }
 
@@ -204,12 +289,13 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
   if (s.beacon != null) {
     // rotating red emergency beacon: a single sweeping wedge of light
     const g = ctx.createConicGradient ? ctx.createConicGradient(s.beacon, 0, 0) : null;
+    const bc = s.beaconColor ?? st.beacon ?? '210,50,35';
     if (g) {
-      g.addColorStop(0, 'rgba(210,50,35,0.28)');
-      g.addColorStop(0.08, 'rgba(210,50,35,0)');
-      g.addColorStop(0.5, 'rgba(210,50,35,0)');
-      g.addColorStop(0.58, 'rgba(210,50,35,0.28)');
-      g.addColorStop(0.581, 'rgba(210,50,35,0)');
+      g.addColorStop(0, `rgba(${bc},0.28)`);
+      g.addColorStop(0.08, `rgba(${bc},0)`);
+      g.addColorStop(0.5, `rgba(${bc},0)`);
+      g.addColorStop(0.58, `rgba(${bc},0.28)`);
+      g.addColorStop(0.581, `rgba(${bc},0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(0, 0, R * 2.4, 0, TAU);
@@ -413,6 +499,239 @@ export class SummonStage {
   }
 }
 
+// ---------------------------------------------------------------- rare shows
+// Signature reveals for the rarest units. They only decorate the sequence:
+// the result was decided before the animation started.
+
+const lerp = (a, b, k) => a + (b - a) * k;
+
+function sunsetWash(ctx, w, h, a) {
+  const g = ctx.createLinearGradient(0, h, 0, 0);
+  g.addColorStop(0, `rgba(230,120,40,${0.32 * a})`);
+  g.addColorStop(1, `rgba(120,40,30,${0.12 * a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function coinShower(ctx, cx, h, R, t, n, color = '#e8c255') {
+  for (let i = 0; i < n; i++) {
+    const seed = (i * 97.13) % 1;
+    const x = cx + (((i * 53) % 100) / 100 - 0.5) * R * 3.2;
+    const y = -20 + ((t * (220 + ((i * 31) % 120)) + i * 37) % (h + 40));
+    const flip = Math.abs(Math.sin(t * 8 + i));
+    ctx.fillStyle = color;
+    ctx.strokeStyle = '#8a6a1a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 5 + seed * 2, (5 + seed * 2) * flip + 0.6, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+const SLOT_SYMBOLS = ['7', '♣', 'BAR', '♦', '★', '♥'];
+
+const RARE_SHOWS = {
+  // FASTEST HAND IN THE WEST: a sundown standoff. A revolver cylinder spins in the
+  // silence, then six shots ring out around the circle before the crate lands.
+  'fastest-hand': {
+    stamp: 'HIGH NOON',
+    stampColor: '#e8c255',
+    beaconColor: '230,150,60',
+    cues(seq, t, ph) {
+      if (t >= ph.quiet) seq.cue('cylinder', () => sfx.cylinder(12));
+      for (let i = 0; i < 6; i++) if (t >= ph.slam + i * 0.09) seq.cue(`bang${i}`, () => sfx.shot('golden', 1));
+    },
+    draw(ctx, { cx, cy, R, w, h, t, ph }) {
+      if (t > ph.quiet) sunsetWash(ctx, w, h, Math.min(1, (t - ph.quiet) / 0.6));
+      if (t > ph.quiet && t < ph.slam + 0.2) {
+        const k = Math.min(1, (t - ph.quiet) / (ph.slam - ph.quiet));
+        const rot = (1 - Math.pow(1 - k, 3)) * TAU * 5;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.globalAlpha = t > ph.slam ? 1 - (t - ph.slam) / 0.2 : 1;
+        ctx.fillStyle = '#4a4850';
+        ctx.strokeStyle = '#141216';
+        ctx.lineWidth = 3;
+        circle(ctx, 0, 0, R * 0.34);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#141216';
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * TAU;
+          circle(ctx, Math.cos(a) * R * 0.2, Math.sin(a) * R * 0.2, R * 0.07);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#c9a24a';
+        circle(ctx, 0, 0, R * 0.05);
+        ctx.fill();
+        ctx.restore();
+      }
+      for (let i = 0; i < 6; i++) {
+        const tt = t - (ph.slam + i * 0.09);
+        if (tt < 0) continue;
+        const a = -Math.PI / 2 + (i / 6) * TAU;
+        const x = cx + Math.cos(a) * R * 0.86;
+        const y = cy + Math.sin(a) * R * 0.86;
+        ctx.fillStyle = '#141216';
+        circle(ctx, x, y, R * 0.03);
+        ctx.fill();
+        if (tt < 0.14) {
+          ctx.fillStyle = `rgba(255,233,168,${1 - tt / 0.14})`;
+          ctx.beginPath();
+          for (let j = 0; j < 8; j++) {
+            const b = (j / 8) * TAU;
+            const rr = (j % 2 ? 0.35 : 1) * R * 0.12;
+            ctx.lineTo(x + Math.cos(b) * rr, y + Math.sin(b) * rr);
+          }
+          ctx.fill();
+        }
+      }
+    },
+  },
+  // THE HOUSE: the circle becomes a slot machine. Three reels stop one by one on
+  // 7-7-7, the lamps flood gold and coins pour down.
+  'the-house': {
+    stamp: 'JACKPOT',
+    stampColor: '#e8c255',
+    beaconColor: '230,190,70',
+    cues(seq, t, ph) {
+      for (let i = 0; i < 3; i++) if (t >= ph.reel(i)) seq.cue(`reel${i}`, () => sfx.reelStop(1 + i * 0.25));
+      if (t >= ph.slam) seq.cue('jackpot', () => sfx.coins(true));
+      if (t >= ph.slam + 0.4) seq.cue('jackpot2', () => sfx.coins(true));
+    },
+    draw(ctx, { cx, cy, R, w, h, t, ph }) {
+      if (t > ph.quiet && t < ph.tDrop) {
+        const fw = R * 1.3;
+        const fh = R * 0.46;
+        const x0 = cx - fw / 2;
+        const y0 = cy - R * 0.62;
+        ctx.fillStyle = '#5a1f2a';
+        ctx.strokeStyle = '#d6b048';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.roundRect(x0 - 10, y0 - 10, fw + 20, fh + 20, 10);
+        ctx.fill();
+        ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+          const rx = x0 + (i * fw) / 3 + 4;
+          const rw = fw / 3 - 8;
+          ctx.fillStyle = '#f4efe6';
+          ctx.fillRect(rx, y0, rw, fh);
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(rx, y0, rw, fh);
+          ctx.clip();
+          const stopped = t >= ph.reel(i);
+          const spin = stopped ? 0 : (t * (9 + i * 2)) % SLOT_SYMBOLS.length;
+          ctx.font = `800 ${fh * 0.62}px "Barlow Condensed", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          for (let k = -1; k <= 1; k++) {
+            const idx = stopped ? 0 : (Math.floor(spin) + k + SLOT_SYMBOLS.length) % SLOT_SYMBOLS.length;
+            const off = stopped ? k * fh : (k - (spin % 1)) * fh;
+            const sym = SLOT_SYMBOLS[idx];
+            ctx.fillStyle = sym === '7' ? '#c4392b' : '#1d1b1a';
+            if (!stopped || k === 0) ctx.fillText(sym, rx + rw / 2, y0 + fh / 2 + off);
+          }
+          ctx.restore();
+          if (stopped && t - ph.reel(i) < 0.2) {
+            ctx.strokeStyle = '#ffe9a8';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(rx, y0, rw, fh);
+          }
+        }
+      }
+      if (t >= ph.slam) coinShower(ctx, cx, h, R, t - ph.slam, 46);
+    },
+  },
+  'high-roller': {
+    stamp: 'HIGH ROLLER',
+    stampColor: '#e8c255',
+    beaconColor: '230,190,70',
+    cues(seq, t, ph) {
+      if (t >= ph.slam) seq.cue('coins', () => sfx.coins(true));
+    },
+    draw(ctx, { cx, h, R, t, ph }) {
+      if (t >= ph.slam) coinShower(ctx, cx, h, R, t - ph.slam, 22, '#b7353a');
+    },
+  },
+  // NUCLEAR WARHEAD (arcade): a launch countdown, then a teal flash.
+  'nuclear-warhead': {
+    stamp: 'GROUND ZERO',
+    stampColor: '#2fb39a',
+    beaconColor: '60,220,180',
+    cues(seq, t, ph) {
+      for (let i = 0; i < 3; i++) if (t >= lerp(ph.quiet, ph.slam, i / 3)) seq.cue(`count${i}`, () => sfx.click(1.6 - i * 0.2));
+      if (t >= ph.slam) seq.cue('boom', () => sfx.explosion(4, 1));
+    },
+    draw(ctx, { cx, cy, R, w, h, t, ph }) {
+      if (t > ph.quiet && t < ph.slam) {
+        const k = (t - ph.quiet) / (ph.slam - ph.quiet);
+        const n = 3 - Math.floor(k * 3);
+        ctx.font = `800 ${R * 0.7}px "Barlow Condensed", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = `rgba(159,245,221,${0.4 + 0.6 * (1 - ((k * 3) % 1))})`;
+        ctx.fillText(String(n), cx, cy);
+      }
+      if (t >= ph.slam && t < ph.slam + 0.5) {
+        ctx.fillStyle = `rgba(200,255,240,${0.6 * (1 - (t - ph.slam) / 0.5)})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+    },
+  },
+  // ANTIMATTER WARHEAD (arcade): space folds into the centre, then bursts violet.
+  'antimatter-warhead': {
+    stamp: 'SINGULARITY',
+    stampColor: '#b79cff',
+    beaconColor: '150,110,240',
+    cues(seq, t, ph) {
+      if (t >= ph.quiet) seq.cue('implode', () => sfx.implode(ph.slam - ph.quiet));
+      if (t >= ph.slam) seq.cue('boom', () => sfx.explosion(4, 1));
+    },
+    draw(ctx, { cx, cy, R, w, h, t, ph }) {
+      if (t > ph.quiet && t < ph.slam) {
+        const k = (t - ph.quiet) / (ph.slam - ph.quiet);
+        for (let i = 0; i < 5; i++) {
+          const q = 1 - (((k * 2 + i / 5) % 1));
+          ctx.strokeStyle = `rgba(183,156,255,${0.7 * (1 - q)})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(cx, cy, R * 1.6 * q, 0, TAU);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#0c0814';
+        circle(ctx, cx, cy, R * 0.08 * (1 + k));
+        ctx.fill();
+      }
+      if (t >= ph.slam && t < ph.slam + 0.5) {
+        ctx.fillStyle = `rgba(220,200,255,${0.6 * (1 - (t - ph.slam) / 0.5)})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+    },
+  },
+};
+
+/** Phase times of the current reveal, shared by the rare shows. */
+function phases(T) {
+  const tLock = T.lock;
+  const tCharge = tLock + T.charge;
+  const tDrop = tCharge + T.drop;
+  return {
+    tLock,
+    tCharge,
+    tDrop,
+    tOpen: tDrop + T.open,
+    quiet: tLock * 0.6,
+    slam: tLock + T.charge * 0.7,
+    reel: (i) => tLock + T.charge * (0.25 + i * 0.2),
+  };
+}
+
+export const hasRareShow = (unitId) => !!RARE_SHOWS[unitId];
+
 // ---------------------------------------------------------------- reveal
 
 const portraitImages = new Map();
@@ -518,6 +837,8 @@ export class RevealSequence {
       if (this.t >= at) this.cue(`lock${k}`, () => sfx.click(1 + k * 0.08));
     }
     if (this.t >= tLock * 0.5) this.cue('hum', () => sfx.hum(T.charge + tLock * 0.5, tier / 5));
+    const show = r.rare ? RARE_SHOWS[r.unit] : null;
+    show?.cues(this, this.t, phases(T));
     if ((tier >= 5 || r.rare) && this.t >= tLock) this.cue('alarm', () => sfx.alarm(r.rare));
     if (this.t >= tCharge) this.cue('whoosh', () => sfx.whoosh(T.drop));
     if (this.t >= tDrop) this.cue('thud', () => sfx.thud(Math.min(2, tier / 2.5)));
@@ -566,6 +887,7 @@ export class RevealSequence {
     const lamps = [];
     // Rare: lamps black out and a red beacon sweeps, then every lamp slams on in the tier colour.
     const rare = !!r.rare;
+    const show = rare ? RARE_SHOWS[r.unit] : null;
     const blackout = rare && t > tLock * 0.6 && t < tLock + T.charge * 0.7;
     for (let i = 0; i < LAMPS; i++) {
       if (rare) lamps.push(blackout ? null : t >= tLock + T.charge * 0.7 ? tierColor : i < litCount ? ladder[0] : null);
@@ -592,11 +914,16 @@ export class RevealSequence {
       beacon: blackout ? t * 5 : null,
       stamp: rare && t >= tLock + T.charge * 0.7 ? (t - (tLock + T.charge * 0.7)) / 0.25 : 0,
       style: this.style,
+      stampText: show?.stamp,
+      stampColor: show?.stampColor,
+      beaconColor: show?.beaconColor,
       sweepColor: ladder[stage],
       strobe: tier >= 5 && t > tLock && t < tDrop ? 0.5 + 0.5 * Math.sin(t * 18) : 0,
       shakeX,
       shakeY,
     });
+
+    show?.draw(ctx, { cx, cy, R, w, h, t, ph: phases(T) });
 
     // the crate falls from above the lamp and lands on the star
     if (t >= tCharge) {

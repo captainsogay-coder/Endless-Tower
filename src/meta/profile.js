@@ -38,7 +38,7 @@ export class Profile {
       unlocked: [...this.starterUnits],
       plan: createPlan('Battle Plan Alpha', []),
       // Meta currencies. Coins are per-battle and live in the Game, never here.
-      wallet: { tokens: 0 },
+      wallet: { tokens: 0, gems: 0 },
       owned: {}, // unitId -> times obtained (duplicates are counted, not duplicated)
       mapHistory: [], // recent battlefields, used to avoid repeats
       battles: 0,
@@ -64,7 +64,7 @@ export class Profile {
       ...base,
       unlocked: [...unlocked],
       plan: createPlan(typeof d.plan?.name === 'string' && d.plan.name.trim() ? d.plan.name.slice(0, 32) : base.plan.name, units),
-      wallet: { tokens: Math.max(0, Math.floor(Number(d.wallet?.tokens) || 0)) },
+      wallet: { tokens: Math.max(0, Math.floor(Number(d.wallet?.tokens) || 0)), gems: Math.max(0, Math.floor(Number(d.wallet?.gems) || 0)) },
       owned: d.owned && typeof d.owned === 'object' ? Object.fromEntries(Object.entries(d.owned).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Math.floor(Number(v))])) : {},
       mapHistory: Array.isArray(d.mapHistory) ? d.mapHistory.filter((m) => m && typeof m.biome === 'string').slice(-8) : [],
       battles: Number(d.battles) || 0,

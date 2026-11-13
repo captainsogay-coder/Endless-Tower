@@ -15,6 +15,19 @@ const MIN_GAP = {
   artillery: 0.15,
   drone: 0.12,
   'explosive-drone': 0.12,
+  revolver: 0.03,
+  golden: 0.1,
+  bottle: 0.1,
+  dynamite: 0.12,
+  card: 0.05,
+  chip: 0.05,
+  sequin: 0.08,
+  missile: 0.12,
+  icbm: 0.3,
+  warhead: 0.4,
+  antimatter: 0.4,
+  coins: 0.15,
+  flyover: 1,
   explosion: 0.05,
   death: 0.08,
 };
@@ -63,10 +76,24 @@ export class AudioDirector {
       if (v) sfx.shot(p.kind, v);
     });
     game.on('impact', (p) => {
-      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone'].includes(p.kind)) return;
+      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter'].includes(p.kind)) return;
       const v = this.allow('explosion');
       if (v) sfx.explosion((p.splash || 32) / 32, v);
     });
+    game.on('blast', (b) => {
+      const v = this.allow('explosion');
+      if (v) sfx.explosion(Math.min(4, b.radius / 32), v);
+    });
+    game.on('bonusCoins', (c) => {
+      const v = this.allow('coins');
+      if (v) sfx.coins(!!c.label, v);
+    });
+    game.on('flyover', (f) => {
+      const v = this.allow('flyover');
+      if (v) sfx.flyover(Math.min(3, f.duration));
+    });
+    game.on('field', (f) => this.active && sfx.implode(f.duration));
+    game.on('houseWheel', () => this.active && sfx.reelStop(1.2));
     game.on('lightning', () => this.active && sfx.lightning());
     game.on('bossArrived', () => this.active && sfx.bossRoar());
     game.on('waveStart', () => {

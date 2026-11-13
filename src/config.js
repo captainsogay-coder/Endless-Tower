@@ -9,6 +9,8 @@ export const GAME_CONFIG = Object.freeze({
   startingCoins: 100,
   sellRefund: 0.7,
   tokensPerWave: 100,
+  // Gems: a separate, rarer currency for premium circles. Earned only by clearing boss waves.
+  gemsPerBossWave: 50,
   // Multi-wave: called waves start this many seconds apart; one call can queue up to maxWaveCall waves.
   waveStagger: 0.35,
   maxWaveCall: 1000,

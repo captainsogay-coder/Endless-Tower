@@ -487,3 +487,89 @@ table.levels tr.current td { color: var(--accent); }
   .banner-tabs { left: 16px; right: 16px; bottom: 12px; }
   .banner-tab { flex: 1; padding: 6px 8px; font-size: 12px; }
 }
+
+/* ---------------------------------------------------------------- unit panel (upgrades)
+   Lives in the dock. Desktop: floats above the dock at the right edge of the
+   battlefield. Phones: takes the deploy bar's place inside the dock, so the
+   Upgrade button is always on screen and wave controls stay reachable. */
+#dock { position: relative; }
+#unit-panel { position: absolute; right: 16px; bottom: calc(100% + 12px); top: auto; width: 300px; max-height: calc(100vh - 230px); max-height: calc(100dvh - 230px); display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.45); z-index: 4; }
+#unit-panel[hidden] { display: none; }
+#unit-panel .up-body { overflow-y: auto; min-height: 0; }
+.up-tier { color: var(--c); }
+.up-pips { display: flex; gap: 3px; }
+.up-pips i { flex: 1; height: 4px; background: var(--surface-3); border-radius: 1px; }
+.up-pips i.on { background: var(--accent); }
+.up-costline { margin-top: 6px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.up-costline b { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-family: var(--display); font-size: 15px; }
+.up-need { color: var(--danger); }
+.up-max { margin-top: 6px; font-family: var(--display); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-size: 13px; color: var(--ok); }
+.up-lines { margin: 6px 0 0; padding-left: 16px; font-size: 12px; color: var(--text-2); line-height: 1.4; }
+.up-actions { padding: 8px 12px 12px; border-top: 1px solid var(--line); }
+.up-btn { justify-content: space-between !important; min-height: 40px; }
+.up-btn .up-cost { display: inline-flex; align-items: center; gap: 4px; }
+.up-btn.maxed { background: var(--surface-2); color: var(--ok); border-color: var(--line-2); }
+.up-close { min-width: 32px; min-height: 32px; font-size: 18px; }
+@media (max-width: 760px) {
+  #unit-panel { position: static; width: auto; max-height: 46vh; box-shadow: none; }
+  #app.inspecting .deploy-panel { display: none; }
+  .up-head { grid-template-columns: 40px 1fr auto; padding: 6px 10px; }
+  .up-head img { width: 40px; height: 40px; }
+  .up-head h3 { font-size: 18px; }
+  .up-body { padding: 8px 10px; gap: 8px; }
+  .up-actions { padding: 6px 10px 8px; }
+  .up-actions button { min-height: 44px; }
+}
+
+/* ---------------------------------------------------------------- gems + more circles */
+.ico.gem { fill: #5fd3b8; }
+.wallet.gems .num { color: #8fe8d4; }
+.wallet.gems.bump { animation: bump 0.5s ease; }
+.banner-tabs { flex-wrap: wrap; max-width: calc(100% - 64px); }
+.banner-tab.gems .bt-price { color: #5fd3b8; }
+.wallets { justify-self: end; display: flex; gap: 8px; }
+@media (max-width: 760px) {
+  .menu-bar .wallets { grid-column: 2; grid-row: 1; }
+  .wallets .wallet { padding: 4px 8px; }
+  .wallets .wallet .label { display: none; }
+}
+
+/* ---------------------------------------------------------------- phones held sideways
+   Short landscape screens: the battlefield gets the height. The dock becomes one
+   compact row (scrolling unit cards + wave controls), the top HUD one thin line. */
+@media (max-height: 520px) and (orientation: landscape) {
+  #hud-top { padding: 2px 10px; gap: 8px; }
+  #wave-num { font-size: 22px; }
+  .wave-block .label, .wave-detail, .hud-center, .tokens-earned, #btn-fx { display: none; }
+  .icon-btn, .speed button { height: 26px; min-width: 28px; }
+  #stage { padding: 2px; }
+  #stage::after { display: none; }
+  #dock { grid-template-columns: 1fr auto !important; gap: 8px; padding: 4px 8px; align-items: center; }
+  #dock .section-head, .next-preview { display: none; }
+  .deploy-card { width: 104px !important; grid-template-rows: 30px auto; }
+  .deploy-card .dc-art { height: 30px; }
+  .deploy-card .dc-art img { width: 38px; height: 38px; }
+  .deploy-card .dc-info { padding: 2px 6px 3px; }
+  .deploy-card .dc-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .deploy-card .dc-row { font-size: 12px; }
+  .next-actions { flex-wrap: nowrap; gap: 6px; }
+  .next-actions .btn-primary { padding: 6px 10px; font-size: 14px; white-space: nowrap; }
+  .call-many input { width: 48px; padding: 4px; }
+  .call-many .btn-secondary { padding: 6px 8px; font-size: 13px; }
+  .auto { font-size: 12px; }
+  .weather-card { width: 180px; padding: 4px 8px; }
+  .weather-card ul { font-size: 11px; }
+  /* the unit panel takes the unit cards' place in the dock row (wave controls stay); its body scrolls */
+  #app.inspecting .deploy-panel { display: none; }
+  #unit-panel { position: static; width: auto; max-height: 52vh; box-shadow: none; }
+  #unit-panel .up-body { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .up-head { padding: 4px 8px; grid-template-columns: 30px 1fr auto; }
+  .up-head img { width: 30px; height: 30px; }
+  .up-head h3 { font-size: 16px; }
+  .up-actions { padding: 4px 8px 6px; }
+  .up-actions button { min-height: 36px; }
+}
+.up-now { margin-top: 6px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+@media (max-height: 520px) and (orientation: landscape) {
+  .up-pips { grid-column: 1 / -1; }
+}

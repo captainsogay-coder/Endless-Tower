@@ -18,15 +18,19 @@
 //                                         // ctx = { deployed } copies of this unit on the field
 //    onHit?: [{ status, chance }],        // status rolled per enemy damaged (see game/effects.js)
 //    impactHazard?: { kind, radius, duration, dpsFactor }, // ground left burning where shots land
-//    buffs?: [{ id, radius, damageMult?, cooldownMult?, rangeMult? }], // allies in radius (Infinity = map-wide); same id never stacks
+//    buffs?: [{ id, radius, damageMult?, cooldownMult?, rangeMult?, levelScale? }], // allies in radius (Infinity = map-wide,
+//                                         // 'range' = its attack range); same id never stacks; levelScale grows it per upgrade
 //    economy?: { id, coinMult },          // battle-wide coin gain; same id never stacks
 //    summon?: { every, kind, speed, damageFactor, splash, explosive?, onHit? }, // secondary drone launches
+//    ability?: { id, ...numbers },        // special behaviour (src/game/abilities.js); all tuning lives here
+//    passive.watches?: [unitId],          // re-evaluate the passive when these units are deployed/sold
+//                                         // (ctx.count(id) = player-deployed copies; summoned allies never count)
 //    art: string,                         // key into src/render/unitArt.js
 //    onFire?(unit, target, game), onUpdate?(unit, dt, game), onPlace?(unit, game)
 //  }
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { registerUnit, getUnit } from './unitRegistry.js';
+import { registerUnit, getUnit, registerAllyDef, getAllyDef } from './unitRegistry.js';
 import dude from './defs/dude.js';
 import cadet from './defs/cadet.js';
 import gunnerman from './defs/gunnerman.js';
@@ -38,12 +42,19 @@ import commander from './defs/commander.js';
 import colonel from './defs/colonel.js';
 import general from './defs/general.js';
 import fortress from './defs/fortress.js';
+import { WILD_WEST_UNITS } from './defs/wildWest.js';
+import { GAMBINO_UNITS } from './defs/gambino.js';
+import { NUCLEAR_WAR_UNITS, BATTALION_SOLDIER } from './defs/nuclearWar.js';
 
-export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress];
+export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress, ...WILD_WEST_UNITS, ...GAMBINO_UNITS, ...NUCLEAR_WAR_UNITS];
+
+/** Temporary combatants created by abilities (never summoned, listed or deployed). */
+export const ALLY_DEFS = [BATTALION_SOLDIER];
 
 /** Units every new player owns. Everything else is obtained by summoning. */
 export const STARTER_UNITS = ['dude'];
 
 export function registerRoster() {
   for (const def of ROSTER) if (!getUnit(def.id)) registerUnit(def);
+  for (const def of ALLY_DEFS) if (!getAllyDef(def.id)) registerAllyDef(def);
 }

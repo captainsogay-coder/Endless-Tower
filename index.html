@@ -18,6 +18,7 @@
     <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 3v10l8.5-5z"/></symbol>
     <symbol id="i-fx" viewBox="0 0 16 16"><path d="M8 2 14 5 8 8 2 5z"/><path d="M2.6 8.2 8 10.9l5.4-2.7L14 9.5 8 12.5 2 9.5z" opacity="0.6"/></symbol>
     <symbol id="i-flag" viewBox="0 0 16 16"><path d="M4 14V2" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M4.8 2.5h7.5l-2 3 2 3H4.8z"/></symbol>
+    <symbol id="i-gem" viewBox="0 0 16 16"><path d="M4 2h8l3 4-7 8-7-8z"/><path d="M4 2 6 6h4l2-4M1 6h14M6 6l2 8 2-8" fill="none" stroke="#123a33" stroke-width="0.9"/></symbol>
     <symbol id="i-token" viewBox="0 0 16 16"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5z"/><path d="M8 4.5 11 6.3v3.4L8 11.5 5 9.7V6.3z" fill="#1c1406"/></symbol>
     <symbol id="i-sound" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
     <symbol id="i-mute" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 6l3.5 4M14.5 6 11 10" stroke="currentColor" stroke-width="1.5"/></symbol>
@@ -51,9 +52,15 @@
         <button class="tab active" role="tab" data-page="plans" aria-selected="true">Battle Plans</button>
         <button class="tab" role="tab" data-page="summon" aria-selected="false">Summoning</button>
       </div>
+      <div class="wallets">
       <div class="wallet" title="Tokens — earned by clearing waves, spent on summons">
         <svg class="ico token"><use href="#i-token" /></svg>
         <span id="wallet-tokens" class="num">0</span><span class="label">Tokens</span>
+      </div>
+      <div class="wallet gems" title="Gems — earned by clearing boss waves, spent on premium circles">
+        <svg class="ico gem"><use href="#i-gem" /></svg>
+        <span id="wallet-gems" class="num">0</span><span class="label">Gems</span>
+      </div>
       </div>
     </nav>
 
@@ -113,7 +120,7 @@
       </aside>
     </div>
     <footer class="sm-footer">
-      <div class="sm-earn"><span class="label">Price</span><span><b id="banner-price">150</b> Tokens per summon</span><span class="muted small">Earn 100 Tokens for every wave you clear.</span></div>
+      <div class="sm-earn"><span class="label">Price</span><span><b id="banner-price">150</b> <span id="banner-currency">Tokens</span> per summon</span><span id="earn-note" class="muted small">Earn 100 Tokens for every wave you clear.</span></div>
       <div id="pull-buttons" class="pull-buttons"></div>
     </footer>
   </section>
@@ -191,11 +198,11 @@
       </div>
       <div id="banner" aria-live="polite"></div>
       <div id="toasts"></div>
-      <aside id="unit-panel" hidden></aside>
       <div id="pause-veil" hidden><div>Paused</div></div>
     </main>
 
     <footer id="dock">
+      <aside id="unit-panel" hidden aria-label="Selected unit"></aside>
       <section class="deploy-panel">
         <div class="section-head"><h2>Deploy</h2><span class="muted hint">Tap a unit, then tap open ground to place it · right-click or Esc cancels</span></div>
         <div id="deploy-bar" class="deploy-bar"></div>

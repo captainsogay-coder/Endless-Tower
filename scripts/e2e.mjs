@@ -57,7 +57,7 @@ const wave = await ev(() => {
 });
 check('exactly 100 Tokens for a completed wave', wave.afterFirst - t0 === 100, `${t0} → ${wave.afterFirst}`);
 check('no Tokens for a partially completed wave', wave.partial === wave.afterFirst);
-check('Coins and Tokens are separate balances (no Gems)', wave.profileCoins === 0 && wave.gems === undefined && wave.coins0 > 0);
+check('Coins, Tokens and Gems are separate balances (coins never saved; Gems only from boss waves)', wave.profileCoins === 0 && wave.gems === 0 && wave.coins0 > 0);
 await page.click('#btn-retreat');
 await page.click('#btn-retreat-confirm');
 
@@ -212,7 +212,7 @@ const wx = await ev(() => {
 });
 await page.waitForTimeout(400);
 const card = await page.textContent('#weather-card');
-check('weather: Nova shows its card with remaining time and effects', wx.id === 'nova' && wx.rem === 20 && /Nova/i.test(card) && /30% cooldown/.test(card), card.replace(/\s+/g, ' ').slice(0, 80));
+check('weather: Nova shows its card with remaining time and effects', wx.id === 'nova' && wx.rem === 20 && /Nova/i.test(card) && /40% cooldown/.test(card) && /30% damage/.test(card), card.replace(/\s+/g, ' ').slice(0, 80));
 await page.click('#btn-weather');
 const off = await ev(() => ({ cur: window.endlessTower.game.weather.current, en: window.endlessTower.game.weatherEnabled }));
 check('weather toggle turns weather off and clears the active weather', off.cur === null && off.en === false);
@@ -238,6 +238,97 @@ await page.click('#btn-reveal-done');
 const b1 = await wallet();
 check('Advanced ×25 costs 6,250 and pays 75 per duplicate, shown in results', b0 - b1 === 6250 - advComp && advComp === compShown * 75 && compShown > 0, `${b0} → ${b1}, ${compShown} dupes`);
 
+// 11. New circles, full flow: summon → plan → deploy → select → range → upgrade → fight → rewards
+await page.click('.tab[data-page="summon"]');
+await page.waitForTimeout(200);
+const circles = [];
+for (const id of ['wild-west-circle', 'gambino-circle', 'nuclear-war-circle']) {
+  await page.click(`[data-banner="${id}"]`);
+  const rows = await page.$$eval('.pool-item', (els) => els.map((e) => ({ name: e.querySelector('.pi-name').textContent, tier: e.querySelector('.pi-sub').textContent.split('·')[0].trim(), chance: parseFloat(e.querySelector('.pi-chance').firstChild.textContent) })));
+  circles.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, price: await page.textContent('#banner-price'), cur: await page.textContent('#banner-currency') });
+}
+check('Wild West, Gambino and Nuclear War pools list tier + drop rate and total exactly 100%', circles.every((c) => c.sum === 100 && c.rows.every((r) => /^Tier [IVXL]+$/.test(r.tier))) && circles.map((c) => c.rows.length).join() === '8,7,9', circles.map((c) => `${c.id}:${c.rows.length}/${c.sum}%`).join(' '));
+check('prices: Wild West 300 Tokens, Gambino 300 Tokens, Nuclear War 500 Gems', circles.map((c) => `${c.price} ${c.cur}`).join('|') === '300 Tokens|300 Tokens|500 Gems', circles.map((c) => `${c.price} ${c.cur}`).join('|'));
+// Wild West ×10 with Tokens
+await page.click('[data-banner="wild-west-circle"]');
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 3000; p.data.wallet.gems = 777; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="10"]');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const ww = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation, cur: r.compensationCurrency })), t: window.endlessTower.profile.balance('tokens'), g: window.endlessTower.profile.balance('gems') }));
+await page.click('#btn-reveal-done');
+const wwComp = ww.res.reduce((a, r) => a + r.comp, 0);
+check('Wild West ×10 charges 3,000 Tokens (Gems untouched); duplicates refund 90 Tokens', ww.t === wwComp && ww.g === 777 && ww.res.every((r) => r.cur === 'tokens' && (r.comp === 0 || r.comp === 90)), `tokens ${ww.t}, comp ${wwComp}, gems ${ww.g}`);
+// Nuclear War with Gems
+await page.click('[data-banner="nuclear-war-circle"]');
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.gems = 1000; p.data.wallet.tokens = 5; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="1"]');
+const nwConfirm = await page.textContent('#confirm-body');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const nw = await ev(() => ({ r: window.endlessTower.summoning.results[0], g: window.endlessTower.profile.balance('gems'), t: window.endlessTower.profile.balance('tokens') }));
+await page.click('#btn-reveal-done');
+check('Nuclear War deducts 500 Gems (never Tokens) and unlocks the pulled unit', nw.g === 500 + nw.r.compensation && nw.t === 5 && /500 Gems/.test(nwConfirm) && (await ev((u) => window.endlessTower.profile.isUnlocked(u), nw.r.unit)), `${nw.r.unit}, gems ${nw.g}`);
+// put a summoned Wild West unit in the plan through the Battle Plans screen
+const wwUnit = ww.res[0].unit;
+await page.click('.tab[data-page="plans"]');
+await page.waitForTimeout(200);
+const inPlan = await ev(() => window.endlessTower.profile.plan.units.length);
+if (inPlan >= 12) await ev(() => window.endlessTower.profile.plan.units.pop());
+const wwCard = `.unit-card[data-id="${wwUnit}"]`;
+if (!(await page.$eval(wwCard, (e) => e.classList.contains("selected")))) await page.click(wwCard);
+const planHas = await ev((u) => window.endlessTower.profile.plan.units.includes(u), wwUnit);
+check('the summoned unit can be added to the Battle Plan', planHas, wwUnit);
+await page.click('#btn-battle');
+await page.waitForTimeout(300);
+await ev(() => { window.endlessTower.game.coins = 50000; });
+const slot = await ev((u) => window.endlessTower.game.loadout.findIndex((d) => d.id === u), wwUnit);
+await page.click(`.deploy-card[data-def="${wwUnit}"]`);
+const box2 = await page.locator('#game').boundingBox();
+const at = await ev(() => { const g = window.endlessTower.game; for (let y = 2; y < 20; y++) for (let x = 2; x < 38; x++) if (g.canPlace(x, y) && g.map.pathDist[y * 40 + x] <= 2) return [x, y]; });
+const tp = { x: box2.x + ((at[0] + 0.5) / 40) * box2.width, y: box2.y + ((at[1] + 0.5) / 22) * box2.height };
+await page.mouse.move(tp.x, tp.y);
+await page.waitForTimeout(100);
+const preview = await ev(([x, y, u]) => window.endlessTower.game.previewStats(u, x, y).range, [at[0], at[1], wwUnit]);
+await page.mouse.click(tp.x, tp.y);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(250);
+await page.mouse.click(tp.x, tp.y);
+await page.waitForTimeout(150);
+const sel = await ev(() => { const u = window.endlessTower.renderer.ui.selected; return u && { id: u.def.id, lv: u.level, range: u.stats.range, dmg: u.stats.damage, panel: !document.getElementById('unit-panel').hidden, text: document.getElementById('unit-panel').textContent }; });
+check('tapping the deployed unit selects it and opens its upgrade panel (name, tier, level, stats, next level, cost)', sel && sel.id === wwUnit && sel.panel && /Tier/.test(sel.text) && /Level 0 \/ 5/.test(sel.text) && /Damage/.test(sel.text) && /Range/.test(sel.text) && /Upgrade cost/.test(sel.text), sel?.text?.slice(0, 90));
+check('range ring = combat range (preview before deploy matched too)', Math.abs(preview - sel.range) < 1e-9, `${sel.range.toFixed(1)} px`);
+const coinsBefore = await ev(() => window.endlessTower.game.coins);
+const cost = await ev(() => window.endlessTower.game.upgradeInfo(window.endlessTower.renderer.ui.selected).cost);
+await page.click('[data-act="upgrade"]');
+await page.waitForTimeout(150);
+const up = await ev(() => { const u = window.endlessTower.renderer.ui.selected; return { lv: u.level, range: u.stats.range, dmg: u.stats.damage, coins: window.endlessTower.game.coins }; });
+check('Upgrade button spends the exact cost and updates stats and range immediately', up.lv === 1 && coinsBefore - up.coins === cost && up.dmg > sel.dmg && up.range >= sel.range, `Lv ${up.lv}, −${coinsBefore - up.coins}, dmg ${sel.dmg.toFixed(1)}→${up.dmg.toFixed(1)}`);
+await ev(() => { window.endlessTower.game.coins = 0; });
+await page.waitForTimeout(100);
+const poor = await ev(() => document.querySelector('[data-act="upgrade"]').disabled);
+await ev(() => { window.endlessTower.game.coins = 1e7; });
+for (let i = 0; i < 6; i++) { await page.waitForTimeout(60); await page.click('[data-act="upgrade"]').catch(() => {}); }
+const maxed = await ev(() => ({ lv: window.endlessTower.renderer.ui.selected.level, btn: document.querySelector('[data-act="upgrade"]').textContent.trim(), dis: document.querySelector('[data-act="upgrade"]').disabled }));
+check('upgrade is blocked when unaffordable and shows a clear max-level state', poor && maxed.lv === 5 && /Max level/.test(maxed.btn) && maxed.dis, JSON.stringify(maxed));
+await ev(() => { window.endlessTower.game.weather.start('windy'); });
+await page.waitForTimeout(100);
+const windy = await ev(() => window.endlessTower.renderer.ui.selected.stats.range);
+await ev(() => { window.endlessTower.game.weather.stop(); });
+const calm = await ev(() => window.endlessTower.renderer.ui.selected.stats.range);
+check('weather changes the range ring immediately and leaves no trace afterwards (Windy +20%)', Math.abs(windy / calm - 1.2) < 1e-9, `${calm.toFixed(1)} → ${windy.toFixed(1)}`);
+const tokens0 = await ev(() => window.endlessTower.profile.balance('tokens'));
+await ev(() => { const g = window.endlessTower.game; g.towerHp = g.towerMaxHp = 1e9; g.callWaves(3); });
+await page.click('.speed button[data-speed="3"]');
+await page.waitForFunction(() => window.endlessTower.game.stats.wavesCleared >= 3, null, { timeout: 120000 });
+const fought = await ev(() => ({ kills: window.endlessTower.game.stats.kills, unitKills: window.endlessTower.game.units.reduce((a, u) => a + u.kills, 0), tokens: window.endlessTower.profile.balance('tokens') }));
+check('the battle is fought and rewards land in the profile (100 Tokens per wave)', fought.kills > 0 && fought.unitKills > 0 && fought.tokens - tokens0 === 300, JSON.stringify(fought));
+await page.click('.speed button[data-speed="1"]');
+await page.click('#btn-retreat');
+await page.click('#btn-retreat-confirm');
+
 // 8. Persistence across a restart
 const snap = await ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units] }));
 await page.reload();
@@ -260,6 +351,16 @@ await m.waitForTimeout(400);
 const mobileBattle = await m.evaluate(() => window.endlessTower.settings.inBattle && !!window.endlessTower.game.map);
 await m.screenshot({ path: 'screenshots/e2e-mobile-battle.png' });
 check('mobile: no horizontal overflow, tabs and battle work by touch', !overflow && mobileBattle);
+const mu = await m.evaluate(() => { const g = window.endlessTower.game; g.coins = 1e5; for (let y = 2; y < 20; y++) for (let x = 2; x < 38; x++) if (g.canPlace(x, y)) { g.deploy(g.loadout[0].id, x, y); return [x, y]; } });
+const mbox = await m.locator('#game').boundingBox();
+await m.touchscreen.tap(mbox.x + ((mu[0] + 0.5) / 40) * mbox.width, mbox.y + ((mu[1] + 0.5) / 22) * mbox.height);
+await m.waitForTimeout(250);
+const ubtn = await m.locator('[data-act="upgrade"]').boundingBox();
+const vp = m.viewportSize();
+await m.touchscreen.tap(ubtn.x + ubtn.width / 2, ubtn.y + ubtn.height / 2);
+await m.waitForTimeout(200);
+const mlv = await m.evaluate(() => window.endlessTower.game.units[0].level);
+check('mobile: the upgrade panel is fully on screen and upgrades by touch; wave controls stay visible', ubtn.y + ubtn.height <= vp.height && mlv === 1 && (await m.isVisible('#btn-next')), `button bottom ${Math.round(ubtn.y + ubtn.height)} / ${vp.height}`);
 
 check('no runtime errors during the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
 const failed = results.filter((r) => !r.ok).length;

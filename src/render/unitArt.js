@@ -185,14 +185,14 @@ function fallback(ctx, { level = 0 } = {}) {
 
 // ---------------------------------------------------------------- shared soldier parts
 
-function shadow(ctx, w = 7.5) {
+export function shadow(ctx, w = 7.5) {
   ctx.fillStyle = 'rgba(20,14,24,0.32)';
   ctx.beginPath();
   ctx.ellipse(1.5, 0.5, w, w * 0.4, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function limb(ctx, x0, y0, x1, y1, color, o, w = 2.2) {
+export function limb(ctx, x0, y0, x1, y1, color, o, w = 2.2) {
   ctx.lineCap = 'round';
   ctx.strokeStyle = o;
   ctx.lineWidth = w + 1.4;
@@ -205,7 +205,7 @@ function limb(ctx, x0, y0, x1, y1, color, o, w = 2.2) {
   ctx.stroke();
 }
 
-function legs(ctx, pants, boots, o, spread = 0) {
+export function legs(ctx, pants, boots, o, spread = 0) {
   ctx.lineWidth = 1.4;
   ctx.strokeStyle = o;
   ctx.fillStyle = pants;
@@ -221,7 +221,7 @@ function legs(ctx, pants, boots, o, spread = 0) {
   ctx.fill();
 }
 
-function torso(ctx, color, o, wide = 0) {
+export function torso(ctx, color, o, wide = 0) {
   ctx.lineWidth = 1.4;
   ctx.strokeStyle = o;
   ctx.fillStyle = color;
@@ -243,7 +243,7 @@ function torso(ctx, color, o, wide = 0) {
   ctx.fill();
 }
 
-function head(ctx, skin, o) {
+export function head(ctx, skin, o) {
   ctx.lineWidth = 1.4;
   ctx.strokeStyle = o;
   ctx.fillStyle = skin;
@@ -257,7 +257,7 @@ function head(ctx, skin, o) {
   ctx.fill();
 }
 
-function levelStripes(ctx, level) {
+export function levelStripes(ctx, level) {
   if (level <= 0) return;
   ctx.fillStyle = '#f2e6c9';
   ctx.strokeStyle = 'rgba(20,14,24,0.7)';
@@ -274,7 +274,7 @@ function levelStripes(ctx, level) {
 }
 
 /** Flat, hard-edged muzzle flash (it is a light source, but stays crisp – no bloom). */
-function muzzleFlash(ctx, x, y, size) {
+export function muzzleFlash(ctx, x, y, size) {
   ctx.fillStyle = '#ffe9a8';
   ctx.beginPath();
   for (let i = 0; i < 8; i++) {
@@ -1030,6 +1030,15 @@ function fortress(ctx, { level = 0 } = {}) {
 }
 
 const PAINTERS = { dude, cadet, gunnerman, grenadier, tank, specialForces, commander, colonel, general, drone: droneStation, fortress };
+
+/**
+ * Adds art for a unit (used by castArt.js for the circle units). `anim(u, t)`
+ * returns { frame, dx?, dy?, flip? } like the built-in personalities.
+ */
+export function registerPainter(key, painter, anim = null) {
+  PAINTERS[key] = painter;
+  if (anim) ANIMS[key] = anim;
+}
 
 
 /** Bounds (in world px) of every unit sprite, relative to the feet. */

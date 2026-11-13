@@ -204,9 +204,65 @@ export function shot(kind, v = 1) {
       tone('sawtooth', 180, 240, 0.25, 0.04 * v);
       burst(0.2, 0.05 * v, 'bandpass', 1500, 2500, 6);
       break;
+    case 'revolver':
+    case 'golden':
+      // a sharper crack with a short ring: frontier six-shooter
+      burst(0.06, 0.14 * v, 'highpass', 2200);
+      tone('square', 300, 120, 0.05, 0.05 * v);
+      if (kind === 'golden') tone('triangle', 1600, 1500, 0.25, 0.04 * v);
+      break;
+    case 'bottle':
+    case 'dynamite':
+      tone('triangle', 500, 900, 0.12, 0.04 * v); // whoosh of a throw
+      break;
+    case 'card':
+      burst(0.03, 0.06 * v, 'bandpass', 3500, 3000, 4); // flick
+      break;
+    case 'chip':
+      tone('triangle', 2400, 2300, 0.05, 0.04 * v); // clink
+      break;
+    case 'sequin':
+      tone('sine', 1200, 1800, 0.12, 0.04 * v);
+      break;
+    case 'missile':
+    case 'icbm':
+    case 'warhead':
+    case 'antimatter':
+      burst(0.4, 0.1 * v, 'lowpass', 1600, 400); // launch roar
+      tone('sawtooth', 90, 60, 0.35, 0.04 * v);
+      break;
     default:
       burst(0.05, 0.08 * v, 'highpass', 1500);
   }
+}
+
+/** Coins: a bright little arpeggio (jackpots, bounties, payouts). */
+export function coins(big = false, v = 1) {
+  const n = big ? 6 : 3;
+  for (let i = 0; i < n; i++) tone('triangle', 1320 * Math.pow(2, ((i * 4) % 12) / 12), 1320 * Math.pow(2, ((i * 4) % 12) / 12), 0.12, 0.05 * v, 'sfx', i * 0.05);
+}
+
+/** A slot-machine reel stopping. */
+export function reelStop(pitch = 1) {
+  burst(0.05, 0.1, 'bandpass', 900 * pitch, 900 * pitch, 3);
+  tone('square', 440 * pitch, 440 * pitch, 0.06, 0.04);
+}
+
+/** A plane passing overhead. */
+export function flyover(duration = 2) {
+  burst(duration, 0.07, 'lowpass', 400, 900, 1);
+  tone('sawtooth', 70, 55, duration, 0.025);
+}
+
+/** Gravity field: a falling, sucking tone. */
+export function implode(duration = 3) {
+  tone('sine', 300, 40, duration, 0.12);
+  burst(duration, 0.05, 'bandpass', 2000, 200, 4);
+}
+
+/** Spinning revolver cylinder: fast clicks. */
+export function cylinder(n = 6) {
+  for (let i = 0; i < n; i++) burst(0.02, 0.06, 'highpass', 3000, 3000, 1, 'sfx', i * 0.06);
 }
 
 /** Explosion; size ~ blast radius in tiles. */

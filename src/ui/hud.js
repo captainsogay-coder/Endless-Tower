@@ -50,7 +50,7 @@ export class Hud {
       retreat: $('screen-retreat'),
     };
     this.deployKey = '';
-    this.panelKey = '';
+    this.panelUnit = null;
     this.npKey = '';
     this.textTimer = 0;
     this.bind();
@@ -98,6 +98,7 @@ export class Hud {
       ['Bosses felled', s.bossesDefeated],
       ['Units deployed', formatNumber(s.unitsDeployed)],
       ['Tokens earned', formatNumber(data.tokens ?? 0)],
+      ['Gems earned', formatNumber(data.gems ?? 0)],
       ['Damage dealt', formatNumber(s.damage)],
     ];
     this.el.overStats.innerHTML = stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
@@ -118,7 +119,9 @@ export class Hud {
     this.el.realmName.textContent = game.biome.name;
     this.el.realmLayout.textContent = `${game.map.variantName ? `${game.map.variantName} · ` : ''}${game.map.layoutLabel} · ${game.map.routes.length} ${game.map.routes.length > 1 ? 'entrances' : 'entrance'}`;
     this.deployKey = '';
-    this.panelKey = '';
+    this.panelUnit = null;
+    this.el.unitPanel.hidden = true;
+    document.getElementById('app')?.classList.remove('inspecting');
     this.npKey = '';
     this.el.bossBar.hidden = true;
     this.el.toasts.innerHTML = '';
@@ -151,8 +154,8 @@ export class Hud {
     }
   }
 
-  onWaveClear({ wave, reward, tokens }, game) {
-    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens</div>`, '#e3a33b', 'small');
+  onWaveClear({ wave, reward, tokens, gems }, game) {
+    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens${gems ? ` · +${formatNumber(gems)} Gems` : ''}</div>`, gems ? '#5fd3b8' : '#e3a33b', 'small');
     this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
     this.el.tokens.parentElement.classList.remove('bump');
     void this.el.tokens.offsetWidth;
@@ -310,58 +313,107 @@ export class Hud {
       .join('');
   }
 
+  /**
+   * Unit panel. The frame (header, buttons) is built once per selected unit and
+   * then only updated in place, so buttons are never replaced under the
+   * player's finger – a click always lands, even mid-battle. The stats body is
+   * re-rendered only when its text actually changes.
+   */
   renderUnitPanel(game, ui) {
     const u = ui?.selected;
+    const panel = this.el.unitPanel;
     if (!u || !u.placed) {
-      if (this.panelKey !== '') {
-        this.panelKey = '';
-        this.el.unitPanel.hidden = true;
+      if (this.panelUnit) {
+        this.panelUnit = null;
+        panel.hidden = true;
+        document.getElementById('app')?.classList.remove('inspecting');
       }
       return;
     }
-    const info = game.upgradeInfo(u);
-    const n = game.deployedCount(u.def.id);
-    const key = `${u.uid}:${u.level}:${n}:${info.affordable}:${u.kills}:${u.auraKey ?? ''}:${game.weather.current?.id ?? ''}`;
-    if (key === this.panelKey) return;
-    this.panelKey = key;
     const def = u.def;
-    const tier = getTier(def.tier);
+    if (this.panelUnit !== u) {
+      this.panelUnit = u;
+      this.panelBody = '';
+      const tier = getTier(def.tier);
+      panel.innerHTML = `
+        <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span> · <span class="up-lv"></span></div></div>
+          <button class="up-close" data-act="close" aria-label="Close" type="button">×</button></div>
+        <div class="up-body"></div>
+        <div class="up-actions">
+          <button class="btn-primary up-btn" data-act="upgrade" type="button" title="Upgrade (U)"></button>
+          <button class="btn-secondary up-sell" data-act="sell" type="button" title="Sell (X)"></button>
+        </div>`;
+      this.panelEls = {
+        lv: panel.querySelector('.up-lv'),
+        body: panel.querySelector('.up-body'),
+        up: panel.querySelector('.up-btn'),
+        sell: panel.querySelector('.up-sell'),
+      };
+      panel.hidden = false;
+      document.getElementById('app')?.classList.add('inspecting');
+    }
+    const info = game.upgradeInfo(u);
+    const E = this.panelEls;
+    const max = maxLevel(def);
+    E.lv.textContent = `Level ${u.level} / ${max}`;
+    // upgrade button: label, cost and affordability
+    const upKey = info.maxed ? 'max' : `${info.cost}:${info.affordable}`;
+    if (E.up.dataset.key !== upKey) {
+      E.up.dataset.key = upKey;
+      E.up.disabled = info.maxed || !info.affordable;
+      E.up.classList.toggle('maxed', info.maxed);
+      E.up.innerHTML = info.maxed
+        ? 'Max level'
+        : `<span>Upgrade</span><span class="up-cost"><span class="coin sm"></span>${formatNumber(info.cost)}</span>`;
+    }
+    const need = info.maxed || info.affordable ? '' : `Need ${formatNumber(info.cost - game.coins)} more coins`;
+    if (E.up.title !== (need || 'Upgrade (U)')) E.up.title = need || 'Upgrade (U)';
+    const sell = `Sell +${formatNumber(game.sellValue(u))}`;
+    if (E.sell.textContent !== sell) E.sell.textContent = sell;
+    const body = this.unitPanelBody(game, u, info, need);
+    if (body !== this.panelBody) {
+      this.panelBody = body;
+      E.body.innerHTML = body;
+    }
+  }
+
+  unitPanelBody(game, u, info, need) {
+    const def = u.def;
+    const n = game.deployedCount(def.id);
     const cur = info.current;
+    const nx = info.maxed ? null : info.next;
+    const f1 = (v) => formatNumber(Math.round(v * 10) / 10);
     const row = (label, a, b, fmt) => {
-      const up = b !== undefined && b > a;
-      return `<tr><td>${label}</td><td>${fmt(a)}</td>${b !== undefined ? `<td class="arrow">→</td><td class="${up ? 'up' : ''}">${fmt(b)}</td>` : ''}</tr>`;
+      const show = b !== undefined && b !== null;
+      const up = show && b > a + 1e-9;
+      return `<tr><td>${label}</td><td>${fmt(a)}</td>${show ? `<td class="arrow">→</td><td class="${up ? 'up' : ''}">${fmt(b)}</td>` : '<td></td><td></td>'}</tr>`;
     };
-    const f1 = (v) => (Math.round(v * 10) / 10).toString();
-    const nx = info.maxed ? {} : info.next;
+    const pips = Array.from({ length: maxLevel(def) }, (_, i) => `<i class="${i < u.level ? 'on' : ''}"></i>`).join('');
     const bonusFn = def.passive?.bonus;
+    const lines = u.ability?.describe?.(u, game) ?? [];
     const passive = def.passive
       ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b>${bonusFn ? `<span class="pct">+${Math.round(bonusFn({ deployed: n }) * 100)}%</span>` : ''}</div>
-         <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ` : ''}${esc(def.passive.summary)}</div></div>`
+         <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ` : ''}${esc(def.passive.summary)}</div>
+         ${lines.length ? `<div class="up-now">At this level</div><ul class="up-lines">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</div>`
       : '';
     const buffNames = (u.auras ?? []).map((id) => game.buffDefs().get(id)?.label ?? id);
+    if (game.battleBonus?.damage) buffNames.push(`House Edge +${Math.round(game.battleBonus.damage * 100)}%`);
     if (game.weather.current) buffNames.push(`${game.weather.current.label} weather`);
-    const buffs = buffNames.length ? `<div class="muted small">Active buffs: ${buffNames.map(esc).join(' · ')}</div>` : '';
-    this.el.unitPanel.innerHTML = `
-      <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub">${esc(tier.label)} · Level ${u.level} / ${maxLevel(def)}</div></div>
-        <button class="up-close" data-act="close" aria-label="Close">×</button></div>
-      <div class="up-body">
-        ${passive}
-        ${buffs}
-        <div class="up-upgrade">
-          <h4><span>${info.maxed ? `Level ${u.level} · max` : `Level ${info.level} → ${info.nextLevel}`}</span><span>${formatNumber(u.kills)} kills</span></h4>
-          <table class="cmp">
-            ${row('Damage', cur.damage, nx.damage, f1)}
-            ${row('Range', cur.range, nx.range, tiles)}
-            ${row('Attack speed', cur.rate, nx.rate, (v) => v.toFixed(2))}
-            ${row('DPS', cur.damage * cur.rate, info.maxed ? undefined : nx.damage * nx.rate, f1)}
-          </table>
-        </div>
-        <div class="up-actions">
-          <button class="btn-primary" data-act="upgrade" ${info.maxed || !info.affordable ? 'disabled' : ''} title="Upgrade (U)">
-            ${info.maxed ? 'Max level' : `Upgrade <span class="coin sm"></span>${formatNumber(info.cost)}`}</button>
-          <button class="btn-secondary" data-act="sell" title="Sell (X)">Sell +${formatNumber(game.sellValue(u))}</button>
-        </div>
-      </div>`;
-    this.el.unitPanel.hidden = false;
+    const buffs = buffNames.length ? `<div class="up-buffs muted small">Active buffs: ${buffNames.map(esc).join(' · ')}</div>` : '';
+    return `
+      <div class="up-pips" title="Upgrade level">${pips}</div>
+      <div class="up-upgrade">
+        <h4><span>${info.maxed ? `Level ${u.level} · maximum` : `Level ${info.level} → ${info.nextLevel}`}</span><span>${formatNumber(u.kills)} kills</span></h4>
+        <table class="cmp">
+          ${row('Damage', cur.damage, nx?.damage, f1)}
+          ${row('Range', cur.range, nx?.range, tiles)}
+          ${row('Attack speed', cur.rate, nx?.rate, (v) => `${v.toFixed(2)}/s`)}
+          ${cur.splash ? row('Blast radius', cur.splash, nx?.splash, tiles) : ''}
+          ${row('DPS', cur.damage * cur.rate, nx ? nx.damage * nx.rate : undefined, f1)}
+        </table>
+        ${info.maxed ? '<div class="up-max">Fully upgraded</div>' : `<div class="up-costline">Upgrade cost <b><span class="coin sm"></span>${formatNumber(info.cost)}</b>${need ? ` · <span class="up-need">${need}</span>` : ''}</div>`}
+      </div>
+      ${passive}
+      ${buffs}`;
   }
 }
