@@ -8,6 +8,7 @@ import { getTrait } from '../waves/traits.js';
 import { maxLevel } from '../units/unitStats.js';
 import { esc, tiles } from './format.js';
 import { portrait } from './battlePlans.js';
+import { waveBonusPerWave } from '../balance.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -140,14 +141,14 @@ export class Hud {
     const traits = plan.traits.map((id) => getTrait(id).label).join(' · ');
     if (plan.isBoss) {
       this.banner(
-        `<div class="b-kicker">Wave ${plan.wave} · Boss</div><div class="b-title">${esc(game.biome.bossTitle ?? 'Guardian')}</div>` +
+        `<div class="b-kicker">Wave ${plan.wave} · Boss · +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title">${esc(game.biome.bossTitle ?? 'Guardian')}</div>` +
           `<div class="b-sub">${esc(plan.tagline)}${traits ? ` · ${esc(traits)}` : ''}</div>`,
         plan.color,
         'boss',
       );
     } else {
       this.banner(
-        `<div class="b-kicker">Wave ${plan.wave}</div><div class="b-title"><em>${esc(plan.label)}</em></div>` +
+        `<div class="b-kicker">Wave ${plan.wave} · +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title"><em>${esc(plan.label)}</em></div>` +
           `<div class="b-sub">${formatNumber(plan.total)} enemies · ${esc(plan.patternLabel)}${traits ? ` · ${esc(traits)}` : ''}</div>`,
         plan.color,
       );
@@ -243,7 +244,7 @@ export class Hud {
       this.npKey = `${np.wave}`;
       el.nextPreview.style.setProperty('--c', np.color);
       const traits = np.traits.map((id) => getTrait(id).label).join(' · ');
-      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div>`;
+      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div><div class="np-reward"><svg class="ico token"><use href="#i-token" /></svg>+${formatNumber(np.tokens)} Tokens on clear${np.isBoss ? ' · +Gems' : ''}</div>`;
     }
   }
 
@@ -297,7 +298,7 @@ export class Hud {
     const active = ui?.placingDef?.id ?? '';
     const parts = game.loadout.map((def) => {
       const n = game.deployedCount(def.id);
-      const bonus = def.passive?.bonus ? def.passive.bonus({ deployed: n }) : null;
+      const bonus = def.passive?.bonus ? def.passive.bonus(game.passiveContext(def)) : null;
       return { def, n, bonus, poor: game.coins < def.price };
     });
     const key = parts.map((p) => `${p.def.id}:${p.n}:${p.poor}`).join(',') + `|${active}`;
@@ -392,10 +393,14 @@ export class Hud {
     const bonusFn = def.passive?.bonus;
     const lines = u.ability?.describe?.(u, game) ?? [];
     const passive = def.passive
-      ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b>${bonusFn ? `<span class="pct">+${Math.round(bonusFn({ deployed: n }) * 100)}%</span>` : ''}</div>
+      ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b>${bonusFn ? `<span class="pct">+${Math.round(bonusFn(game.passiveContext(def)) * 100)}%</span>` : ''}</div>
          <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ` : ''}${esc(def.passive.summary)}</div>
          ${lines.length ? `<div class="up-now">At this level</div><ul class="up-lines">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</div>`
       : '';
+    const per = waveBonusPerWave(def.tier);
+    const waveLine = per
+      ? `<div class="up-wave"><b>Wave scaling +${Math.round(game.waveBonus(def) * 100)}%</b> damage · +${Math.round(per * 100)}% of base damage per wave cleared (${game.stats.wavesCleared} so far)</div>`
+      : `<div class="up-wave muted">No wave scaling at ${esc(getTier(def.tier).label)} (Tier I–VI only)</div>`;
     const buffNames = (u.auras ?? []).map((id) => game.buffDefs().get(id)?.label ?? id);
     if (game.battleBonus?.damage) buffNames.push(`House Edge +${Math.round(game.battleBonus.damage * 100)}%`);
     if (game.weather.current) buffNames.push(`${game.weather.current.label} weather`);
@@ -413,6 +418,7 @@ export class Hud {
         </table>
         ${info.maxed ? '<div class="up-max">Fully upgraded</div>' : `<div class="up-costline">Upgrade cost <b><span class="coin sm"></span>${formatNumber(info.cost)}</b>${need ? ` · <span class="up-need">${need}</span>` : ''}</div>`}
       </div>
+      ${waveLine}
       ${passive}
       ${buffs}`;
   }

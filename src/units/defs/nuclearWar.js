@@ -11,7 +11,8 @@ export const missileLauncher = {
   description: 'A truck full of fireworks with ambitions.',
   price: 220,
   projectile: { kind: 'missile', speed: 380 },
-  levels: buildLevels({ damage: 40, range: 176, rate: 0.7, splash: 40 }, 220),
+  // balance: the best value per coin in every test (early and late) – trimmed from 40 damage
+  levels: buildLevels({ damage: 32, range: 176, rate: 0.7, splash: 40 }, 220),
   ability: { id: 'missile-launcher', bonusEvery: 8, bonusMult: 2 },
   passive: { id: 'missile-launcher', name: 'Salvo', summary: 'Area attacks. Every 8th attack fires a bonus missile for 2× damage.' },
   art: 'missileLauncher',
@@ -64,7 +65,7 @@ export const bomber = {
   role: 'Bombing flyovers',
   description: 'Circles overhead and drops a line of bombs across the road.',
   price: 850,
-  levels: buildLevels({ damage: 120, range: 224, rate: 1 / 6, splash: 40 }, 850),
+  levels: buildLevels({ damage: 145, range: 224, rate: 1 / 4.5, splash: 40 }, 850), // balance: 145 per bomb (was 120), a run every 4.5 s (was 6 s); flies along the road
   ability: { id: 'bomber', bombOffsets: [-60, -20, 20, 60], bonusEvery: 3, bonusMult: 2, bonusRadius: 1.6, planeSpeed: 520 },
   passive: { id: 'bomber', name: 'Carpet Run', summary: 'Every attack is a flyover dropping 4 bombs along its path. Every third run adds an extra 2× explosion.' },
   art: 'bomber',
@@ -110,7 +111,7 @@ export const gloriousLeader = {
   description: 'A very big hat and a very loud speech.',
   price: 7000,
   projectile: { kind: 'golden', speed: 900 },
-  levels: buildLevels({ damage: 320, range: 208, rate: 1.2 }, 7000),
+  levels: buildLevels({ damage: 420, range: 208, rate: 1.2 }, 7000), // balance: 320 → 420 (weakest Tier XV)
   buffs: [LEADER_GLORY],
   ability: { id: 'glorious-leader', coinEvery: 25, coins: 400, weakenEvery: 20, weaken: 0.15, weakenDuration: 5 },
   passive: { id: 'glorious-leader', name: 'Glory', summary: 'All allies: +20% damage (more per upgrade). Every 25 s a large coin reward. Every 20 s all enemies take +15% damage for 5 s.' },
@@ -123,9 +124,10 @@ export const nuclearWarhead = {
   tier: 17,
   role: 'Enormous blast · energy zone',
   description: 'Arcade-grade boom. Leaves the ground humming.',
-  price: 12000,
+  price: 9000,
   projectile: { kind: 'warhead', speed: 260 },
-  levels: buildLevels({ damage: 2500, range: 320, rate: 0.12, splash: 160 }, 12000),
+  // balance: cheaper and faster (was 12,000 coins, 0.12/s) – the rarest units must arrive in time to matter
+  levels: buildLevels({ damage: 2500, range: 320, rate: 0.2, splash: 160 }, 9000),
   onHit: [{ status: 'exposed', chance: 1, amount: 0.2, duration: 5 }],
   impactHazard: { kind: 'energy', status: 'charged', radius: 112, duration: 6, dpsFactor: 0.06 },
   ability: { id: 'nuclear-warhead', exposed: 0.2, exposedDuration: 5, zoneDuration: 6 },
@@ -139,9 +141,10 @@ export const antimatterWarhead = {
   tier: 19,
   role: 'Huge energy blast · gravity field',
   description: 'Fictional physics, very real results.',
-  price: 20000,
+  price: 14000,
   projectile: { kind: 'antimatter', speed: 280 },
-  levels: buildLevels({ damage: 4000, range: 352, rate: 0.12, splash: 192 }, 20000),
+  // balance: cheaper and faster (was 20,000 coins, 0.12/s)
+  levels: buildLevels({ damage: 4000, range: 352, rate: 0.18, splash: 192 }, 14000),
   onHit: [{ status: 'exposed', chance: 1, amount: 0.3, duration: 8 }],
   ability: { id: 'antimatter', exposed: 0.3, exposedDuration: 8, fieldEvery: 40, fieldRadius: 144, fieldDuration: 3, fieldMult: 2 },
   passive: { id: 'antimatter', name: 'Singularity', summary: 'Huge energy blast; enemies hit take +30% damage for 8 s. Every 40 s a gravity field gathers enemies, then detonates.' },

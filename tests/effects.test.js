@@ -107,7 +107,7 @@ test('Tank aura: allies in radius attack 10% faster, never stacking, removed wit
   void t3;
 });
 
-test('exactly 100 Tokens per completed wave; none for a wave in progress or lost', () => {
+test('exactly 250 Tokens per completed early wave; none for a wave in progress or lost', () => {
   const g = new Game({ seed: 7, loadout: ['dude'] });
   const got = [];
   g.on('waveClear', (w) => got.push(w.tokens));
@@ -118,18 +118,17 @@ test('exactly 100 Tokens per completed wave; none for a wave in progress or lost
     g.startNextWave();
     for (let i = 0; i < 60 * 900 && g.phase === 'wave'; i++) g.update(1 / 60);
   }
-  assert.deepEqual(got, [100, 100, 100]);
-  assert.equal(g.tokensEarned, 300);
-  assert.equal(GAME_CONFIG.tokensPerWave, 100);
+  assert.deepEqual(got, [250, 250, 250]);
+  assert.equal(g.tokensEarned, 750);
   // A wave that is only partly done awards nothing.
   g.startNextWave();
   for (let i = 0; i < 30; i++) g.update(1 / 60);
-  assert.equal(g.tokensEarned, 300);
+  assert.equal(g.tokensEarned, 750);
   // Losing mid-wave awards nothing either.
   g.towerHp = 1;
   g.leak(g.enemies[0] ?? { towerDamage: 5, alive: true });
   assert.equal(g.phase, 'gameover');
-  assert.equal(g.tokensEarned, 300);
+  assert.equal(g.tokensEarned, 750);
 });
 
 test('Coins, Tokens and Gems are separate: coins live in the battle, tokens and gems in the profile', () => {

@@ -56,7 +56,7 @@ test('Dude Power counts deployed Dudes and updates on deploy and sell', () => {
   for (const u of [a, b, c, d]) assert.ok(Math.abs(u.stats.damage - base * 1.3) < 1e-9);
   // other unit types do not count
   const plain = game.deploy('test-plain', ...tiles[4]);
-  assert.equal(plain.stats.damage, 10);
+  assert.equal(plain.stats.damage, 10 * 1.2, 'the global balance layer applies to every unit, even new ones');
   assert.ok(Math.abs(a.stats.damage - base * 1.3) < 1e-9);
   game.sell(d);
   for (const u of [a, b, c]) assert.ok(Math.abs(u.stats.damage - base * 1.2) < 1e-9);

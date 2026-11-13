@@ -3,6 +3,7 @@
 
 import { getBanner, listBanners, MILITARY_CIRCLE, summon, summonCost, duplicateCompensation, compensationCurrency, isRare, CURRENCY_LABEL, SUMMON_CONFIG } from '../units/summoning.js';
 import { GAME_CONFIG } from '../config.js';
+import { BALANCE } from '../balance.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
 import { SummonStage, RevealSequence } from '../render/summonFx.js';
@@ -109,7 +110,7 @@ export class SummoningView {
     el.tagline.textContent = banner.tagline;
     el.price.textContent = banner.price;
     $('banner-currency').textContent = label(banner.currency);
-    $('earn-note').textContent = banner.currency === 'gems' ? `Earn ${GAME_CONFIG.gemsPerBossWave} Gems for every boss wave you clear.` : `Earn ${GAME_CONFIG.tokensPerWave} Tokens for every wave you clear.`;
+    $('earn-note').textContent = banner.currency === 'gems' ? `Earn ${GAME_CONFIG.gemsPerBossWave} Gems for every boss wave you clear.` : `Earn ${BALANCE.tokens.base} Tokens per wave cleared, +${Math.round(BALANCE.tokens.milestoneBonus * 100)}% every ${BALANCE.tokens.milestoneEvery} waves.`;
     const compCur = compensationCurrency(banner);
     const pctComp = Math.round(SUMMON_CONFIG.duplicateCompensation * 100);
     $('pool-note').textContent = `Summoned units are unlocked permanently and appear in Battle Plans. Duplicates pay back ${duplicateCompensation(banner)} ${label(compCur)} each (${pctComp}% of a summon${compCur !== 'tokens' ? '; no Gem-to-Token rate is set, so it is paid in Gems' : ''}).`;

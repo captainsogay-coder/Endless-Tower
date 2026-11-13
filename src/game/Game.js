@@ -15,6 +15,7 @@ import { getEnemyCategory } from '../enemies/enemyCategories.js';
 import { getUnit, listUnits, getAllyDef } from '../units/unitRegistry.js';
 import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier, computeAuras, applyModifiers, scaledBuff, HAZARD_TICK } from './effects.js';
 import { abilityOf } from './abilities.js';
+import { BALANCE, tokensForWave, waveDamageBonus } from '../balance.js';
 import { WeatherSystem, WEATHER_SETTINGS } from './weather.js';
 import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
 
@@ -435,7 +436,7 @@ export class Game {
       ally: true,
       owner,
       level,
-      stats: levelStats(def, level),
+      stats: this.allyStats(def, level, owner),
       x: owner.x + Math.cos(ang) * TILE * 0.9,
       y: owner.y + Math.sin(ang) * TILE * 0.6,
       cooldown: 0.4,
@@ -450,6 +451,21 @@ export class Game {
     this.stats.alliesSummoned++;
     this.emit('allySpawn', a);
     return a;
+  }
+
+  /** Allies use their own table at the owner's level plus the owner's wave scaling (no buffs). */
+  allyStats(def, level, owner) {
+    const s = levelStats(def, level);
+    s.damage *= 1 + this.waveBonus(owner.def);
+    return s;
+  }
+
+  /** A point `ahead` px further along an enemy's road (with the travel direction), or null. */
+  roadPoint(e, ahead = 0) {
+    if (!e.route) return null;
+    const at = { x: 0, y: 0, dx: 0, dy: 0 };
+    sampleRoute(e.route, Math.max(0, Math.min(e.route.length, e.d + ahead)), at, 0);
+    return Math.hypot(at.dx, at.dy) > 0 ? at : null;
   }
 
   alliesOf(owner) {
@@ -539,7 +555,7 @@ export class Game {
 
   /** Bonus coins from abilities (shown as a pop-up). Goes through the coin multiplier. */
   grantCoins(amount, x, y, label = null) {
-    const gained = this.gainCoins(amount);
+    const gained = this.gainCoins(amount * BALANCE.global.abilityCoinMult);
     this.stats.bonusCoins += gained;
     this.emit('bonusCoins', { amount: gained, x, y, label });
     return gained;
@@ -714,7 +730,10 @@ export class Game {
 
   /** All coin income goes through here so weather and economy buffs apply once. */
   gainCoins(amount) {
-    const gained = Math.round(amount * this.coinMult);
+    // fractions carry over, so small multipliers (e.g. +15% on a 2-coin payout) are never rounded away
+    const exact = amount * this.coinMult + (this.coinFrac ?? 0);
+    const gained = Math.floor(exact + 1e-9);
+    this.coinFrac = Math.max(0, exact - gained);
     this.coins += gained;
     return gained;
   }
@@ -768,11 +787,13 @@ export class Game {
     const plan = wave.plan;
     const coins = this.gainCoins(plan.reward);
     // Tokens are only granted for fully completed waves.
-    const tokens = GAME_CONFIG.tokensPerWave;
+    const tokens = plan.tokens ?? tokensForWave(plan.wave);
     this.tokensEarned += tokens;
     const gems = plan.isBoss ? GAME_CONFIG.gemsPerBossWave : 0;
     this.gemsEarned += gems;
     this.stats.wavesCleared++;
+    // wave scaling changed: re-derive stats (once per completed wave, never per frame)
+    if (this.units.some((u) => this.waveBonus(u.def) > 0)) this.refreshAll();
     this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, gems, plan });
   }
 
@@ -817,7 +838,8 @@ export class Game {
   /** Recomputes the battle-wide coin multiplier: weather × each distinct economy buff once. */
   refreshEconomy() {
     const ids = new Map();
-    for (const u of this.units) if (u.def.economy) ids.set(u.def.economy.id, u.def.economy.coinMult);
+    // economy bonuses are unit abilities too: their extra share gets the ability coin boost
+    for (const u of this.units) if (u.def.economy) ids.set(u.def.economy.id, 1 + (u.def.economy.coinMult - 1) * BALANCE.global.abilityCoinMult);
     let m = this.weather?.current?.coinMult ?? 1;
     for (const v of ids.values()) m *= v;
     this.coinMult = m;
@@ -924,11 +946,15 @@ export class Game {
    * Nothing here mutates base stats, so buffs can never accumulate.
    */
   effectiveStats(u, level = u.level) {
-    const s = applyPassive(u.def, levelStats(u.def, level), this.passiveContext(u.def));
+    const ctx = this.passiveContext(u.def);
+    const p = u.def.passive;
+    // Count-based damage passives (Dude Power, Squad Tactics, The Gang) expose `bonus(ctx)`
+    // and join the ADDITIVE bucket, so they add to wave scaling instead of multiplying it.
+    const s = p?.bonus ? levelStats(u.def, level) : applyPassive(u.def, levelStats(u.def, level), ctx);
     const defs = this.buffDefs();
     for (const id of u.auras ?? []) applyModifiers(s, scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0));
-    // capped self bonuses from abilities (streaks, jackpots, soldiers) and battle-long bonuses
-    const dmg = (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0);
+    // ADDITIVE bucket: wave scaling + capped self bonuses (jackpots, soldiers) + battle-long bonuses
+    const dmg = this.waveBonus(u.def) + (p?.bonus ? p.bonus(ctx) : 0) + (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0);
     if (dmg) s.damage *= 1 + dmg;
     if (u.bonus?.rate) s.rate *= 1 + u.bonus.rate;
     applyModifiers(s, this.weather?.current);
@@ -955,13 +981,20 @@ export class Game {
     }
     probe.auras = [...best.keys()];
     probe.auraLevels = Object.fromEntries(best);
-    const ctx = this.passiveContext(def);
-    const s = applyPassive(def, levelStats(def, 0), { ...ctx, deployed: ctx.deployed + 1 });
+    const ctx0 = this.passiveContext(def);
+    const ctx = { ...ctx0, deployed: ctx0.deployed + 1 };
+    const s = def.passive?.bonus ? levelStats(def, 0) : applyPassive(def, levelStats(def, 0), ctx);
     const defs = this.buffDefs();
     for (const id of probe.auras) applyModifiers(s, scaledBuff(defs.get(id), probe.auraLevels[id]));
-    if (this.battleBonus?.damage) s.damage *= 1 + this.battleBonus.damage;
+    const add = this.waveBonus(def) + (def.passive?.bonus ? def.passive.bonus(ctx) : 0) + (this.battleBonus?.damage ?? 0);
+    if (add) s.damage *= 1 + add;
     applyModifiers(s, this.weather?.current);
     return s;
+  }
+
+  /** Wave-scaling damage share for a unit type (same for every copy). */
+  waveBonus(def) {
+    return waveDamageBonus(def.tier, this.stats.wavesCleared);
   }
 
   /** Preview of the next upgrade: cost and before/after effective stats. */

@@ -38,8 +38,8 @@ test('each concurrent wave keeps its own scaling and pays its own reward when cl
   // let everything leak through: waves still complete and pay out once each
   run(g, 400);
   assert.deepEqual(cleared.map((c) => c.wave).sort((a, b) => a - b), [1, 2, 3]);
-  assert.ok(cleared.every((c) => c.tokens === 100));
-  assert.equal(g.tokensEarned, 300);
+  assert.ok(cleared.every((c) => c.tokens === 250));
+  assert.equal(g.tokensEarned, 750);
   assert.equal(g.phase, 'build');
 });
 

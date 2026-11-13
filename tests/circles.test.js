@@ -163,7 +163,7 @@ test('Gambler: 15% crits for 3×, every 10th attack guaranteed + 2 coins', () =>
   const others = s.filter((_, i) => (i + 1) % 10 !== 0);
   const rate = others.filter((x) => x.crit).length / others.length;
   assert.ok(Math.abs(rate - 0.15) < 0.015, `crit rate ${rate}`);
-  assert.equal(g.coins - c0, (N / 10) * 2);
+  assert.ok(Math.abs(g.coins - c0 - (N / 10) * 2 * 1.15) <= 1, 'every 10th attack pays 2 coins (+15% ability coin boost)');
 });
 
 test('Bandit: +3% per consecutive hit on one enemy, capped at +30%, resets on a new target', () => {
@@ -206,7 +206,7 @@ test('Bounty Hunter: marks the highest-HP enemy every 8 s, +20% damage to it, bo
   const c0 = g.coins;
   const bounty = strong.bounty.coins;
   g.damageEnemy(strong, 1e9, u);
-  assert.equal(g.coins - c0, strong.reward + bounty);
+  assert.ok(Math.abs(g.coins - c0 - (strong.reward + bounty * 1.15)) <= 1);
   assert.ok(bounty > 0);
 });
 
@@ -350,7 +350,7 @@ test('Pit Boss: +15% damage and 10% cooldown reduction in a large radius; High R
   const c0 = g.coins;
   for (let i = 0; i < 400; i++) hr.ability.fire(hr, e, g);
   assert.ok(close(hr.stats.damage, d0 * 1.25), 'jackpot bonus capped');
-  assert.equal(g.coins - c0, 40 * 30);
+  assert.ok(Math.abs(g.coins - c0 - 40 * 30 * 1.15) <= 1);
 });
 
 test('High Roller: 8× shot every 8 s', () => {
@@ -392,7 +392,7 @@ test('THE HOUSE wheel outcomes: Jackpot +500 coins, Double Down doubles its dama
   g.on('bonusCoins', (b) => c.push(b.amount));
   for (let i = 0; i < 60 * 20 * 12 && results.size < 3; i++) g.update(1 / 60);
   assert.equal(results.size, 3, 'all three outcomes occur');
-  assert.ok(c.includes(500));
+  assert.ok(c.some((v) => Math.abs(v - 500 * 1.15) <= 1), 'Jackpot: 500 coins + 15% ability coin boost');
   h.doubleUntil = g.time + 10;
   const s = shots(g, h);
   h.ability.fire(h, e, g);
@@ -471,7 +471,7 @@ test('B-2: bombing run every 12 s; the strongest enemy in the main blast takes 3
   const weak = foe(g, 260, 1e6);
   const strong = foe(g, 262, 1e9);
   const u = place(g, 'b2', weak);
-  assert.ok(close(1 / u.stats.rate, 12, 0.5));
+  assert.ok(close(1 / u.stats.rate, 12 * 0.9, 0.5), '12 s run − 10% global cooldown');
   g.explode(weak.x, weak.y, u.stats.splash, 1000, u, { focusMult: 3 });
   assert.ok(close(1e9 - strong.hp, 3000) && close(1e6 - weak.hp, 1000));
 });

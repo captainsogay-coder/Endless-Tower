@@ -19,7 +19,7 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 
 1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle.
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
-3. **Tokens:** every **fully completed wave pays exactly 100 Tokens**. They are saved immediately and kept between battles and sessions.
+3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
 4. **Summoning:** spend Tokens (or Gems) at five circles (Military, Advanced Military, Wild West, Gambino and Nuclear War) to unlock new unit types permanently.
 
 ### Upgrading and range
@@ -43,7 +43,7 @@ Tap a unit card (or press its key) to select it. This is free. Then tap open gro
 - **Call wave N** calls the next wave immediately, even while others are fighting.
 - **Call ×N** queues up to 1,000 waves at once. Queued waves enter 0.35 s apart, and enemies from every wave share the road.
 - **Auto Skip** calls the next wave as soon as the newest one has finished spawning.
-- Every wave keeps its own scaling and pays its own reward (coins plus 100 Tokens) the moment its last enemy dies. The HUD lists the active waves and the queue.
+- Every wave keeps its own scaling and pays its own reward (coins plus its Tokens) the moment its last enemy dies. The HUD lists the active waves and the queue.
 
 ### Weather
 
@@ -75,7 +75,7 @@ While weather is on (the cloud button at the top left), every second has a **1% 
 | Currency | Earned | Spent on | Lifetime |
 | --- | --- | --- | --- |
 | **Coins** | Defeating enemies, clearing waves | Deploying and upgrading units in battle | One battle |
-| **Tokens** | 100 per completed wave | Military, Advanced, Wild West and Gambino circles | Saved permanently |
+| **Tokens** | 250 per completed wave, +5% per 10-wave milestone (`BALANCE.tokens` in `src/balance.js`) | Military, Advanced, Wild West and Gambino circles | Saved permanently |
 | **Gems** | 50 per completed **boss** wave (`GAME_CONFIG.gemsPerBossWave`) | Nuclear War circle | Saved permanently |
 
 The balances never mix. Nothing converts Gems to Tokens or back unless a rate is set in `SUMMON_CONFIG.tokenValue.gems` (it is `null` by default).
@@ -168,6 +168,17 @@ Every pool is checked at start-up to total exactly 100%.
 
   Odds are never adjusted. Every pull is a plain independent draw, and the outcome is decided before the animation starts. Normal summons keep their short reveal.
 
+## Balance and progression
+
+Every knob is in `src/balance.js`; measurements and the reasoning behind each individual adjustment are in **[docs/BALANCE.md](docs/BALANCE.md)** (`node scripts/balance.mjs tokens|units|bot [--before]` reproduces them).
+
+- **Global layer (every unit, including future ones):** +20% damage, +10% range, −10% attack cooldown, +15% coins from abilities and economy bonuses.
+- **Upgrades:** each level adds +8% damage, +2% range and +2% attack speed on top of the unit's own table, so every upgrade is at least +20% DPS.
+- **Wave scaling:** Tier I–III units gain +2% of their base damage per completed wave and Tier IV–VI +1%. Tier VII and up get none. It is linear, the same for every copy, shown in the unit panel, and never written into base stats.
+- **Stacking:** wave scaling, count passives (Dude Power, Squad Tactics, The Gang) and capped self bonuses are **added** together. Buffs (once per id) and weather (one at a time) **multiply**. Nothing compounds per wave.
+
+The tables below list each unit's own level-0 values. The global layer above applies on top of them.
+
 ## Units
 
 Every unit has a base level plus 5 upgrades, bought per copy in battle. All numbers live in one data table per unit in `src/units/defs/`.
@@ -177,11 +188,11 @@ Every unit has a base level plus 5 upgrades, bought per copy in battle. All numb
 | Dude | I | 15 | 4 | 2 | 1.25 | Starter. **Dude Power:** `Damage × [1 + 0.10 × (deployed Dudes − 1)]` |
 | Cadet | I | 30 | 7 | 2.5 | 1.5 | Better DPS and range than Dude |
 | Gunnerman | II | 75 | 5 | 3.5 | 4.0 | Sustained machine-gun DPS |
-| Grenade Launcher | III | 160 | 32 | 4 | 0.45 | Small blast (1.1 tiles). **Wounded:** 20% per enemy hit, −5% speed for 4 s, refreshes, never stacks |
+| Grenade Launcher | III | 160 | 32 | 4 | 0.55 | Small blast (1.1 tiles). **Wounded:** 20% per enemy hit, −5% speed for 4 s, refreshes, never stacks |
 | Tank | V | 450 | 85 | 5 | 0.4 | Blast 1.5 tiles. Leaves **flames** for 3 s (8% of shell damage per second). **Command Presence:** allies within 2.5 tiles attack 10% faster; overlapping Tanks don't stack |
 
-| Special Forces | III | 110 | 10 | 3.5 | 3.0 | **Squad Tactics:** `Damage × [1 + 0.20 × (deployed Special Forces − 1)]` (`SQUAD_TACTICS_PER_UNIT`) |
-| Drone | V | 320 | 60 | 6.25 | 0.67 | Launches a drone every 1.5 s that hunts a target and detonates (1-tile blast). 10% are **Explosive Drones**: 5× damage, 2× blast radius |
+| Special Forces | III | 110 | 10 | 3.5 | 3.0 | **Squad Tactics:** +15% damage per other Special Forces deployed, up to +300% (`SQUAD_TACTICS_PER_UNIT`, `SQUAD_TACTICS_CAP`) |
+| Drone | V | 320 | 51 | 6.25 | 0.67 | Launches a drone every 1.5 s (1.35 s with the global cooldown cut) that hunts a target and detonates (1-tile blast). 10% are **Explosive Drones**: 5× damage, 2× blast radius |
 | Commander | V | 420 | 34 | 10 | 2.4 | Extreme range, targets the strongest enemy. **Field Command:** allies within 5.5 tiles get +8% range and 8% cooldown reduction |
 | Colonel | VI | 90 | 26 | 4 | 1.2 | Cheap. **Orders:** every unit on the map gets +15% damage, 10% cooldown reduction and +5% range. **Requisitions:** +15% coins |
 | General | VII | 900 | 150 | 6.5 | 0.5 | Artillery (1.75-tile blast). **High Command:** allies within 6.5 tiles get +25% damage, 15% cooldown reduction and +10% range. Launches a regular drone every 4 s |
@@ -195,28 +206,28 @@ Range is in tiles; ability numbers live in each unit's `ability` block (`src/uni
 | --- | --- | --- | --- | --- | --- |
 | Gambler | 120 | 14 | 3.5 | 1.4 | 15% crits for 3×; every 10th attack is a guaranteed crit and pays 2 coins |
 | Bandit | 100 | 9 | 3.25 | 2.2 | +3% per consecutive hit on one enemy, up to +30%; resets on a new target |
-| Outlaw | 260 | 30 | 4 | 1.2 | Every 6th attack: dynamite (1.5×, 1.4-tile blast), enemies hit take +10% damage for 4 s |
-| Bounty Hunter | 300 | 48 | 5.5 | 0.8 | Every 8 s marks the highest-HP enemy in range; +20% damage to it; a marked kill pays 4× its coin reward |
-| Gunslinger | 650 | 55 | 4.7 | 2.0 | Every 5th attack: 3-shot burst at 70%; 20% crit chance, crits 2.5× |
-| Sheriff | 1,100 | 120 | 5.5 | 1.0 | Allies within 7 tiles: +12% damage, +10% range; every 15 s a 5× shot at the strongest enemy |
+| Outlaw | 260 | 34 | 4 | 1.2 | Every 6th attack: dynamite (1.5×, 1.4-tile blast), enemies hit take +10% damage for 4 s |
+| Bounty Hunter | 300 | 58 | 5.5 | 0.8 | Every 8 s marks the highest-HP enemy in range; +20% damage to it; a marked kill pays 4× its coin reward |
+| Gunslinger | 650 | 68 | 4.7 | 2.0 | Every 5th attack: 3-shot burst at 70%; 20% crit chance, crits 2.5× |
+| Sheriff | 1,100 | 135 | 5.5 | 1.0 | Allies within 7 tiles: +12% damage, +10% range; every 15 s a 5× shot at the strongest enemy |
 | Outlaw Leader | 1,300 | 110 | 5 | 1.1 | Calls 3 Outlaws for 12 s every 12 s; +5% damage per *deployed* Outlaw (max +50%); every 20 s 0.5 coins per enemy alive (max 150) |
 | Fastest Hand In The West | 4,000 | 260 | 6.5 | 0.25 | Six-shot barrage per attack; +2% attack speed per consecutive kill (max +40%, resets after 8 s); every 25 s a 10× crit at the strongest enemy |
 | Drunkard | 25 | 6 | 2.25 | 1.2 | 70% or 160% damage; every 10th attack a stumble that slows 5% for 2 s |
 | Dealer | 500 | 40 | 5 | 1.6 | Card throws; allies in its range: 10% cooldown reduction; every 20 s 1 coin per enemy eliminated (max 200) |
-| Night Dancer | 480 | 30 | 4 | 1.5 | Small blasts; every 5 attacks a pulse slowing enemies in range 15% for 3 s |
-| Desperate Gambler | 600 | 60 | 4.5 | 1.4 | 50%: 2.5× or 40%; every 15 s an all-in shot of 0.5×–5× |
+| Night Dancer | 480 | 27 | 4 | 1.5 | Small blasts; every 5 attacks a pulse slowing enemies in range 15% for 3 s |
+| Desperate Gambler | 600 | 75 | 4.5 | 1.4 | 50%: 2.5× or 40%; every 15 s an all-in shot of 0.5×–5× |
 | Pit Boss | 1,200 | 90 | 5 | 1.0 | Allies within 7.5 tiles: +15% damage, 10% cooldown reduction; every 15 s 1.5 coins per enemy defeated (max 300) |
 | High Roller | 2,200 | 140 | 5.5 | 1.2 | Every 8 s an 8× shot; every 10th attack a Jackpot: 30 coins and +1% battle damage (max +25%) |
 | THE HOUSE | 8,000 | 300 | 7.5 | 1.0 | All allies +10% damage, 10% cooldown reduction; every 20 s Jackpot (+500 coins), Bankruptcy (5× in a 4-tile area) or Double Down (2× damage for 10 s); every 50 kills all allies +1% damage for the battle (max +20%) |
-| Missile Launcher | 220 | 40 | 5.5 | 0.7 | Area rockets; every 8th attack a bonus 2× missile |
+| Missile Launcher | 220 | 32 | 5.5 | 0.7 | Area rockets; every 8th attack a bonus 2× missile |
 | Special Force Battalion | 350 | 26 | 4.25 | 2.0 | Keeps up to 3 mini soldiers (20 s each, one more every 3 s); +5% damage per surviving soldier |
 | ICBM | 900 | 260 | 15 | 0.2 | 3-tile blast plus a 40% aftershock |
-| Bomber | 850 | 120 | 7 | 1 per 6 s | Flyover dropping 4 bombs along its path; every 3rd run an extra 2× explosion |
+| Bomber | 850 | 145 | 7 | 1 per 4.5 s | Flyover dropping 4 bombs along the road, leading the column; every 3rd run an extra 2× explosion |
 | B-2 | 1,600 | 900 | 8 | 1 per 12 s | Bombing run; the strongest enemy in the main blast takes 3× |
 | Marshal | 3,500 | 200 | 6.25 | 1.2 | All allies +15% damage, +10% range; every 20 s 120 coins; every 30 s a 6× barrage |
-| Glorious Leader | 7,000 | 320 | 6.5 | 1.2 | All allies +20% damage; every 25 s 400 coins; every 20 s every enemy takes +15% damage for 5 s |
-| Nuclear Warhead | 12,000 | 2,500 | 10 | 0.12 | 5-tile blast, a 6 s energy zone, enemies hit take +20% damage for 5 s |
-| Antimatter Warhead | 20,000 | 4,000 | 11 | 0.12 | 6-tile energy blast, +30% damage taken for 8 s; every 40 s a gravity field holds and gathers enemies for 3 s, then detonates (bosses resist the pull) |
+| Glorious Leader | 7,000 | 420 | 6.5 | 1.2 | All allies +20% damage; every 25 s 400 coins; every 20 s every enemy takes +15% damage for 5 s |
+| Nuclear Warhead | 9,000 | 2,500 | 10 | 0.2 | 5-tile blast, a 6 s energy zone, enemies hit take +20% damage for 5 s |
+| Antimatter Warhead | 14,000 | 4,000 | 11 | 0.18 | 6-tile energy blast, +30% damage taken for 8 s; every 40 s a gravity field holds and gathers enemies for 3 s, then detonates (bosses resist the pull) |
 
 Selling refunds 70% of everything spent on that copy.
 
@@ -273,9 +284,10 @@ src/
 ## Development
 
 ```bash
-npm test                           # 100 unit tests: maps, waves, units, every ability, odds, currencies, weather, persistence
+npm test                           # 109 unit tests: maps, waves, units, every ability, odds, currencies, weather, balance, persistence
+node scripts/balance.mjs units     # balance report (also: tokens, bot; add --before for the old balance)
 npm run build                      # production build → dist/
-node scripts/e2e.mjs URL           # 46 browser checks against a running build (needs Playwright)
+node scripts/e2e.mjs URL           # 47 browser checks against a running build (needs Playwright)
 npm run sim -- 10 150              # headless balance sim
 node scripts/screenshot.mjs URL    # every realm mid-battle
 node scripts/interactions.mjs URL  # real clicks/drags/keys: plan edit, deploy, upgrade, sell, boss

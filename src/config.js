@@ -8,7 +8,7 @@ export const WORLD_H = ROWS * TILE;
 export const GAME_CONFIG = Object.freeze({
   startingCoins: 100,
   sellRefund: 0.7,
-  tokensPerWave: 100,
+  // Token rewards per wave are in src/balance.js (BALANCE.tokens).
   // Gems: a separate, rarer currency for premium circles. Earned only by clearing boss waves.
   gemsPerBossWave: 50,
   // Multi-wave: called waves start this many seconds apart; one call can queue up to maxWaveCall waves.

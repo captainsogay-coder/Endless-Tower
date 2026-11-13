@@ -5,6 +5,7 @@
 
 import { createRng } from '../core/rng.js';
 import { GAME_CONFIG } from '../config.js';
+import { tokensForWave } from '../balance.js';
 import { listArchetypes, getArchetype } from './archetypes.js';
 import { waveScaling, traitSlots } from './scaling.js';
 import { rollTraits, getTrait } from './traits.js';
@@ -121,5 +122,6 @@ export function composePlan(arch, wave, rng, entranceCount = 1) {
     scaling: waveScaling(wave),
     isBoss,
     reward: waveClearReward(wave, isBoss),
+    tokens: tokensForWave(wave),
   };
 }

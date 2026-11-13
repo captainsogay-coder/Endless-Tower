@@ -41,7 +41,8 @@ export const nightDancer = {
   description: 'Every spin sends out a shimmer that slows the crowd.',
   price: 480,
   projectile: { kind: 'sequin', speed: 480 },
-  levels: buildLevels({ damage: 30, range: 128, rate: 1.5, splash: 28 }, 480),
+  // balance: with wave scaling it matched the T7 General's crowd damage by wave 250 – trimmed from 30
+  levels: buildLevels({ damage: 27, range: 128, rate: 1.5, splash: 28 }, 480),
   ability: { id: 'night-dancer', pulseEvery: 5, pulseSlow: 0.15, pulseDuration: 3 },
   passive: { id: 'night-dancer', name: 'Encore', summary: 'Small area attacks. Every 5 attacks releases a pulse that slows enemies in range by 15% for 3 s.' },
   art: 'nightDancer',
@@ -55,7 +56,8 @@ export const desperateGambler = {
   description: 'All in. Every time.',
   price: 600,
   projectile: { kind: 'chip', speed: 600 },
-  levels: buildLevels({ damage: 60, range: 144, rate: 1.4 }, 600),
+  // balance: T7 gets no wave scaling; raised from 60 so it stays ahead of T3 gunmen late
+  levels: buildLevels({ damage: 75, range: 144, rate: 1.4 }, 600),
   ability: { id: 'desperate-gambler', winMult: 2.5, loseMult: 0.4, allInEvery: 15, allInMin: 0.5, allInMax: 5 },
   passive: { id: 'desperate-gambler', name: 'Double or Nothing', summary: 'Each attack: 50% chance of 2.5× damage, otherwise 40%. Every 15 s an all-in shot deals a random 0.5×–5×.' },
   art: 'desperateGambler',

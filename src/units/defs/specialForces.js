@@ -1,7 +1,8 @@
 // SPECIAL FORCES — Tier 3. Elite DPS rifleman with a stronger, Dude-style
 // stacking passive. SQUAD_TACTICS_PER_UNIT is the configurable scaling.
-export const SQUAD_TACTICS_PER_UNIT = 0.2;
-export const squadTacticsMultiplier = (deployed) => 1 + SQUAD_TACTICS_PER_UNIT * Math.max(0, deployed - 1);
+export const SQUAD_TACTICS_PER_UNIT = 0.15;
+export const SQUAD_TACTICS_CAP = 3; // balance: capped at +300% (21 operators) – uncapped, 60 copies out-scaled Tier X units
+export const squadTacticsMultiplier = (deployed) => 1 + Math.min(SQUAD_TACTICS_CAP, SQUAD_TACTICS_PER_UNIT * Math.max(0, deployed - 1));
 
 export default {
   id: 'special-forces',
@@ -23,8 +24,8 @@ export default {
   passive: {
     id: 'squad-tactics',
     name: 'Squad Tactics',
-    summary: `+${SQUAD_TACTICS_PER_UNIT * 100}% damage to all Special Forces for every other Special Forces deployed.`,
-    formula: `Damage × [1 + ${SQUAD_TACTICS_PER_UNIT.toFixed(2)} × (deployed Special Forces − 1)]`,
+    summary: `+${Math.round(SQUAD_TACTICS_PER_UNIT * 100)}% damage to all Special Forces for every other Special Forces deployed (up to +${SQUAD_TACTICS_CAP * 100}%).`,
+    formula: `Damage × [1 + min(${SQUAD_TACTICS_CAP}, ${SQUAD_TACTICS_PER_UNIT.toFixed(2)} × (deployed Special Forces − 1))]`,
     modify(stats, ctx) {
       stats.damage *= squadTacticsMultiplier(ctx.deployed);
     },

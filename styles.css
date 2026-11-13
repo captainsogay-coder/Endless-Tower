@@ -573,3 +573,6 @@ table.levels tr.current td { color: var(--accent); }
 @media (max-height: 520px) and (orientation: landscape) {
   .up-pips { grid-column: 1 / -1; }
 }
+.np-reward { margin-top: 3px; display: flex; align-items: center; gap: 5px; font-family: var(--display); font-weight: 700; font-size: 13px; color: var(--accent); }
+.up-wave { font-size: 12px; color: var(--text-2); }
+.up-wave b { color: var(--ok); font-family: var(--display); font-size: 14px; letter-spacing: 0.02em; }

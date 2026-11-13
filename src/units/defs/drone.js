@@ -13,13 +13,14 @@ export default {
   price: 320,
   targeting: 'first',
   projectile: { kind: 'drone', speed: 230, explosive: EXPLOSIVE_DRONE },
+  // balance: damage trimmed 15% – with wave scaling it out-lasted the Tier VII General
   levels: [
-    { damage: 60, range: 200, rate: 1 / 1.5, splash: 30 },
-    { cost: 350, damage: 75, range: 200, rate: 1 / 1.5, splash: 30 },
-    { cost: 550, damage: 92, range: 216, rate: 1 / 1.4, splash: 32 },
-    { cost: 820, damage: 115, range: 216, rate: 1 / 1.3, splash: 32 },
-    { cost: 1200, damage: 145, range: 232, rate: 1 / 1.2, splash: 34 },
-    { cost: 1700, damage: 185, range: 248, rate: 1 / 1.1, splash: 36 },
+    { damage: 51, range: 200, rate: 1 / 1.5, splash: 30 },
+    { cost: 350, damage: 64, range: 200, rate: 1 / 1.5, splash: 30 },
+    { cost: 550, damage: 78, range: 216, rate: 1 / 1.4, splash: 32 },
+    { cost: 820, damage: 98, range: 216, rate: 1 / 1.3, splash: 32 },
+    { cost: 1200, damage: 123, range: 232, rate: 1 / 1.2, splash: 34 },
+    { cost: 1700, damage: 157, range: 248, rate: 1 / 1.1, splash: 36 },
   ],
   passive: {
     id: 'explosive-drones',

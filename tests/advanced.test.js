@@ -85,14 +85,16 @@ test('Colonel and Fortress raise coin gain once each, battle-wide', () => {
   assert.equal(g.coinMult, 1);
   g.deploy('colonel', ...t[0]);
   g.deploy('colonel', ...t[3]);
-  assert.ok(Math.abs(g.coinMult - 1.15) < 1e-9);
+  const col = 1 + 0.15 * 1.15; // economy bonuses get the +15% ability-coin boost
+  const fort = 1 + 0.25 * 1.15;
+  assert.ok(Math.abs(g.coinMult - col) < 1e-9);
   const f = g.deploy('fortress', ...t[6]);
-  assert.ok(Math.abs(g.coinMult - 1.15 * 1.25) < 1e-9);
+  assert.ok(Math.abs(g.coinMult - col * fort) < 1e-9);
   g.sell(f);
-  assert.ok(Math.abs(g.coinMult - 1.15) < 1e-9, 'removed with the unit');
+  assert.ok(Math.abs(g.coinMult - col) < 1e-9, 'removed with the unit');
 });
 
-test('Drone station launches a drone every 1.5 s; ~10% are Explosive Drones (5× damage, 2× radius)', () => {
+test('Drone station launches a drone every 1.35 s (1.5 s − 10% global cooldown); ~10% are Explosive Drones (5× damage, 2× radius)', () => {
   const g = game(6);
   g.towerMaxHp = g.towerHp = 1e12;
   const t = freeTiles(g).filter(([x, y]) => g.map.pathDist[y * g.map.cols + x] === 1);
@@ -104,7 +106,7 @@ test('Drone station launches a drone every 1.5 s; ~10% are Explosive Drones (5×
   for (let i = 0; i < 60 * 200; i++) g.update(1 / 60);
   assert.ok(shots.length >= 20, `${shots.length} launches`);
   const gaps = shots.slice(1).map((s, i) => s.t - shots[i].t).filter((d) => d < 1.6);
-  assert.ok(gaps.length > 10 && gaps.every((d) => d >= 1.5 - 1 / 60 - 1e-9 && d <= 1.5 + 2 / 60), 'one drone every 1.5 s');
+  assert.ok(gaps.length > 10 && gaps.every((d) => d >= 1.35 - 1 / 60 - 1e-9 && d <= 1.35 + 2 / 60), 'one drone every 1.35 s');
   // the explosive roll itself, over many launches
   const target = { x: st.x + 50, y: st.y, alive: true, radius: 8 };
   const N = 5000;

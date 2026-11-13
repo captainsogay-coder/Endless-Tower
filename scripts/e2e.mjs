@@ -55,7 +55,7 @@ const wave = await ev(() => {
   for (let i = 0; i < 20; i++) game.update(1 / 60); // partially played wave
   return { phase: game.phase, afterFirst, partial: window.endlessTower.profile.balance('tokens'), coins0, profileCoins: window.endlessTower.profile.balance('coins'), gems: window.endlessTower.profile.data.wallet.gems };
 });
-check('exactly 100 Tokens for a completed wave', wave.afterFirst - t0 === 100, `${t0} → ${wave.afterFirst}`);
+check('exactly 250 Tokens for a completed early wave', wave.afterFirst - t0 === 250, `${t0} → ${wave.afterFirst}`);
 check('no Tokens for a partially completed wave', wave.partial === wave.afterFirst);
 check('Coins, Tokens and Gems are separate balances (coins never saved; Gems only from boss waves)', wave.profileCoins === 0 && wave.gems === 0 && wave.coins0 > 0);
 await page.click('#btn-retreat');
@@ -204,6 +204,10 @@ const mw = await ev(() => {
   return { active: game.activeWaveNumbers().length, queued: game.queuedWaveNumbers().length, waves: new Set(game.enemies.map((e) => e.wave?.number)).size, info: document.getElementById('queue-info').textContent };
 });
 check('calling 40 waves: several waves active at once, rest queued, HUD lists them', mw.active > 1 && mw.active + mw.queued >= 39 && mw.waves > 1 && /queued/.test(mw.info), JSON.stringify(mw));
+const np = await page.textContent('#next-preview');
+const npWave = await ev(() => window.endlessTower.game.nextPlan.wave);
+const expectTok = Math.round(250 * (1 + 0.05 * Math.floor(npWave / 10)));
+check('the next wave shows its Token reward before it starts (+5% per 10 waves)', new RegExp(`\\+${expectTok} Tokens on clear`).test(np.replace(/,/g, '')), `wave ${npWave}: ${np.replace(/\s+/g, ' ').slice(-40)}`);
 const wx = await ev(() => {
   const { game } = window.endlessTower;
   game.weather.start('nova');
@@ -324,7 +328,7 @@ await ev(() => { const g = window.endlessTower.game; g.towerHp = g.towerMaxHp = 
 await page.click('.speed button[data-speed="3"]');
 await page.waitForFunction(() => window.endlessTower.game.stats.wavesCleared >= 3, null, { timeout: 120000 });
 const fought = await ev(() => ({ kills: window.endlessTower.game.stats.kills, unitKills: window.endlessTower.game.units.reduce((a, u) => a + u.kills, 0), tokens: window.endlessTower.profile.balance('tokens') }));
-check('the battle is fought and rewards land in the profile (100 Tokens per wave)', fought.kills > 0 && fought.unitKills > 0 && fought.tokens - tokens0 === 300, JSON.stringify(fought));
+check('the battle is fought and rewards land in the profile (250 Tokens per early wave)', fought.kills > 0 && fought.unitKills > 0 && fought.tokens - tokens0 === 750, JSON.stringify(fought));
 await page.click('.speed button[data-speed="1"]');
 await page.click('#btn-retreat');
 await page.click('#btn-retreat-confirm');

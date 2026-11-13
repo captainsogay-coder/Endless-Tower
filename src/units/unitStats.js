@@ -1,17 +1,31 @@
 // Shared unit math: level stats, upgrade costs and passive application.
 // Every unit goes through these helpers – nothing here is unit-specific.
 
+import { balanceLayer } from '../balance.js';
+
 let nextUid = 1;
 
 export const maxLevel = (def) => def.levels.length - 1;
 
-/** Raw stats for a definition at a level (no passive applied). */
-export function levelStats(def, level) {
+/** The level table entry exactly as written in the unit definition. */
+export function tableStats(def, level) {
   const L = def.levels[Math.max(0, Math.min(level, maxLevel(def)))];
+  return { damage: L.damage, range: L.range, rate: L.rate, splash: L.splash ?? 0 };
+}
+
+/**
+ * Base stats for a definition at a level: the unit's table with the global
+ * balance layer and per-upgrade growth applied (see src/balance.js). No
+ * passive, buffs or weather. Every unit – including future ones – goes through here.
+ */
+export function levelStats(def, level) {
+  const lv = Math.max(0, Math.min(level, maxLevel(def)));
+  const L = def.levels[lv];
+  const k = balanceLayer(lv);
   return {
-    damage: L.damage,
-    range: L.range,
-    rate: L.rate,
+    damage: L.damage * k.damage,
+    range: L.range * k.range,
+    rate: L.rate * k.rate,
     projectileSpeed: L.projectileSpeed ?? def.projectile?.speed ?? 520,
     splash: L.splash ?? 0,
   };

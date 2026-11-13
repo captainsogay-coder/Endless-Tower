@@ -11,13 +11,14 @@ export default {
   price: 160,
   targeting: 'first',
   projectile: { kind: 'grenade', speed: 260 },
+  // balance: +0.1 attacks/s at every level – the slowest early AOE fell behind as a solo damage dealer
   levels: [
-    { damage: 32, range: 128, rate: 0.45, splash: 36 },
-    { cost: 200, damage: 40, range: 128, rate: 0.45, splash: 36 },
-    { cost: 320, damage: 50, range: 136, rate: 0.5, splash: 38 },
-    { cost: 480, damage: 62, range: 136, rate: 0.5, splash: 40 },
-    { cost: 700, damage: 78, range: 144, rate: 0.55, splash: 42 },
-    { cost: 1000, damage: 98, range: 152, rate: 0.6, splash: 44 },
+    { damage: 32, range: 128, rate: 0.55, splash: 36 },
+    { cost: 200, damage: 40, range: 128, rate: 0.55, splash: 36 },
+    { cost: 320, damage: 50, range: 136, rate: 0.6, splash: 38 },
+    { cost: 480, damage: 62, range: 136, rate: 0.6, splash: 40 },
+    { cost: 700, damage: 78, range: 144, rate: 0.65, splash: 42 },
+    { cost: 1000, damage: 98, range: 152, rate: 0.7, splash: 44 },
   ],
   onHit: [{ status: 'wounded', chance: WOUND_CHANCE }],
   passive: {

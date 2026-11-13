@@ -14,5 +14,5 @@ export function upgradeRange(def) {
 
 /** Sample points showing how a count-based passive scales. */
 export function passiveScale(def, counts = [1, 2, 5, 10, 25]) {
-  return counts.map((n) => [n, def.passive.bonus({ deployed: n })]);
+  return counts.map((n) => [n, def.passive.bonus({ deployed: n, count: () => n })]);
 }

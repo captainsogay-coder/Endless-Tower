@@ -414,17 +414,21 @@ const icbm = {
 
 /** Flyover: a plane crosses the map over the target and bombs along its line. */
 function bombingRun(u, target, game, opts) {
-  const ang = game.combatRng.next() * Math.PI * 2;
-  const dx = Math.cos(ang);
-  const dy = Math.sin(ang);
   const reach = 760;
   const speed = opts.speed;
-  game.emit('flyover', { kind: opts.kind, x0: target.x - dx * reach, y0: target.y - dy * reach, x1: target.x + dx * reach, y1: target.y + dy * reach, duration: (2 * reach) / speed, unit: u });
-  const tx = target.x;
-  const ty = target.y;
+  const arrive = reach / speed + 0.25;
+  // lead the target: aim where it will be when the bombs land, and lay the bombs
+  // along the road (around corners too) so the line follows the enemy column
+  const lead = (target.speed ?? 0) * arrive;
+  const centre = game.roadPoint(target, lead) ?? { x: target.x, y: target.y, dx: 1, dy: 0 };
+  const ang = Math.atan2(centre.dy, centre.dx);
+  const dx = Math.cos(ang);
+  const dy = Math.sin(ang);
+  game.emit('flyover', { kind: opts.kind, x0: centre.x - dx * reach, y0: centre.y - dy * reach, x1: centre.x + dx * reach, y1: centre.y + dy * reach, duration: (2 * reach) / speed, unit: u });
   for (const b of opts.bombs) {
+    const p = game.roadPoint(target, lead + b.offset) ?? { x: centre.x + dx * b.offset, y: centre.y + dy * b.offset };
     const t = (reach + b.offset) / speed + 0.25;
-    game.after(t, () => game.explode(tx + dx * b.offset, ty + dy * b.offset, b.radius, b.damage, u, { kind: opts.blast, focusMult: b.focusMult }));
+    game.after(t, () => game.explode(p.x, p.y, b.radius, b.damage, u, { kind: opts.blast, focusMult: b.focusMult }));
   }
 }
 

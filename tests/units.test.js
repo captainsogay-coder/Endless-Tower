@@ -70,7 +70,7 @@ test('new units match their brief', () => {
   assert.deepEqual(['cadet', 'gunnerman', 'grenade-launcher', 'tank'].map((id) => getUnit(id).tier), [1, 2, 3, 5]);
   assert.ok(dps('cadet') > dps('dude') && s0('cadet').range > s0('dude').range, 'Cadet beats Dude on DPS and range');
   assert.ok(dps('gunnerman') > dps('cadet') && s0('gunnerman').range > s0('cadet').range, 'Gunnerman: DPS focus, good range');
-  assert.ok(s0('grenade-launcher').splash > 0 && s0('grenade-launcher').rate < 0.6, 'Grenade: small AoE, slow cooldown');
+  assert.ok(s0('grenade-launcher').splash > 0 && s0('grenade-launcher').rate < 0.7 && s0('grenade-launcher').rate < s0('cadet').rate / 2, 'Grenade: small AoE, slow cooldown');
   assert.ok(s0('tank').damage > s0('grenade-launcher').damage && s0('tank').range > s0('grenade-launcher').range, 'Tank out-hits the grenadier');
   assert.ok(s0('tank').splash > 0 && getUnit('tank').impactHazard && getUnit('tank').buffs?.length);
   for (const d of ROSTER) assert.equal(maxLevel(d), 5, `${d.id} has 5 upgrade levels`);
