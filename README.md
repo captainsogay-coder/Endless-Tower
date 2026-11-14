@@ -17,10 +17,10 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 
 ## How it plays
 
-1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the roster, or let **Auto Build** pick your strongest types (see [Battle Plans](#battle-plans)).
+1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the collection, filter by role, or let **Auto Pick** choose your strongest types, optionally by DPS, AOE, Summon, Empower or Economy (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at eight circles (Military, Advanced Military, Village Militia, Town Guard, Siege Workshop, Wild West, Gambino and Nuclear War) to unlock new unit types permanently. Tokens are the only summon currency.
+4. **Summoning:** spend Tokens at eight circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
 
 ### Upgrading and range
 
@@ -88,12 +88,20 @@ While weather is on (the cloud button at the top left), every second has a **1% 
 ## Battle Plans
 
 - **Plans** hold up to 12 distinct unit *types*. Tap an owned card to add or remove it.
-- **Favourites:** the ☆ on an owned card (or *Pin to front* in its details) pins that unit type. Pinned types always come first, with a gold star and border, separate from the plan's "in plan" highlight. Pinning never uses a plan slot. Pins are saved in the profile and can be removed any time.
-- **Sort:** *Tier* (highest tier first, stronger units first within a tier) or *Acquired* (the order you got them). Both keep pinned units first, and the choice is remembered.
-- **Auto Build** fills the plan with your strongest owned types. It picks the highest tier first, then the higher baseline combat score (single-target DPS combined with area reach, with support/summoner budgets credited back), then acquisition order. It takes up to 12 distinct types and uses fewer if you own fewer.
-  - It never spends Coins or Tokens, summons, or changes ownership.
-  - Before replacing anything it shows a dialog listing what will be added, replaced and kept.
-  - *Undo Auto Build* restores the previous plan, even after a reload.
+- **Side tiers:** every card shows five measured ratings: **DPS, AOE, SUM (Summon), EMP (Empower) and ECO (Economy)**. They are numbers on coloured bars, while the overall tier keeps its Roman numeral. A dash means N/A. Hover or long-press a number for the measured value behind it. The unit's details panel lists all five with an explanation and where it ranks among your units ("#2 of 14 owned"). See [docs/SIDE_TIERS.md](docs/SIDE_TIERS.md) for how they are measured and the full table.
+- **Collection filters:**
+  - **Roles:** *All roles* · DPS · AOE · Summon · Empower · Economy. Shows only units with a real rating in that role and ranks them by it.
+  - **Sort:** overall tier, acquired order, or any side tier.
+  - **Circle:** a summoning circle, listed by price, or starter units.
+  - **Ownership:** all / owned / not owned.
+  - *Clear filters* resets everything. Units you don't own yet follow the same filters, so "the best Economy unit I can still summon" is two taps away.
+- **Favourites:** the pin on an owned card (or *Pin to front* in its details) pins that unit type. Pinned types always come first in every sort, marked with a brass corner tab that looks nothing like the "in plan" frame. Pinning never uses a plan slot. Pins are saved and can be removed any time.
+- **Auto Pick** (the upgraded Auto Build) fills the plan with your strongest owned types.
+  - **Priority:** *Balanced* (the original Auto Build: overall tier, then measured combat strength, then acquisition order) or one side tier.
+  - **Then:** an optional second side tier. For example, Economy first and DPS second puts the earners first, then fills the rest with the hardest hitters.
+  - **Ranking:** primary side tier → secondary side tier → overall tier → combat strength → acquisition order. Units with N/A in the priority fill the remaining slots. At most 12 distinct owned types, never duplicates or units you don't own.
+  - The preview updates live and marks each unit *New* or *Kept*, and lists what would be *replaced*. Nothing changes until you confirm.
+  - It never spends Coins or Tokens, summons, or changes ownership. *Undo Auto Pick* restores the previous plan, even after a reload. Your priorities are remembered.
 
 ## Currencies
 
@@ -105,6 +113,8 @@ While weather is on (the cloud button at the top left), every second has a **1% 
 There is exactly one summon currency: **Tokens**. `registerBanner` refuses a circle priced in anything else, the profile saves only a Token balance (an old save's stray Gem balance is dropped on load), and wave rewards are coins and Tokens only.
 
 ## Summoning
+
+All circles live in one collection **sorted by Token price, cheapest first**. The order comes from the data (`listCirclesByPrice()` in `src/units/summoning.js`): a new circle lands in the right place just by being registered, and equal prices keep their registration order. On desktop every circle is visible at once; on phones they scroll sideways in the same order. Each circle's drop-rate list also shows every unit's side tiers.
 
 ### Military Summoning Circle
 
@@ -349,6 +359,40 @@ Selling refunds 70% of everything spent on that copy.
 
 Shared systems handle the rest: targeting, upgrades, passives, `onHit` statuses, `impactHazard` ground effects, `buffs`, `economy` coin bonuses and `summon` drone launchers, mostly in `src/game/effects.js` and `src/game/Game.js`. Passives and buffs are recomputed only when units are deployed, sold or upgraded, never every frame.
 
+## Art direction
+
+The game is staged as a **campaign table**. Units are painted miniatures on a diorama battlefield, and the interface is the commander's field kit. One set of rules covers everything.
+
+- **Interface:**
+  - Warm war-table darks, bone-white type and one brass accent.
+  - Headings in a condensed industrial face (Big Shoulders Display), data and labels in a typewriter mono (IBM Plex Mono), reading text in IBM Plex Sans.
+  - Flat plates with hairline rules and no glow. Colour always means something: tier, faction, side tier or state.
+  - Feedback is brief: cards lift on hover, selections settle with a short brass frame, the unit panel flashes once on upgrade, wallet numbers tick.
+  - Reduced-motion settings turn all of it off.
+- **Units:**
+  - Every unit stands on a miniature base. The base size and rim metal show the tier band (iron I–III, bronze IV–VI, silver VII–X, gold XI–XIV, platinum XV+). A painted front edge shows the summoning circle (faction colour). Figures grow gently with tier.
+  - Summoned allies get a ghosted, dashed base, so they never read as deployed units.
+  - Shared body language on top of each unit's own animation:
+    - breathing at rest
+    - leaning into the target just before an attack
+    - rocking back and squashing on recoil
+    - a short hop with a faction-coloured ground ring when an ability fires
+  - Support units send up blue Empower chevrons every few seconds.
+- **Battlefields:**
+  - **Shapes:** water, lava, ice and the sky void are traced from a noisy field (marching squares, `src/maps/contour.js`), so shores wander naturally instead of being built from circles.
+  - **Roads:** irregular verges, a darker shoulder, a worn crown and wheel ruts. Ground tufts spill over the edge so the two materials interlock.
+  - **Relief:** a height field (rolling ground, the road cut in, pools in hollows) lit from the same top-left key light as everything else.
+  - **Set pieces:** each realm has a few beside the road (`src/maps/vignettes.js`) with live details: a woodcutters' camp with smoke, a frontier outpost with a pennant, a dig site with a lantern, an ore cart, a maintenance shed with a beacon, a sky mill whose sails turn.
+  - **Movement:** trees sway gently, harder in wind and storms.
+- **Effects are proportional** (`src/render/impact.js`):
+  - Every explosion still shows its true area.
+  - How much fire fills it, how long it lasts, its secondary shockwave, any screen shake and its sound all follow the damage it actually dealt relative to the enemies on the field. A warhead that only scratches a late-wave brute is a dust ring and a small pop.
+  - Distinct visual language: damage is warm orange/white, crits are white with a label, buffs are blue chevrons, debuffs are coloured marks under enemies, summons are green ground rings, income is gold coin pop-ups.
+- **Performance:**
+  - Bases, trees and parts are pre-rendered sprites trimmed to their painted pixels.
+  - Most units draw in a single scaled blit.
+  - With more than 160 units and allies on the field, decorative cues (breathing, chevrons, ability rings) switch off.
+
 ## Waves, scaling and realms
 
 - **Waves:** endless, built from four archetypes (Swarm, Army, Commando and Boss), with gradual, finite-forever scaling and progressive encounter traits.
@@ -369,12 +413,12 @@ src/
   game/effects.js           statuses (Wounded, Crippled, Exposed, Slowed, Burning), hazards, buffs
   game/abilities.js         circle unit abilities (crits, bursts, bounties, summons, bombing runs, fields)
   game/weather.js           weather rolls and modifiers
-  maps/                     generator, biomes + variants, rotation (random battlefields), painters
+  maps/                     generator, biomes + variants, rotation, painters, contour fields, set pieces
   waves/                    archetypes, director, scaling, traits, spawn schedules
   enemies/                  weight classes + roster variant hook
   units/                    tiers, registry, roster, defs/, stats/upgrades, summoning banners
-  meta/                     battle plans (12 types) + persistent profile (tokens, unlocks)
-  render/                   renderer, unit art & animation, summoning circle & reveal, effects
+  meta/                     battle plans, profile, roster order/filters/Auto Pick, side tiers (+ measuring bench)
+  render/                   renderer, unit art & animation, miniature bases (unitIdentity), impact weight, summoning, effects
   audio/sfx.js              synthesized sound effects (WebAudio, no assets)
   ui/                       Battle Plans, Summoning, battle HUD
 ```
@@ -382,10 +426,11 @@ src/
 ## Development
 
 ```bash
-npm test                           # 115 unit tests: maps, waves, units, every ability, odds, currencies, weather, balance, persistence
+npm test                           # 139 unit tests: maps, waves, units, abilities, odds, side tiers, Auto Pick, filters, persistence
+npm run ratings                    # re-measure every unit's side tiers (≈2 s); npm run ratings:check reports stale ones
 node scripts/balance.mjs units     # balance report (also: tokens, bot; add --before for the old balance)
 npm run build                      # production build → dist/
-node scripts/e2e.mjs URL           # 48 browser checks
+node scripts/e2e.mjs URL           # 72 browser checks
 node scripts/mobile-shots.mjs URL  # phone + desktop screenshots with layout checks against a running build (needs Playwright)
 npm run sim -- 10 150              # headless balance sim
 node scripts/screenshot.mjs URL    # every realm mid-battle

@@ -1108,3 +1108,5 @@ html:not(.phone) .circle-cards { display: grid; grid-template-columns: repeat(au
 html:not(.phone) .circle-card { min-width: 0; padding: 8px 10px; gap: 4px; }
 html:not(.phone) .circle-card .cc-name { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html:not(.phone) .circle-card .cc-units img { width: 26px; height: 26px; }
+.ab-unit .ab-name { padding-right: 30px; }
+.ab-section h3 { flex-wrap: wrap; row-gap: 2px; }

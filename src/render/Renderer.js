@@ -9,7 +9,7 @@ import { WORLD_W, WORLD_H, TILE, COLS, ROWS } from '../config.js';
 import { TileType, tileIndex } from '../maps/mapGenerator.js';
 import { MapScene } from '../maps/MapScene.js';
 import { buildEnemySprites } from './enemySprites.js';
-import { drawUnit, unitSprite } from './unitArt.js';
+import { drawUnit, unitSprite, setUnitDetail } from './unitArt.js';
 import { Effects } from './fx.js';
 import { WeatherFx } from './weatherFx.js';
 import { CastFx, BLAST_PALETTES } from './castFx.js';
@@ -593,6 +593,7 @@ export class Renderer {
     const { game } = this;
     // Units first (they stand on the ground), then enemies by weight class.
     const units = game.units;
+    setUnitDetail(units.length + game.allies.length > 160);
     for (let i = 0; i < units.length; i++) {
       const u = units[i];
       const age = game.time - u.placedAt;

@@ -62,7 +62,7 @@ export class MapScene {
       const g = c.getContext('2d');
       g.setTransform(s, 0, 0, s, 0, 0);
       this.biome.paintDecor?.(g, { ...d, x: half, y: half }, rng, this.map);
-      d.sprite = { img: c, half };
+      d.sprite = trimSprite(c, half, s);
       d.phase = d.seed * 40;
     }
   }
@@ -98,14 +98,12 @@ export class MapScene {
     const motion = this.effects > 0 ? 1 : 0;
     for (const d of this.swayers) {
       if (!d.sprite) continue;
-      const { img, half } = d.sprite;
-      // canopy leans and returns; the trunk (sprite centre) stays planted
+      const { img, ox, oy, w, h } = d.sprite;
+      // canopy leans and returns
       const lean = motion * (Math.sin(t * 1.3 + d.phase) * 0.018 + Math.sin(t * 0.47 + d.phase * 0.7) * 0.012) * (1 + this.wind * 3.5) + this.wind * 0.03 * motion;
-      ctx.save();
-      ctx.translate(d.x, d.y);
-      ctx.transform(1, 0, lean, 1, 0, 0);
-      ctx.drawImage(img, -half, -half, half * 2, half * 2);
-      ctx.restore();
+      // an axis-aligned sub-pixel drift of the canopy (a skew would force the slow blit path)
+      const dx = lean * d.r * 1.6;
+      ctx.drawImage(img, d.x + ox + dx, d.y + oy - Math.abs(dx) * 0.15, w, h);
     }
     for (const d of this.vignettes) {
       ctx.save();
@@ -141,4 +139,31 @@ export class MapScene {
     this.ambient.drawOver?.(ctx, this.time);
     ctx.restore();
   }
+}
+
+/** Crops a sprite to its painted pixels (most of a tree's box is empty), so each frame blits far fewer pixels. */
+function trimSprite(c, half, s) {
+  const g = c.getContext('2d');
+  const { width: W, height: H } = c;
+  const a = g.getImageData(0, 0, W, H).data;
+  let x0 = W;
+  let y0 = H;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (a[(y * W + x) * 4 + 3] > 2) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return { img: c, ox: -half, oy: -half, w: half * 2, h: half * 2 };
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const t = makeCanvas(w, h);
+  t.getContext('2d').drawImage(c, x0, y0, w, h, 0, 0, w, h);
+  return { img: t, ox: x0 / s - half, oy: y0 / s - half, w: w / s, h: h / s };
 }

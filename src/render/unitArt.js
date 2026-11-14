@@ -1147,7 +1147,14 @@ const ANIMS = {
  *   recoil        – rocks back and squashes after firing (heavier the bigger the kick)
  *   ability       – a short hop when a special ability fires
  */
+/** Crowd level of detail: with very many units on the field, decorative cues are skipped. */
+let crowded = false;
+export function setUnitDetail(manyUnits) {
+  crowded = manyUnits;
+}
+
 function pose(u, t, facing) {
+  if (crowded) return { lean: u.recoil > 0 ? -0.09 * u.recoil * facing : 0, sx: 1, sy: 1, hop: 0 };
   const p = { lean: 0, sx: 1, sy: 1 + Math.sin(t * 2.1 + u.uid * 1.3) * 0.014, hop: 0 };
   if (u.hasTarget && u.cooldown > 0 && u.cooldown < 0.16) p.lean = 0.07 * facing * (1 - u.cooldown / 0.16);
   if (u.recoil > 0) {
@@ -1162,6 +1169,7 @@ function pose(u, t, facing) {
 
 /** Ground cue under a unit whose ability just fired: its faction colour, sized to the base. */
 function abilityCue(ctx, u, t, x, y) {
+  if (crowded) return;
   const since = t - Math.max(u.lastSpecial ?? -99, u.lastSummon ?? -99);
   if (since < 0 || since > 0.6) return;
   const k = since / 0.6;
@@ -1179,7 +1187,7 @@ function abilityCue(ctx, u, t, x, y) {
  * from them in the Empower colour (the same colour as the EMP side tier).
  */
 function supportCue(ctx, u, t, x, y) {
-  if (!u.def.buffs?.length || u.ally) return;
+  if (crowded || !u.def.buffs?.length || u.ally) return;
   const k = ((t + u.uid * 0.37) % 3.4) / 0.9;
   if (k > 1) return;
   ctx.strokeStyle = `rgba(109,154,216,${0.85 * (1 - k)})`;
@@ -1210,12 +1218,20 @@ export function drawUnit(ctx, u, t) {
   abilityCue(ctx, u, t, u.x, feetY);
   const S = unitScale(u.def);
   const p = pose(u, t, facing);
-  ctx.save();
-  ctx.translate(u.x + (anim.dx ?? 0) * facing, feetY + (anim.dy ?? 0) + p.hop);
-  if (p.lean) ctx.rotate(p.lean);
-  ctx.scale(S * p.sx, S * p.sy);
-  ctx.drawImage(s.img, s.ox, s.oy, s.w, s.h);
-  ctx.restore();
+  const fx = u.x + (anim.dx ?? 0) * facing;
+  const fy = feetY + (anim.dy ?? 0) + p.hop;
+  const kx = S * p.sx;
+  const ky = S * p.sy;
+  if (Math.abs(p.lean) > 0.004) {
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(p.lean);
+    ctx.drawImage(s.img, s.ox * kx, s.oy * ky, s.w * kx, s.h * ky);
+    ctx.restore();
+  } else {
+    // most frames: one scaled blit, no state changes
+    ctx.drawImage(s.img, fx + s.ox * kx, fy + s.oy * ky, s.w * kx, s.h * ky);
+  }
   supportCue(ctx, u, t, u.x, feetY - 30 * S);
 }
 

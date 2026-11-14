@@ -27,7 +27,7 @@ const assets = await ev(() => [...document.querySelectorAll('script[type=module]
 check('hashed production assets are served', assets >= 2 || base.includes('8123'), `${assets} hashed assets`);
 
 // 1. Map randomization
-check('no battlefield selector exists', (await page.$('#realm-select')) === null && (await page.$('select')) === null);
+check('no battlefield selector exists', (await page.$('#realm-select')) === null && (await page.$('#app select, .bp-footer select')) === null);
 const realms = [];
 for (let i = 0; i < 4; i++) {
   await page.click('#btn-battle');
@@ -64,6 +64,11 @@ await page.click('#btn-retreat-confirm');
 // 4 + 5. Summoning prices, insufficient funds, x1/x5/x10/x25
 await page.click('.tab[data-page="summon"]');
 await page.waitForTimeout(200);
+const order = await page.$$eval('.circle-card', (els) => els.map((e) => ({ id: e.dataset.banner, price: Number(e.querySelector('.cc-price').textContent.replace(/[^0-9]/g, '')), active: e.classList.contains('active') })));
+check('all 8 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 8 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,250,250,300,300,400,500', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
+const poolStrips = await page.$$eval('.pool-item', (els) => els.every((e) => e.querySelectorAll('.st-cell').length === 5));
+check('drop-rate list shows each unit\'s five side tiers', poolStrips);
+await page.click('[data-banner="military-circle"]');
 await ev(() => {
   const p = window.endlessTower.profile;
   p.data.wallet.tokens = 700;
@@ -80,6 +85,7 @@ await ev(() => {
 });
 for (const n of [1, 5, 10, 25]) {
   const before = await wallet();
+  await page.waitForSelector(`[data-count="${n}"]:not([disabled])`, { timeout: 5000 });
   await page.click(`[data-count="${n}"]`);
   const confirmText = await page.textContent('#confirm-body');
   await page.click('#btn-confirm-ok');
@@ -368,14 +374,14 @@ await page.click(`.unit-card[data-id="${favId}"] .uc-fav`);
 await page.waitForTimeout(100);
 const fav = await ev((id) => ({ first: document.querySelector('.roster-grid .unit-card[data-id]').dataset.id, pinned: document.querySelector(`.unit-card[data-id="${id}"]`).classList.contains('pinned'), fav: window.endlessTower.profile.data.favorites, plan: [...window.endlessTower.profile.plan.units], divider: !!document.querySelector('.roster-divider') }), favId);
 check('star pins a unit type to the front, visibly, without using a plan slot', fav.first === favId && fav.pinned && fav.fav.includes(favId) && JSON.stringify(fav.plan) === JSON.stringify(planBefore) && fav.divider && lockedStars === 0, `${favId} first=${fav.first}`);
-await page.click('[data-sort="acquired"]');
+await page.selectOption('#roster-sort', 'acquired');
 await page.waitForTimeout(100);
 const acq = await ev(() => { const p = window.endlessTower.profile; const ids = [...document.querySelectorAll('.roster-grid .unit-card[data-id]')].map((e) => e.dataset.id).filter((id) => p.isUnlocked(id)); return { ids, mode: p.data.rosterSort }; });
 const acqRest = acq.ids.filter((id) => id !== favId);
 const acqOk = acq.ids[0] === favId && acq.mode === 'acquired';
 const acqIdx = await ev((ids) => ids.map((id) => window.endlessTower.profile.acquiredIndex(id)), acqRest);
 check('"Acquired" sort keeps pinned first, then acquisition order (and is remembered)', acqOk && acqIdx.every((v, i) => i === 0 || v > acqIdx[i - 1]), acq.ids.slice(0, 4).join(', '));
-await page.click('[data-sort="tier"]');
+await page.selectOption('#roster-sort', 'tier');
 // manual plan edit still works
 const manual = await page.$$eval('.roster-grid .unit-card:has(.uc-fav)', (els) => els.map((e) => e.dataset.id));
 await ev(() => { window.endlessTower.profile.plan.units.length = 0; window.endlessTower.profile.save(); window.endlessTower.plans.render(); });
@@ -390,7 +396,7 @@ await page.waitForTimeout(150);
 const dlg = await page.textContent('#autobuild-body');
 await page.click('#btn-autobuild-cancel');
 const afterCancel = await ev(() => [...window.endlessTower.profile.plan.units]);
-check('Auto Build asks first (lists added and replaced units); Cancel changes nothing', /Add/i.test(dlg) && afterCancel.join() === man.join() && (await page.isHidden('#screen-autobuild')), dlg.replace(/\s+/g, ' ').slice(0, 90));
+check('Auto Pick asks first (preview of new, kept and replaced units); Cancel changes nothing', /new/i.test(dlg) && /replaced/i.test(dlg) && afterCancel.join() === man.join() && (await page.isHidden('#screen-autobuild')), dlg.replace(/\s+/g, ' ').slice(0, 90));
 await page.click('#btn-autobuild');
 await page.click('#btn-autobuild-ok');
 await page.waitForTimeout(150);
@@ -400,7 +406,49 @@ check('Undo Auto Build is offered and restores the previous plan', (await page.i
 await page.click('#btn-undo-build');
 const undone = await ev(() => ({ u: [...window.endlessTower.profile.plan.units], b: window.endlessTower.profile.data.planBackup }));
 check('Undo restores the exact manual plan and hides itself', JSON.stringify(undone.u) === JSON.stringify(man) && undone.b === null && (await page.isHidden('#btn-undo-build')), undone.u.join(', '));
+
+// 14. Side tiers everywhere + side-tier Auto Pick + collection filters
+await ev(() => { const p = window.endlessTower.profile; for (const id of ['colonel', 'bomber', 'outlaw-leader', 'glorious-leader', 'bounty-hunter', 'trebuchet', 'pit-boss', 'fastest-hand']) p.recordSummon(id); p.save(); window.endlessTower.plans.render(); });
+const strips = await page.$$eval('.roster-grid .unit-card', (els) => els.map((e) => e.querySelectorAll('.st-strip .st-cell').length));
+const dossierRows = await page.$$eval('#dossier .st-row', (els) => els.map((e) => e.querySelector('.st-name').textContent.trim()));
+const naShown = await page.$$eval('.roster-grid .st-cell.na .st-num', (els) => els.length);
+check('every collection card shows five side tiers (DPS AOE SUM EMP ECO), N/A drawn as a dash; the dossier explains each', strips.length > 0 && strips.every((n) => n === 5) && dossierRows.join() === 'DPS,AOE,Summon,Empower,Economy' && naShown > 0, `${strips.length} cards, dossier: ${dossierRows.join('/')}`);
+const tip = await page.$eval('.roster-grid .st-cell[title]', (e) => e.title);
+check('side-tier numbers have tooltips with the measured value and what the category measures', /measures:/.test(tip) && tip.length > 60, tip.slice(0, 70));
+await page.click('.rt-focus [data-side="economy"]');
+await page.waitForTimeout(100);
+const eco = await ev(() => {
+  const ids = [...document.querySelectorAll('.roster-grid .unit-card:not(.locked)')].map((e) => e.dataset.id);
+  const nums = [...document.querySelectorAll('.roster-grid .unit-card:not(.locked) .st-cell.hl .st-num')].map((e) => Number(e.textContent));
+  return { ids, nums, sort: document.getElementById('roster-sort').value, pinnedFirst: document.querySelector('.roster-grid .unit-card').classList.contains('pinned') };
+});
+const unpinned = eco.nums.slice(eco.pinnedFirst ? 1 : 0);
+check('Economy filter shows only earners, ranked by Economy (pinned still first)', eco.sort === 'economy' && eco.ids.length >= 3 && !eco.ids.includes('fastest-hand') && eco.ids.includes('glorious-leader') && unpinned.every((v, i) => i === 0 || v <= unpinned[i - 1]), `${eco.ids.join(', ')} | ${eco.nums.join(',')}`);
+await page.selectOption('#roster-circle', 'wild-west-circle');
+await page.click('.rt-own [data-own="locked"]');
+await page.waitForTimeout(100);
+const wwf = await ev(() => [...document.querySelectorAll(".roster-grid .unit-card")].map((e) => ({ id: e.dataset.id, locked: e.classList.contains('locked') })));
+check("circle + ownership filters combine (Wild West · not owned · Economy)", wwf.every((c) => c.locked) && wwf.every((c) => ['gambler', 'bandit', 'outlaw', 'bounty-hunter', 'gunslinger', 'sheriff', 'outlaw-leader', 'fastest-hand'].includes(c.id)), wwf.map((c) => c.id).join(", ") || "none");
+await page.click('#roster-reset');
+await page.waitForTimeout(100);
+const reset = await ev(() => ({ f: window.endlessTower.profile.data.rosterFilter, n: document.querySelectorAll('.roster-grid .unit-card').length, sort: window.endlessTower.profile.data.rosterSort }));
+check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 55 && reset.sort === 'tier', JSON.stringify(reset));
+const before14 = await ev(() => [...window.endlessTower.profile.plan.units]);
 await page.click('#btn-autobuild');
+await page.click('#ab-primary [data-prio="economy"]');
+await page.click('#ab-secondary [data-prio="dps"]');
+await page.waitForTimeout(100);
+const pv = await ev(() => ({ chips: [...document.querySelectorAll('#autobuild-body .ab-section:first-child .ab-unit .ab-side')].map((e) => e.textContent.trim()), rule: document.getElementById('ab-rule').textContent, secDisabled: document.querySelector('#ab-secondary [data-prio="economy"]').disabled }));
+await page.click('#btn-autobuild-ok');
+await page.waitForTimeout(100);
+const ap = await ev(() => { const p = window.endlessTower.profile; return { units: [...p.plan.units], backup: p.data.planBackup?.units ?? null, prio: p.data.autoPick }; });
+const exp = await ev(() => { const p = window.endlessTower.profile; const T = window.endlessTower.sideTiers; return p.data.unlocked.filter((id) => T(id).economy != null).sort((a, b) => T(b).economy - T(a).economy)[0]; });
+check('Auto Pick by Economy then DPS: preview shows ECO values, the top earner leads, ranking rule explained', pv.chips[0]?.startsWith('ECO') && /Economy side tier, then DPS/.test(pv.rule) && pv.secDisabled && ap.units[0] === exp && ap.prio.primary === 'economy' && ap.prio.secondary === 'dps', `${pv.chips.slice(0, 4).join(' ')} · first ${ap.units[0]}`);
+check('side-tier Auto Pick keeps Undo (previous plan saved)', JSON.stringify(ap.backup) === JSON.stringify(before14));
+await page.click('#btn-undo-build');
+check('Undo after a side-tier Auto Pick restores the plan', JSON.stringify(await ev(() => window.endlessTower.profile.plan.units)) === JSON.stringify(before14));
+await page.click('#btn-autobuild');
+await page.click('#ab-primary [data-prio=""]');
 await page.click('#btn-autobuild-ok');
 
 // 8. Persistence across a restart
@@ -435,6 +483,8 @@ const vp = m.viewportSize();
 await m.touchscreen.tap(ubtn.x + ubtn.width / 2, ubtn.y + ubtn.height / 2);
 await m.waitForTimeout(200);
 const mlv = await m.evaluate(() => window.endlessTower.game.units[0].level);
+const panelStrip = await m.$$eval('#unit-panel .st-cell', (els) => els.length);
+check('battle unit panel shows the five side tiers', panelStrip === 5);
 check('mobile: the upgrade panel is fully on screen and upgrades by touch; wave controls stay visible', ubtn.y + ubtn.height <= vp.height && mlv === 1 && (await m.isVisible('#btn-next')), `button bottom ${Math.round(ubtn.y + ubtn.height)} / ${vp.height}`);
 
 // mobile weather: compact chip → tap opens details → tap outside closes → placing keeps it collapsed

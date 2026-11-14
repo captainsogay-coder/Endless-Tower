@@ -11,6 +11,7 @@ import { formatNumber } from './core/math.js';
 import { AudioDirector } from './audio/director.js';
 import { registerRoster, STARTER_UNITS } from './units/roster.js';
 import { getUnit } from './units/unitRegistry.js';
+import { sideTiers } from './meta/sideTiers.js';
 import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
 import './render/castArt.js';
@@ -360,7 +361,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Exposed for debugging and automated screenshots.
-window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit };
+window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit, sideTiers };
 
 // Boot complete: hide the loader.
 window.__etBooted = true;
