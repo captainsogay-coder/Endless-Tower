@@ -57,7 +57,7 @@ const wave = await ev(() => {
 });
 check('exactly 250 Tokens for a completed early wave', wave.afterFirst - t0 === 250, `${t0} → ${wave.afterFirst}`);
 check('no Tokens for a partially completed wave', wave.partial === wave.afterFirst);
-check('Coins, Tokens and Gems are separate balances (coins never saved; Gems only from boss waves)', wave.profileCoins === 0 && wave.gems === 0 && wave.coins0 > 0);
+check('Coins and Tokens are separate balances (coins never saved); no other currency exists', wave.profileCoins === 0 && wave.gems === undefined && wave.coins0 > 0);
 await page.click('#btn-retreat');
 await page.click('#btn-retreat-confirm');
 
@@ -249,32 +249,35 @@ const circles = [];
 for (const id of ['wild-west-circle', 'gambino-circle', 'nuclear-war-circle']) {
   await page.click(`[data-banner="${id}"]`);
   const rows = await page.$$eval('.pool-item', (els) => els.map((e) => ({ name: e.querySelector('.pi-name').textContent, tier: e.querySelector('.pi-sub').textContent.split('·')[0].trim(), chance: parseFloat(e.querySelector('.pi-chance').firstChild.textContent) })));
-  circles.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, price: await page.textContent('#banner-price'), cur: await page.textContent('#banner-currency') });
+  circles.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, price: await page.textContent('#banner-price'), card: await page.textContent(`[data-banner="${id}"] .cc-price`) });
 }
 check('Wild West, Gambino and Nuclear War pools list tier + drop rate and total exactly 100%', circles.every((c) => c.sum === 100 && c.rows.every((r) => /^Tier [IVXL]+$/.test(r.tier))) && circles.map((c) => c.rows.length).join() === '8,7,9', circles.map((c) => `${c.id}:${c.rows.length}/${c.sum}%`).join(' '));
-check('prices: Wild West 300 Tokens, Gambino 300 Tokens, Nuclear War 500 Gems', circles.map((c) => `${c.price} ${c.cur}`).join('|') === '300 Tokens|300 Tokens|500 Gems', circles.map((c) => `${c.price} ${c.cur}`).join('|'));
-// Wild West ×10 with Tokens
+check('every circle is priced in Tokens: Wild West 300, Gambino 300, Nuclear War 500', circles.map((c) => `${c.price}|${c.card.trim()}`).join(' ') === '300|300 Tokens 300|300 Tokens 500|500 Tokens', circles.map((c) => c.card.trim()).join(' / '));
+const allCards = await page.$$eval('.circle-card .cc-price', (els) => els.map((e) => e.textContent.trim()));
+const gemText = await ev(() => /\bgems?\b/i.test(document.body.innerText + document.body.innerHTML.replace(/<svg[\s\S]*?<\/svg>/g, '')));
+check('no Gems anywhere: no Gem text, icon, balance or price in the page; one currency in the wallet', !gemText && allCards.every((t) => /Tokens$/.test(t)) && (await page.$('#i-gem, #wallet-gems')) === null && JSON.stringify(Object.keys(await ev(() => window.endlessTower.profile.data.wallet))) === '["tokens"]', allCards.join(', '));
+// Wild West ×10
 await page.click('[data-banner="wild-west-circle"]');
-await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 3000; p.data.wallet.gems = 777; p.save(); window.endlessTower.summoning.render(); });
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 3000; p.save(); window.endlessTower.summoning.render(); });
 await page.click('[data-count="10"]');
 await page.click('#btn-confirm-ok');
 await page.click('#btn-reveal-skip');
 await page.waitForTimeout(200);
-const ww = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation, cur: r.compensationCurrency })), t: window.endlessTower.profile.balance('tokens'), g: window.endlessTower.profile.balance('gems') }));
+const ww = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation })), t: window.endlessTower.profile.balance('tokens') }));
 await page.click('#btn-reveal-done');
 const wwComp = ww.res.reduce((a, r) => a + r.comp, 0);
-check('Wild West ×10 charges 3,000 Tokens (Gems untouched); duplicates refund 90 Tokens', ww.t === wwComp && ww.g === 777 && ww.res.every((r) => r.cur === 'tokens' && (r.comp === 0 || r.comp === 90)), `tokens ${ww.t}, comp ${wwComp}, gems ${ww.g}`);
-// Nuclear War with Gems
+check('Wild West ×10 charges 3,000 Tokens; duplicates refund 90 Tokens each', ww.t === wwComp && ww.res.every((r) => r.comp === 0 || r.comp === 90), `tokens ${ww.t}, comp ${wwComp}`);
+// Nuclear War: 500 Tokens
 await page.click('[data-banner="nuclear-war-circle"]');
-await ev(() => { const p = window.endlessTower.profile; p.data.wallet.gems = 1000; p.data.wallet.tokens = 5; p.save(); window.endlessTower.summoning.render(); });
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 505; p.save(); window.endlessTower.summoning.render(); });
 await page.click('[data-count="1"]');
 const nwConfirm = await page.textContent('#confirm-body');
 await page.click('#btn-confirm-ok');
 await page.click('#btn-reveal-skip');
 await page.waitForTimeout(200);
-const nw = await ev(() => ({ r: window.endlessTower.summoning.results[0], g: window.endlessTower.profile.balance('gems'), t: window.endlessTower.profile.balance('tokens') }));
+const nw = await ev(() => ({ r: window.endlessTower.summoning.results[0], t: window.endlessTower.profile.balance('tokens') }));
 await page.click('#btn-reveal-done');
-check('Nuclear War deducts 500 Gems (never Tokens) and unlocks the pulled unit', nw.g === 500 + nw.r.compensation && nw.t === 5 && /500 Gems/.test(nwConfirm) && (await ev((u) => window.endlessTower.profile.isUnlocked(u), nw.r.unit)), `${nw.r.unit}, gems ${nw.g}`);
+check('Nuclear War deducts 500 Tokens (150 back per duplicate) and unlocks the pulled unit', nw.t === 5 + nw.r.compensation && [0, 150].includes(nw.r.compensation) && /500 Tokens/.test(nwConfirm) && (await ev((u) => window.endlessTower.profile.isUnlocked(u), nw.r.unit)), `${nw.r.unit}, tokens ${nw.t}`);
 // put a summoned Wild West unit in the plan through the Battle Plans screen
 const wwUnit = ww.res[0].unit;
 await page.click('.tab[data-page="plans"]');

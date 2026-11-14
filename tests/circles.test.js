@@ -5,7 +5,7 @@ import { registerRoster, ROSTER } from '../src/units/roster.js';
 import { getUnit, validateUnitDef } from '../src/units/unitRegistry.js';
 import { levelStats, maxLevel } from '../src/units/unitStats.js';
 import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier } from '../src/game/effects.js';
-import { getBanner, summon, pull, WILD_WEST_CIRCLE, GAMBINO_CIRCLE, NUCLEAR_WAR_CIRCLE, duplicateCompensation, compensationCurrency, isRare } from '../src/units/summoning.js';
+import { getBanner, summon, pull, WILD_WEST_CIRCLE, GAMBINO_CIRCLE, NUCLEAR_WAR_CIRCLE, duplicateCompensation, isRare, listBanners, registerBanner } from '../src/units/summoning.js';
 import { Profile, memoryStorage } from '../src/meta/profile.js';
 import { createRng } from '../src/core/rng.js';
 import { GAME_CONFIG } from '../src/config.js';
@@ -63,7 +63,7 @@ test('three new circles: exact odds totalling 100%, tiers and prices as specifie
   const spec = {
     [WILD_WEST_CIRCLE]: { currency: 'tokens', price: 300, pool: { gambler: [3, 0.3], bandit: [3, 0.25], outlaw: [5, 0.18], 'bounty-hunter': [5, 0.13], gunslinger: [7, 0.08], sheriff: [9, 0.04], 'outlaw-leader': [9, 0.015], 'fastest-hand': [12, 0.005] } },
     [GAMBINO_CIRCLE]: { currency: 'tokens', price: 300, pool: { drunkard: [1, 0.45], dealer: [6, 0.25], 'night-dancer': [6, 0.15], 'desperate-gambler': [7, 0.09], 'pit-boss': [9, 0.05], 'high-roller': [10, 0.009], 'the-house': [15, 0.001] } },
-    [NUCLEAR_WAR_CIRCLE]: { currency: 'gems', price: 500, pool: { 'missile-launcher': [4, 0.35], 'special-force-battalion': [5, 0.25], icbm: [7, 0.15], bomber: [7, 0.12], b2: [9, 0.07], marshal: [12, 0.04], 'glorious-leader': [15, 0.015], 'nuclear-warhead': [17, 0.004], 'antimatter-warhead': [19, 0.001] } },
+    [NUCLEAR_WAR_CIRCLE]: { currency: 'tokens', price: 500, pool: { 'missile-launcher': [4, 0.35], 'special-force-battalion': [5, 0.25], icbm: [7, 0.15], bomber: [7, 0.12], b2: [9, 0.07], marshal: [12, 0.04], 'glorious-leader': [15, 0.015], 'nuclear-warhead': [17, 0.004], 'antimatter-warhead': [19, 0.001] } },
   };
   for (const [id, s] of Object.entries(spec)) {
     const b = getBanner(id);
@@ -100,34 +100,33 @@ test('pull frequencies match the odds over 2,000,000 pulls (including 0.1% units
   }
 });
 
-test('Nuclear War charges Gems (never Tokens); Gem duplicates pay 30% in Gems without an assumed rate', () => {
+test('every circle charges Tokens only; Nuclear War costs 500 Tokens and duplicates refund 150 Tokens', () => {
   const p = new Profile({ storage: memoryStorage(), starterUnits: ['dude'] });
-  p.earn('tokens', 99999);
-  p.earn('gems', 500 * 10);
+  p.earn('tokens', 500 * 10);
   const b = getBanner(NUCLEAR_WAR_CIRCLE);
-  assert.equal(compensationCurrency(b), 'gems');
+  assert.equal(b.currency, 'tokens');
   assert.equal(duplicateCompensation(b), 150);
   const r = summon(p, b, 10, createRng(3));
   assert.ok(r.ok);
-  assert.equal(p.balance('tokens'), 99999, 'Tokens untouched');
   const dupes = r.results.filter((x) => !x.isNew).length;
   assert.equal(r.compensation, dupes * 150);
-  assert.equal(p.balance('gems'), r.compensation);
-  assert.ok(r.results.every((x) => getBanner(NUCLEAR_WAR_CIRCLE).pool.some((q) => q.unit === x.unit) && p.isUnlocked(x.unit)));
-  assert.equal(summon(p, b, 10, createRng(4)).ok, false, 'insufficient Gems');
-  // Token circles keep paying 30% of the Token price in Tokens
+  assert.equal(p.balance('tokens'), r.compensation, 'paid 5,000 Tokens, refunds in Tokens');
+  assert.deepEqual(Object.keys(p.data.wallet), ['tokens'], 'no other currency is ever created');
+  assert.ok(r.results.every((x) => b.pool.some((q) => q.unit === x.unit) && p.isUnlocked(x.unit)));
+  assert.equal(summon(p, b, 10, createRng(4)).ok, false, 'insufficient Tokens');
   assert.equal(duplicateCompensation(getBanner(WILD_WEST_CIRCLE)), 90);
-  assert.equal(compensationCurrency(getBanner(GAMBINO_CIRCLE)), 'tokens');
+  assert.equal(duplicateCompensation(getBanner(GAMBINO_CIRCLE)), 90);
+  for (const bn of listBanners()) assert.equal(bn.currency, 'tokens', bn.id);
+  assert.throws(() => registerBanner({ id: 'x', name: 'x', currency: 'gems', price: 10, counts: [1], pool: [{ unit: 'cadet', chance: 1 }] }), /Tokens/);
 });
 
-test('Gems are earned only by clearing boss waves', () => {
+test('wave rewards are Tokens and coins only', () => {
   const g = arena(2);
   const got = [];
   g.on('waveClear', (d) => got.push(d));
   g.completeWave({ plan: { wave: 3, reward: 10, isBoss: false } });
   g.completeWave({ plan: { wave: 10, reward: 10, isBoss: true } });
-  assert.deepEqual(got.map((d) => d.gems), [0, GAME_CONFIG.gemsPerBossWave]);
-  assert.equal(g.gemsEarned, GAME_CONFIG.gemsPerBossWave);
+  assert.deepEqual(got.map((d) => Object.keys(d).sort()), [['plan', 'reward', 'tokens', 'wave'], ['plan', 'reward', 'tokens', 'wave']]);
 });
 
 // ---------------------------------------------------------------- statuses

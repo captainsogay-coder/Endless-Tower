@@ -21,7 +21,9 @@ test('Dude is cheap, short-ranged and low damage', () => {
   const s = levelStats(dude, 0);
   assert.ok(dude.price <= 20);
   assert.ok(s.range <= 2.5 * 32);
-  assert.ok(s.damage <= 5);
+  const c = levelStats(getUnit('cadet'), 0);
+  assert.ok(s.damage * s.rate < c.damage * c.rate, 'weaker alone than the Cadet (Dude Power makes up for it in numbers)');
+  assert.ok(dude.price < getUnit('cadet').price);
 });
 
 test('Dude has five upgrade levels that each improve him', () => {

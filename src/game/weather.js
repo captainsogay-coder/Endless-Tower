@@ -26,6 +26,7 @@ export const WEATHERS = {
     cooldownMult: 0.8,
     coinMult: 1.1,
     effects: ['+20% cooldown reduction', '+10% coin gain'],
+    short: ['−20% cooldown', '+10% coins'],
     color: '#7fa7c9',
   },
   windy: {
@@ -36,6 +37,7 @@ export const WEATHERS = {
     cooldownMult: 0.9,
     rangeMult: 1.2,
     effects: ['+15% damage', '+10% cooldown reduction', '+20% range'],
+    short: ['+15% dmg', '−10% cooldown', '+20% range'],
     color: '#b9c4b0',
   },
   thunderstorm: {
@@ -46,6 +48,7 @@ export const WEATHERS = {
     rangeMult: 1.15,
     lightning: true,
     effects: ['+25% damage', '+15% range', 'Lightning every 3 s strikes a random enemy: area damage equal to 7% of its max HP'],
+    short: ['+25% dmg', '+15% range', 'lightning'],
     color: '#c9c48a',
   },
   aurora: {
@@ -54,6 +57,7 @@ export const WEATHERS = {
     weight: 1,
     coinMult: 1.35,
     effects: ['+35% coin gain'],
+    short: ['+35% coins'],
     color: '#8fe0c0',
   },
   nova: {
@@ -63,6 +67,7 @@ export const WEATHERS = {
     damageMult: 1.3,
     cooldownMult: 0.6,
     effects: ['+30% damage', '+40% cooldown reduction'],
+    short: ['+30% dmg', '−40% cooldown'],
     color: '#f2c27a',
   },
 };

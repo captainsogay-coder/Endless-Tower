@@ -358,7 +358,7 @@ table.levels tr.current td { color: var(--accent); }
 }
 
 /* ================================================================ SUMMONING */
-#screen-summon { display: grid; grid-template-rows: 1fr auto; background: rgba(15,17,21,0.88); }
+#screen-summon { display: grid; grid-template-rows: auto 1fr auto; background: rgba(15,17,21,0.88); }
 .sm-body { display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
 .sm-stage { position: relative; min-height: 0; overflow: hidden; background: #121418; border-right: 1px solid var(--line); }
 #summon-stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -442,9 +442,6 @@ table.levels tr.current td { color: var(--accent); }
 .pull-btn.primary:disabled { background: var(--surface-2); border-color: var(--line-2); color: var(--text); }
 .pull-btn.primary:disabled .pb-cost { color: var(--accent); }
 .pull-btn.primary:disabled .pb-cost .ico { fill: var(--accent); }
-@media (max-width: 600px) and (orientation: portrait) {
-  #stage::after { content: 'Turn your phone sideways for a bigger battlefield'; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 12px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 4px 10px; pointer-events: none; }
-}
 
 /* ---------------------------------------------------------------- weather + multi-wave */
 .weather-toggle { margin-right: 4px; }
@@ -521,12 +518,8 @@ table.levels tr.current td { color: var(--accent); }
   .up-actions button { min-height: 44px; }
 }
 
-/* ---------------------------------------------------------------- gems + more circles */
-.ico.gem { fill: #5fd3b8; }
-.wallet.gems .num { color: #8fe8d4; }
-.wallet.gems.bump { animation: bump 0.5s ease; }
+/* ---------------------------------------------------------------- more circles */
 .banner-tabs { flex-wrap: wrap; max-width: calc(100% - 64px); }
-.banner-tab.gems .bt-price { color: #5fd3b8; }
 .wallets { justify-self: end; display: flex; gap: 8px; }
 @media (max-width: 760px) {
   .menu-bar .wallets { grid-column: 2; grid-row: 1; }
@@ -534,45 +527,284 @@ table.levels tr.current td { color: var(--accent); }
   .wallets .wallet .label { display: none; }
 }
 
-/* ---------------------------------------------------------------- phones held sideways
-   Short landscape screens: the battlefield gets the height. The dock becomes one
-   compact row (scrolling unit cards + wave controls), the top HUD one thin line. */
-@media (max-height: 520px) and (orientation: landscape) {
-  #hud-top { padding: 2px 10px; gap: 8px; }
-  #wave-num { font-size: 22px; }
-  .wave-block .label, .wave-detail, .hud-center, .tokens-earned, #btn-fx { display: none; }
-  .icon-btn, .speed button { height: 26px; min-width: 28px; }
-  #stage { padding: 2px; }
-  #stage::after { display: none; }
-  #dock { grid-template-columns: 1fr auto !important; gap: 8px; padding: 4px 8px; align-items: center; }
-  #dock .section-head, .next-preview { display: none; }
-  .deploy-card { width: 104px !important; grid-template-rows: 30px auto; }
-  .deploy-card .dc-art { height: 30px; }
-  .deploy-card .dc-art img { width: 38px; height: 38px; }
-  .deploy-card .dc-info { padding: 2px 6px 3px; }
-  .deploy-card .dc-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .deploy-card .dc-row { font-size: 12px; }
-  .next-actions { flex-wrap: nowrap; gap: 6px; }
-  .next-actions .btn-primary { padding: 6px 10px; font-size: 14px; white-space: nowrap; }
-  .call-many input { width: 48px; padding: 4px; }
-  .call-many .btn-secondary { padding: 6px 8px; font-size: 13px; }
-  .auto { font-size: 12px; }
-  .weather-card { width: 180px; padding: 4px 8px; }
-  .weather-card ul { font-size: 11px; }
-  /* the unit panel takes the unit cards' place in the dock row (wave controls stay); its body scrolls */
-  #app.inspecting .deploy-panel { display: none; }
-  #unit-panel { position: static; width: auto; max-height: 52vh; box-shadow: none; }
-  #unit-panel .up-body { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
-  .up-head { padding: 4px 8px; grid-template-columns: 30px 1fr auto; }
-  .up-head img { width: 30px; height: 30px; }
-  .up-head h3 { font-size: 16px; }
-  .up-actions { padding: 4px 8px 6px; }
-  .up-actions button { min-height: 36px; }
 }
 .up-now { margin-top: 6px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-@media (max-height: 520px) and (orientation: landscape) {
-  .up-pips { grid-column: 1 / -1; }
-}
 .np-reward { margin-top: 3px; display: flex; align-items: center; gap: 5px; font-family: var(--display); font-weight: 700; font-size: 13px; color: var(--accent); }
 .up-wave { font-size: 12px; color: var(--text-2); }
 .up-wave b { color: var(--ok); font-family: var(--display); font-size: 14px; letter-spacing: 0.02em; }
+
+/* ================================================================
+   PHONE LAYOUT
+   One system for every phone: html.phone is set by src/ui/responsive.js for
+   (max-width: 760px) or (max-height: 520px); html.phone-landscape adds the
+   sideways layout. Spacing uses a 4/8/12/16 scale, every control is at least
+   40 px tall (the main actions 44+), and safe areas are respected.
+   ================================================================ */
+html.phone { --tap: 44px; --tap-sm: 40px; --pad: 12px; --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); }
+
+/* ---------- battle: shared ---------- */
+html.phone #app { height: 100vh; height: 100dvh; overflow: hidden; padding-left: var(--safe-l); padding-right: var(--safe-r); }
+html.phone #hud-top { display: flex; align-items: center; gap: 8px; padding: calc(4px + var(--safe-t)) 8px 4px; min-height: 48px; }
+html.phone .hud-left { flex: none; gap: 6px; }
+html.phone .hud-center, html.phone .wave-detail { display: none; }
+html.phone .wave-block { flex-direction: row; align-items: baseline; gap: 4px; min-width: 0; padding: 0; border: 0; }
+html.phone .wave-block .label { display: inline; font-size: 11px; }
+html.phone #wave-num { font-size: 22px; }
+html.phone .hud-right { flex: 1; min-width: 0; justify-content: flex-end; gap: 8px; }
+html.phone .tower-hp { gap: 4px; }
+html.phone .tower-hp .ico { display: none; }
+html.phone .hp-bar { width: 40px; height: 6px; }
+html.phone #hp-text { font-size: 14px; min-width: 0; }
+html.phone .tokens-earned { display: flex; font-size: 14px; }
+html.phone .gold { min-width: 0; gap: 4px; }
+html.phone #coins { font-size: 18px; }
+html.phone .controls { gap: 4px; }
+html.phone #btn-fx { display: none; }
+html.phone .icon-btn, html.phone .speed button, html.phone #btn-weather { height: var(--tap-sm); min-width: var(--tap-sm); }
+html.phone .icon-btn svg { width: 18px; height: 18px; }
+html.phone #stage { padding: 4px; }
+html.phone #stage::after { content: none; }
+html.phone #banner { top: 8px; }
+html.phone .banner-card { min-width: 0; padding: 4px 10px 6px 8px; max-width: calc(100vw - 32px); }
+html.phone .banner-card .b-title { font-size: 22px; }
+html.phone .banner-card.boss .b-title { font-size: 26px; }
+html.phone .banner-card .b-kicker { font-size: 11px; letter-spacing: 0.12em; }
+html.phone .banner-card .b-sub { font-size: 12px; }
+html.phone #boss-bar { top: 6px; padding: 4px 8px 6px; width: min(360px, 80%); }
+html.phone .boss-title { font-size: 13px; margin-bottom: 3px; }
+html.phone #toasts { left: 8px; bottom: 8px; max-width: 70%; }
+html.phone .toast { font-size: 13px; padding: 4px 8px; }
+
+/* dock: weather strip → unit cards (or the unit sheet) → control bar */
+html.phone #dock { display: flex; flex-direction: column; gap: 8px; padding: 8px 8px calc(8px + var(--safe-b)); min-height: 0; overflow: hidden; }
+html.phone #dock .section-head { display: none; }
+html.phone .dock-weather:empty { display: none; }
+html.phone .weather-card { position: static; width: auto; padding: 6px 10px; display: grid; grid-template-columns: auto auto 1fr; align-items: center; column-gap: 10px; }
+html.phone .weather-card .wc-head { display: contents; }
+html.phone .weather-card .wc-name { font-size: 16px; }
+html.phone .weather-card .wc-time { font-size: 14px; }
+html.phone .weather-card .wc-bar { display: none; }
+html.phone .weather-card ul { grid-column: 3; display: flex; flex-wrap: wrap; gap: 0 10px; padding: 0; list-style: none; font-size: 12px; line-height: 1.3; }
+html.phone .deploy-panel { min-height: 0; }
+html.phone .deploy-bar { gap: 8px; padding-bottom: 2px; overscroll-behavior: contain; scroll-snap-type: x proximity; }
+html.phone .deploy-card { width: 92px; grid-template-rows: 52px auto; scroll-snap-align: start; }
+html.phone .deploy-card .dc-art img { width: 56px; height: 56px; }
+html.phone .dc-info { padding: 4px 6px 6px; }
+html.phone .dc-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.phone .dc-row { font-size: 13px; }
+html.phone .next-panel { margin-top: auto; }
+html.phone .next-preview { margin: 0 0 8px; padding: 4px 8px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+html.phone .np-arch { font-size: 15px; }
+html.phone .np-sub, html.phone .np-reward { font-size: 12px; margin: 0; }
+html.phone #queue-info { display: none; }
+/* control bar: [pause][1× 2× 3×] [Call wave ———] / [count][Call ×N] [Auto Skip] */
+html.phone .next-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: stretch; }
+html.phone .dock-controls { display: flex; }
+html.phone .play-controls { display: flex; gap: 4px; }
+html.phone .play-controls .speed { gap: 4px; }
+html.phone .play-controls .icon-btn, html.phone .play-controls .speed button { height: var(--tap); min-width: var(--tap); font-size: 15px; }
+html.phone #btn-next { min-height: var(--tap); padding: 0 12px; font-size: 16px; white-space: nowrap; }
+html.phone .call-many { grid-column: 1; display: grid; grid-template-columns: 64px auto; gap: 4px; }
+html.phone .call-many input { height: var(--tap); width: 100%; font-size: 16px; }
+html.phone .call-many .btn-secondary { min-height: var(--tap); padding: 0 12px; font-size: 15px; }
+html.phone .next-actions .auto { grid-column: 2; justify-self: stretch; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); border: 1px solid var(--line-2); border-radius: var(--r); background: var(--surface-2); font-size: 14px; }
+html.phone .next-actions .auto input { width: 20px; height: 20px; }
+
+/* unit sheet: replaces the unit cards, its body scrolls, Upgrade/Sell always visible */
+html.phone #unit-panel { position: static; width: auto; max-height: none; flex: 1 1 auto; min-height: 0; box-shadow: none; display: flex; flex-direction: column; }
+html.phone #unit-panel[hidden] { display: none; }
+html.phone #app.inspecting .deploy-panel { display: none; }
+html.phone .up-head { grid-template-columns: 40px 1fr auto; padding: 6px 8px 6px 10px; gap: 8px; }
+html.phone .up-head img { width: 40px; height: 40px; }
+html.phone .up-head h3 { font-size: 18px; }
+html.phone .up-close { width: var(--tap); height: var(--tap); min-width: var(--tap); font-size: 22px; align-self: center; }
+html.phone #unit-panel .up-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 10px; gap: 8px; }
+html.phone .cmp td { padding: 4px 0; font-size: 15px; }
+html.phone .cmp td:first-child { font-size: 14px; }
+html.phone .up-actions { padding: 8px 10px; gap: 8px; }
+html.phone .up-actions button { min-height: var(--tap); font-size: 16px; }
+
+/* ---------- battle: portrait – battlefield full width at the top ---------- */
+html.phone:not(.phone-landscape) #app { grid-template-rows: auto auto minmax(0, 1fr); }
+html.phone:not(.phone-landscape) #stage { height: calc((100vw - var(--safe-l) - var(--safe-r) - 8px) * 0.55 + 8px); }
+html.phone:not(.phone-landscape) .deploy-panel { flex: none; }
+
+/* ---------- battle: landscape – battlefield left, dock as a side column ---------- */
+html.phone-landscape #app { grid-template-columns: minmax(0, 1fr) clamp(200px, 30vw, 280px); grid-template-rows: auto minmax(0, 1fr); }
+html.phone-landscape #hud-top { grid-column: 1 / -1; min-height: 44px; padding-top: calc(2px + var(--safe-t)); padding-bottom: 2px; }
+html.phone-landscape #stage { grid-column: 1; grid-row: 2; }
+html.phone-landscape #dock { grid-column: 2; grid-row: 2; border-top: 0; border-left: 1px solid var(--line); padding: 6px 6px calc(6px + var(--safe-b)); gap: 6px; }
+html.phone-landscape .deploy-panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+html.phone-landscape .deploy-bar { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); align-content: start; overflow-x: hidden; overflow-y: auto; scroll-snap-type: none; }
+html.phone-landscape .deploy-card { width: auto; grid-template-rows: 40px auto; }
+html.phone-landscape .deploy-card .dc-art img { width: 44px; height: 44px; }
+html.phone-landscape .next-preview { display: none; }
+html.phone-landscape .next-actions { grid-template-columns: 1fr 1fr; gap: 6px; }
+html.phone-landscape .dock-controls { grid-column: 1 / -1; }
+html.phone-landscape .play-controls { width: 100%; justify-content: space-between; }
+html.phone-landscape .play-controls .speed { flex: 1; justify-content: flex-end; }
+html.phone-landscape .play-controls .icon-btn, html.phone-landscape .play-controls .speed button { height: var(--tap-sm); }
+html.phone-landscape #btn-next { grid-column: 1 / -1; min-height: var(--tap-sm); }
+html.phone-landscape .call-many { grid-column: 1 / -1; grid-template-columns: 56px 1fr; }
+html.phone-landscape .call-many input, html.phone-landscape .call-many .btn-secondary, html.phone-landscape .next-actions .auto { height: var(--tap-sm); min-height: var(--tap-sm); }
+html.phone-landscape .next-actions .auto { grid-column: 1 / -1; }
+html.phone-landscape .weather-card { grid-template-columns: auto auto; }
+html.phone-landscape .weather-card ul { grid-column: 1 / -1; }
+html.phone-landscape #unit-panel .up-body { padding: 6px 8px; }
+
+/* ---------- menus (Battle Plans, Summoning) ---------- */
+html.phone, html.phone body { overflow: auto; height: auto; min-height: 100%; }
+html.phone #menu { position: static; min-height: 100vh; display: block; }
+html.phone .menu-bar { position: sticky; top: 0; z-index: 5; grid-template-columns: 1fr auto; height: auto; padding: calc(8px + var(--safe-t)) calc(16px + var(--safe-r)) 0 calc(16px + var(--safe-l)); row-gap: 4px; }
+html.phone .menu-bar .wallets { grid-column: 2; grid-row: 1; }
+html.phone .menu-bar .tabs { grid-column: 1 / -1; height: var(--tap); }
+html.phone .tab { flex: 1; padding: 0 8px; font-size: 15px; }
+html.phone .page { padding-left: var(--safe-l); padding-right: var(--safe-r); }
+html.phone #screen-plans { position: static; display: block; min-height: 0; }
+html.phone .bp-header { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
+html.phone .bp-name { justify-self: stretch; max-width: none; }
+html.phone .bp-name input { min-height: var(--tap); }
+html.phone .bp-title h1 { font-size: 30px; }
+html.phone .bp-body { display: block; }
+html.phone .bp-roster, html.phone .bp-dossier { padding: 16px; overflow: visible; }
+html.phone .bp-dossier { border-left: 0; border-top: 1px solid var(--line); }
+html.phone .roster-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+html.phone #screen-plans > .bp-footer { position: sticky; bottom: 0; z-index: 2; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 8px 16px calc(8px + var(--safe-b)); }
+html.phone .army .section-head .muted, html.phone .battlefield-note, html.phone .battle-msg:empty { display: none; }
+html.phone .army-slots { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+html.phone .army-slots .slot { aspect-ratio: 1 / 1; }
+html.phone .slot .slot-name, html.phone .slot .slot-n { display: none; }
+html.phone .slot.filled img { margin-top: 0; width: 88%; }
+html.phone .slot .slot-x { width: 28px; height: 28px; top: -4px; right: -4px; font-size: 14px; border-radius: 50%; }
+html.phone .btn-battle { font-size: 22px; padding: 0 20px; min-height: 52px; }
+html.phone-landscape .army-slots { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+
+/* summoning: circle cards → stage → drop rates (expandable) → pull buttons */
+html.phone #screen-summon { display: block; }
+html.phone .circle-cards { padding: 12px 16px 4px; }
+html.phone .sm-body { display: block; }
+html.phone .sm-stage { height: clamp(220px, 46vw, 300px); border-right: 0; border-bottom: 1px solid var(--line); }
+html.phone-landscape .sm-stage { height: 220px; }
+html.phone .sm-banner { left: 16px; top: 12px; right: 64px; }
+html.phone .sm-banner h1 { font-size: 26px; }
+html.phone .sm-banner p { font-size: 13px; }
+html.phone .sm-mute { width: var(--tap); height: var(--tap); right: 12px; top: 12px; }
+html.phone .sm-side { padding: 12px 16px; overflow: visible; }
+html.phone #screen-summon > .sm-footer { position: sticky; bottom: 0; z-index: 2; grid-template-columns: 1fr; gap: 8px; padding: 8px 16px calc(8px + var(--safe-b)); }
+html.phone .sm-earn { grid-template-columns: auto 1fr; column-gap: 8px; align-items: baseline; font-size: 13px; }
+html.phone .sm-earn .label { display: none; }
+html.phone .sm-earn #earn-note { grid-column: 1 / -1; }
+html.phone .pull-buttons { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+html.phone .pull-btn { min-height: 56px; padding: 6px 4px; }
+html.phone .pull-btn .pb-n { font-size: 20px; }
+html.phone .pull-btn .pb-cost { font-size: 14px; }
+html.phone .pull-btn .pb-need { font-size: 10px; }
+@media (max-width: 359px) { html.phone .pull-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- reveal + dialogs ---------- */
+html.phone .modal { width: min(440px, calc(100vw - 32px)); }
+html.phone .modal-actions button { min-height: var(--tap); }
+html.phone .reveal-controls { right: calc(16px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); }
+html.phone .reveal-controls button { min-height: var(--tap); }
+html.phone .reveal-card .rc-name { font-size: 34px; }
+html.phone .rs-grid { grid-template-columns: repeat(auto-fill, 88px); }
+html.phone .rs-item img { width: 64px; height: 64px; }
+
+/* ================================================================
+   SUMMONING CIRCLE CARDS (all layouts) + expandable drop rates
+   ================================================================ */
+.circle-cards { display: flex; gap: 8px; padding: 12px 32px 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.circle-card { --c: var(--accent); flex: 0 0 auto; min-width: 168px; display: grid; gap: 6px; text-align: left; padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--line-2); background: var(--surface); color: var(--text-2); scroll-snap-align: start; min-height: 44px; }
+.circle-card:hover { border-color: var(--muted); }
+.circle-card.active { border-color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); color: var(--text); }
+.circle-card .cc-name { font-family: var(--display); font-weight: 800; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.05; }
+.circle-card .cc-price { display: flex; align-items: center; gap: 5px; font-family: var(--display); font-weight: 700; font-size: 14px; color: var(--accent); }
+.circle-card .cc-units { display: flex; gap: 2px; }
+.circle-card .cc-units img { width: 30px; height: 30px; background: #283224; border-radius: 2px; }
+.circle-card .cc-units span { align-self: center; margin-left: 4px; font-size: 12px; color: var(--muted); }
+.pool-details > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-height: var(--tap, 36px); padding: 4px 0 10px; }
+.pool-details > summary::-webkit-details-marker { display: none; }
+.pool-details .pd-title { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.1em; text-transform: uppercase; }
+.pool-details .pd-title::before { content: '▸ '; display: inline-block; width: 1em; transition: transform 0.15s; }
+.pool-details[open] .pd-title::before { content: '▾ '; }
+
+/* ---------- phone refinements: compact weather strip, guaranteed sheet actions, narrow phones ---------- */
+.dock-weather:empty { display: none; }
+.wc-short { display: none; }
+html.phone .weather-card { grid-template-columns: auto auto minmax(0, 1fr); }
+html.phone .weather-card ul { display: none; }
+html.phone .wc-short { display: block; grid-column: 3; min-width: 0; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.phone #dock > * { min-width: 0; }
+html.phone #unit-panel { flex: 1 1 auto; min-height: 150px; }
+html.phone #unit-panel .up-actions { flex: none; }
+html.phone #app.inspecting .next-preview { display: none; }
+html.phone .next-actions { grid-template-columns: auto minmax(0, 1fr); }
+html.phone #btn-next { overflow: hidden; text-overflow: ellipsis; }
+html.phone .next-actions .auto { white-space: nowrap; }
+
+/* landscape: pause/speed live in the top bar; the side column is cards/sheet + two control rows */
+html.phone-landscape .play-controls { display: flex; gap: 4px; width: auto; }
+html.phone-landscape .play-controls .speed { flex: none; }
+html.phone-landscape .next-actions { grid-template-columns: minmax(0, 1fr) auto; }
+html.phone-landscape #btn-next { grid-column: 1 / -1; }
+html.phone-landscape .call-many { grid-column: 1; grid-template-columns: 48px minmax(0, 1fr); }
+html.phone-landscape .next-actions .auto { grid-column: 2; padding: 0 8px; }
+html.phone-landscape .dock-controls:empty { display: none; }
+html.phone-landscape #unit-panel { min-height: 120px; }
+html.phone-landscape .up-head { grid-template-columns: 32px 1fr auto; padding: 4px 6px; }
+html.phone-landscape .up-head img { width: 32px; height: 32px; }
+html.phone-landscape .up-head h3 { font-size: 16px; }
+html.phone-landscape .up-close { width: var(--tap-sm); height: var(--tap-sm); min-width: var(--tap-sm); }
+html.phone-landscape .up-actions { padding: 4px 6px; }
+html.phone-landscape .up-actions button { min-height: var(--tap-sm); font-size: 14px; }
+
+/* narrow phones (< 380 px): one cycling speed button, slimmer top bar */
+html.narrow .speed button:not(.active) { display: none; }
+html.narrow .speed button.active { background: var(--surface-2); color: var(--text); border-color: var(--line-2); }
+html.narrow #hud-top { gap: 4px; padding-left: 4px; padding-right: 4px; }
+html.narrow .hud-right, html.narrow .hud-left, html.narrow .controls { gap: 4px; }
+html.narrow .wave-block .label, html.narrow .hp-bar { display: none; }
+html.narrow .tower-hp .ico { display: block; }
+html.narrow #coins { font-size: 16px; }
+html.narrow .icon-btn, html.narrow #btn-weather { min-width: 36px; height: 40px; padding: 0 6px; }
+html.narrow .call-many { grid-template-columns: 52px auto; }
+html.narrow #btn-next { font-size: 14px; padding: 0 8px; }
+html.narrow .up-actions { grid-template-columns: minmax(0, 1fr) auto; }
+html.narrow .up-btn { padding: 0 8px !important; font-size: 14px !important; }
+.dock-controls:empty { display: none; }
+html.phone-landscape .deploy-bar { grid-auto-rows: max-content; }
+.play-controls { display: flex; gap: 4px; align-items: center; }
+.up-quick { display: none; }
+html.phone .up-quick { display: block; margin-top: 2px; font-family: var(--display); font-weight: 600; font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+html.phone-landscape .up-quick { font-size: 12px; }
+html.phone-landscape .auto-long { display: none; }
+html.phone-landscape .call-many .btn-secondary { padding: 0 6px; font-size: 14px; }
+html.phone #unit-panel { overflow: hidden; }
+html.phone .up-head > div { min-width: 0; }
+html.phone .up-head h3, html.phone .up-head .ds-sub, html.phone .up-quick { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.phone-landscape .up-head .ds-sub { font-size: 11px; }
+html.phone-landscape .up-pips { display: none; }
+html.phone-landscape .up-actions button { padding: 0 8px; }
+html.phone-landscape .up-btn .up-cost { font-size: 14px; }
+html.phone-landscape .up-sell { white-space: nowrap; font-size: 13px !important; }
+/* phones: compact roster cards (art, name, price, tier, key stats); details live in the dossier below */
+html.phone .roster-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: start; }
+html.phone .uc-art { height: 76px; }
+html.phone .uc-art img { width: 72px; height: 72px; }
+html.phone .uc-tier, html.phone .uc-pick { top: 4px; font-size: 11px; padding: 1px 5px; }
+html.phone .uc-tier { left: 4px; }
+html.phone .uc-pick { right: 4px; }
+html.phone .uc-head { padding: 6px 8px 0; }
+html.phone .uc-head h3 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+html.phone .uc-price { font-size: 14px; }
+html.phone .uc-role { padding: 0 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.phone .uc-stats { margin: 6px 8px 8px; }
+html.phone .uc-stats div { padding: 3px 4px; }
+html.phone .uc-stats dt { font-size: 10px; }
+html.phone .uc-stats dd { font-size: 14px; }
+html.phone .unit-card > :not(.uc-art):not(.uc-head):not(.uc-role):not(.uc-stats) { display: none; }
+html.phone .circle-cards { scroll-padding-left: 16px; scroll-padding-right: 16px; }
+html.phone .circle-card { min-width: 0; width: min(78vw, 260px); }
+html.phone .unit-card { min-width: 0; }
+html.phone .uc-head > * { min-width: 0; }
+html.phone .uc-price { flex: none; }

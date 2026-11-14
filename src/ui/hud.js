@@ -74,7 +74,13 @@ export class Hud {
     $('btn-retreat-confirm').addEventListener('click', () => actions.retreat());
     $('btn-again').addEventListener('click', () => actions.again());
     $('btn-to-plans').addEventListener('click', () => actions.toPlans());
-    document.querySelectorAll('.speed button').forEach((b) => b.addEventListener('click', () => actions.setSpeed(Number(b.dataset.speed))));
+    document.querySelectorAll('.speed button').forEach((b) =>
+      b.addEventListener('click', () => {
+        // narrow phones show one speed button that cycles 1× → 2× → 3×
+        const cycle = document.documentElement.classList.contains('narrow') && b.classList.contains('active');
+        actions.setSpeed(cycle ? (Number(b.dataset.speed) % 3) + 1 : Number(b.dataset.speed));
+      }),
+    );
     el.deployBar.addEventListener('click', (ev) => {
       const card = ev.target.closest('.deploy-card');
       if (card) actions.selectDeploy(card.dataset.def);
@@ -99,7 +105,6 @@ export class Hud {
       ['Bosses felled', s.bossesDefeated],
       ['Units deployed', formatNumber(s.unitsDeployed)],
       ['Tokens earned', formatNumber(data.tokens ?? 0)],
-      ['Gems earned', formatNumber(data.gems ?? 0)],
       ['Damage dealt', formatNumber(s.damage)],
     ];
     this.el.overStats.innerHTML = stats.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
@@ -155,8 +160,8 @@ export class Hud {
     }
   }
 
-  onWaveClear({ wave, reward, tokens, gems }, game) {
-    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens${gems ? ` · +${formatNumber(gems)} Gems` : ''}</div>`, gems ? '#5fd3b8' : '#e3a33b', 'small');
+  onWaveClear({ wave, reward, tokens }, game) {
+    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens</div>`, '#e3a33b', 'small');
     this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
     this.el.tokens.parentElement.classList.remove('bump');
     void this.el.tokens.offsetWidth;
@@ -244,7 +249,7 @@ export class Hud {
       this.npKey = `${np.wave}`;
       el.nextPreview.style.setProperty('--c', np.color);
       const traits = np.traits.map((id) => getTrait(id).label).join(' · ');
-      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div><div class="np-reward"><svg class="ico token"><use href="#i-token" /></svg>+${formatNumber(np.tokens)} Tokens on clear${np.isBoss ? ' · +Gems' : ''}</div>`;
+      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div><div class="np-reward"><svg class="ico token"><use href="#i-token" /></svg>+${formatNumber(np.tokens)} Tokens on clear</div>`;
     }
   }
 
@@ -274,7 +279,7 @@ export class Hud {
       this.weatherKey = key;
       card.style.setProperty('--c', w.color);
       card.innerHTML = `<div class="wc-head"><span class="wc-name">${esc(w.label)}</span><span class="wc-time num"></span></div>
-        <div class="wc-bar"><div></div></div><ul>${w.effects.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>`;
+        <div class="wc-bar"><div></div></div><ul>${w.effects.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><span class="wc-short" title="${esc(w.effects.join(' · '))}">${esc((w.short ?? w.effects).join(' · '))}</span>`;
       card.hidden = false;
     }
     card.querySelector('.wc-time').textContent = `${Math.ceil(rem)}s`;
@@ -337,7 +342,7 @@ export class Hud {
       this.panelBody = '';
       const tier = getTier(def.tier);
       panel.innerHTML = `
-        <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span> · <span class="up-lv"></span></div></div>
+        <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span> · <span class="up-lv"></span></div><div class="up-quick"></div></div>
           <button class="up-close" data-act="close" aria-label="Close" type="button">×</button></div>
         <div class="up-body"></div>
         <div class="up-actions">
@@ -346,6 +351,7 @@ export class Hud {
         </div>`;
       this.panelEls = {
         lv: panel.querySelector('.up-lv'),
+        quick: panel.querySelector('.up-quick'),
         body: panel.querySelector('.up-body'),
         up: panel.querySelector('.up-btn'),
         sell: panel.querySelector('.up-sell'),
@@ -357,6 +363,10 @@ export class Hud {
     const E = this.panelEls;
     const max = maxLevel(def);
     E.lv.textContent = `Level ${u.level} / ${max}`;
+    // always-visible stat line for phones (the full comparison table scrolls below)
+    const c = info.current;
+    const quick = `${formatNumber(Math.round(c.damage * 10) / 10)} dmg · ${tiles(c.range)} range · ${c.rate.toFixed(2)}/s`;
+    if (E.quick.textContent !== quick) E.quick.textContent = quick;
     // upgrade button: label, cost and affordability
     const upKey = info.maxed ? 'max' : `${info.cost}:${info.affordable}`;
     if (E.up.dataset.key !== upKey) {

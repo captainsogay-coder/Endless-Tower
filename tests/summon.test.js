@@ -86,7 +86,7 @@ test('a locked unit cannot be put into battle', () => {
   assert.equal(v.ok, false);
 });
 
-import { ADVANCED_MILITARY_CIRCLE, duplicateCompensation, summonValueInTokens, compensationCurrency, SUMMON_CONFIG } from '../src/units/summoning.js';
+import { ADVANCED_MILITARY_CIRCLE, duplicateCompensation, summonValueInTokens, SUMMON_CONFIG } from '../src/units/summoning.js';
 
 test('Advanced Military Circle: 250 Tokens, exact odds including 0.5% Fortress', () => {
   const adv = getBanner(ADVANCED_MILITARY_CIRCLE);
@@ -132,21 +132,11 @@ test('a duplicate within the same multi-summon counts once as new, then as dupli
   assert.ok(r.results.slice(firstCadet + 1).filter((x) => x.unit === 'cadet').every((x) => !x.isNew && x.compensation === 45));
 });
 
-test('Gem circles never assume a Token rate: compensation stays in Gems unless a rate is configured', () => {
-  const plain = { id: 'g0', currency: 'gems', price: 500 };
-  assert.equal(summonValueInTokens(plain), null);
-  assert.equal(compensationCurrency(plain), 'gems');
-  assert.equal(duplicateCompensation(plain), 150);
-  const rated = { id: 'g', currency: 'gems', price: 150, tokenValuePerUnit: 2 };
-  assert.equal(summonValueInTokens(rated), 300);
-  assert.equal(compensationCurrency(rated), 'tokens');
-  assert.equal(duplicateCompensation(rated), Math.round(300 * SUMMON_CONFIG.duplicateCompensation));
-  SUMMON_CONFIG.tokenValue.gems = 3;
-  try {
-    assert.equal(compensationCurrency(plain), 'tokens');
-    assert.equal(duplicateCompensation(plain), 450);
-  } finally {
-    SUMMON_CONFIG.tokenValue.gems = null;
+test('duplicate compensation is 30% of the Token price for every circle', () => {
+  for (const [price, comp] of [[150, 45], [250, 75], [300, 90], [500, 150]]) {
+    assert.equal(summonValueInTokens({ price }), price);
+    assert.equal(duplicateCompensation({ price }), Math.round(price * SUMMON_CONFIG.duplicateCompensation));
+    assert.equal(duplicateCompensation({ price }), comp);
   }
 });
 

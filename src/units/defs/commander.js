@@ -1,5 +1,6 @@
 // COMMANDER — Tier 5. Marksman officer: extremely long range, fast attacks,
 // and a large aura that slightly extends allied range and shortens cooldowns.
+import { tierUnit } from '../levels.js';
 export const COMMANDER_AURA = { id: 'commander-presence', label: 'Commander Presence', radius: 176, rangeMult: 1.08, cooldownMult: 0.92 };
 
 export default {
@@ -8,17 +9,10 @@ export default {
   tier: 5,
   role: 'Officer · long-range support',
   description: 'Reads the whole battlefield through a scoped rifle and keeps everyone nearby sharp.',
-  price: 420,
   targeting: 'strongest',
   projectile: { kind: 'bullet', speed: 1400, color: '#f2e2a8' },
-  levels: [
-    { damage: 34, range: 320, rate: 2.4 },
-    { cost: 420, damage: 42, range: 336, rate: 2.5 },
-    { cost: 650, damage: 52, range: 352, rate: 2.7 },
-    { cost: 950, damage: 64, range: 368, rate: 2.9 },
-    { cost: 1350, damage: 80, range: 384, rate: 3.1 },
-    { cost: 1900, damage: 100, range: 416, rate: 3.4 },
-  ],
+  // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
+  ...tierUnit(5, { rate: 2.4, range: 320, role: 'support', power: 1.35 }),
   buffs: [COMMANDER_AURA],
   passive: {
     id: 'commander-presence',

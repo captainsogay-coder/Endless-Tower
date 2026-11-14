@@ -1,8 +1,7 @@
 // SUMMONING page: banner, pool odds, x1/x5/x10/x25 with confirmation, and the
 // reveal sequence (skippable) followed by a results summary.
 
-import { getBanner, listBanners, MILITARY_CIRCLE, summon, summonCost, duplicateCompensation, compensationCurrency, isRare, CURRENCY_LABEL, SUMMON_CONFIG } from '../units/summoning.js';
-import { GAME_CONFIG } from '../config.js';
+import { getBanner, listBanners, MILITARY_CIRCLE, summon, summonCost, duplicateCompensation, isRare, SUMMON_CONFIG } from '../units/summoning.js';
 import { BALANCE } from '../balance.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
@@ -16,8 +15,7 @@ import { portrait } from './battlePlans.js';
 const $ = (id) => document.getElementById(id);
 // keep sub-percent odds exact (0.5%, 7.5%)
 const pct = (c) => `${Math.round(c * 10000) / 100}%`;
-const currencyIcon = (cur) => (cur === 'gems' ? '<svg class="ico gem"><use href="#i-gem" /></svg>' : '<svg class="ico token"><use href="#i-token" /></svg>');
-const label = (cur) => CURRENCY_LABEL[cur] ?? cur;
+const tokenIcon = '<svg class="ico token"><use href="#i-token" /></svg>';
 
 export class SummoningView {
   constructor({ profile, onChange }) {
@@ -60,6 +58,8 @@ export class SummoningView {
       this.banner = getBanner(b.dataset.banner);
       this.stage.banner = this.banner;
       this.render();
+      b.blur();
+      this.el.tabs.querySelector('.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
     el.buttons.addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-count]');
@@ -91,6 +91,11 @@ export class SummoningView {
 
   show(on) {
     this.el.page.hidden = !on;
+    if (on && !this.detailsInit) {
+      // drop rates start collapsed on phones (expand on tap), open on desktop
+      this.detailsInit = true;
+      $('pool-details').open = !document.documentElement.classList.contains('phone');
+    }
     if (on) {
       this.render();
       this.stage.start();
@@ -109,14 +114,22 @@ export class SummoningView {
     el.name.textContent = banner.name;
     el.tagline.textContent = banner.tagline;
     el.price.textContent = banner.price;
-    $('banner-currency').textContent = label(banner.currency);
-    $('earn-note').textContent = banner.currency === 'gems' ? `Earn ${GAME_CONFIG.gemsPerBossWave} Gems for every boss wave you clear.` : `Earn ${BALANCE.tokens.base} Tokens per wave cleared, +${Math.round(BALANCE.tokens.milestoneBonus * 100)}% every ${BALANCE.tokens.milestoneEvery} waves.`;
-    const compCur = compensationCurrency(banner);
+    $('earn-note').textContent = `Earn ${BALANCE.tokens.base} Tokens per wave cleared, +${Math.round(BALANCE.tokens.milestoneBonus * 100)}% every ${BALANCE.tokens.milestoneEvery} waves.`;
     const pctComp = Math.round(SUMMON_CONFIG.duplicateCompensation * 100);
-    $('pool-note').textContent = `Summoned units are unlocked permanently and appear in Battle Plans. Duplicates pay back ${duplicateCompensation(banner)} ${label(compCur)} each (${pctComp}% of a summon${compCur !== 'tokens' ? '; no Gem-to-Token rate is set, so it is paid in Gems' : ''}).`;
+    $('pool-note').textContent = `Summoned units are unlocked permanently and appear in Battle Plans. Duplicates pay back ${duplicateCompensation(banner)} Tokens each (${pctComp}% of a summon).`;
+    // circle cards: name, Token price and a preview of the units inside
     el.tabs.innerHTML = listBanners()
-      .map((b) => `<button class="banner-tab ${b.id === banner.id ? 'active' : ''} ${b.currency}" role="tab" aria-selected="${b.id === banner.id}" data-banner="${esc(b.id)}">${esc(b.name)}<span class="bt-price">${b.price} ${label(b.currency)}</span></button>`)
+      .map((b) => {
+        const top = [...b.pool].sort((x, y) => getUnit(y.unit).tier - getUnit(x.unit).tier).slice(0, 4);
+        return `<button class="circle-card ${b.id === banner.id ? 'active' : ''}" role="tab" aria-selected="${b.id === banner.id}" data-banner="${esc(b.id)}">
+          <span class="cc-name">${esc(b.name)}</span>
+          <span class="cc-price">${tokenIcon}${formatNumber(b.price)} Tokens</span>
+          <span class="cc-units">${top.map((p) => `<img alt="" src="${portrait(getUnit(p.unit), 60)}" />`).join('')}<span>${b.pool.length} units</span></span>
+        </button>`;
+      })
       .join('');
+    const rarest = Math.min(...banner.pool.map((p) => p.chance));
+    $('pool-summary').textContent = `${banner.pool.length} units · rarest ${pct(rarest)}`;
     el.pool.innerHTML = banner.pool
       .map((p) => {
         const def = getUnit(p.unit);
@@ -134,9 +147,9 @@ export class SummoningView {
       .map((n, i) => {
         const cost = summonCost(banner, n);
         const short = cost - bal;
-        return `<button class="pull-btn ${i === 0 ? 'primary' : ''}" data-count="${n}" ${short > 0 ? 'disabled' : ''} aria-label="Summon ${n} for ${cost} ${label(banner.currency)}">
+        return `<button class="pull-btn ${i === 0 ? 'primary' : ''}" data-count="${n}" ${short > 0 ? 'disabled' : ''} aria-label="Summon ${n} for ${cost} Tokens">
           <span class="pb-n">×${n}</span>
-          <span class="pb-cost">${currencyIcon(banner.currency)}${formatNumber(cost)}</span>
+          <span class="pb-cost">${tokenIcon}${formatNumber(cost)}</span>
           ${short > 0 ? `<span class="pb-need">Need ${formatNumber(short)} more</span>` : ''}
         </button>`;
       })
@@ -154,9 +167,9 @@ export class SummoningView {
     el.confirmTitle.textContent = `Summon ×${n}`;
     el.confirmBody.innerHTML = `
       <dt>Banner</dt><dd>${esc(banner.name)}</dd>
-      <dt>Price per summon</dt><dd>${banner.price} ${label(banner.currency)}</dd>
-      <dt>Total cost</dt><dd>${formatNumber(cost)} ${label(banner.currency)}</dd>
-      <dt>Balance</dt><dd>${formatNumber(bal)} ${label(banner.currency)}</dd>
+      <dt>Price per summon</dt><dd>${banner.price} Tokens</dd>
+      <dt>Total cost</dt><dd>${formatNumber(cost)} Tokens</dd>
+      <dt>Balance</dt><dd>${formatNumber(bal)} Tokens</dd>
       <dt>Balance after</dt><dd class="after">${formatNumber(bal - cost)}</dd>`;
     el.confirm.hidden = false;
     $('btn-confirm-ok').focus();
@@ -214,7 +227,7 @@ export class SummoningView {
     el.card.classList.toggle('rare', !!r.rare);
     el.card.innerHTML = `
       <span class="rc-tier" style="--c:${tier.color}">${esc(tier.label)}</span>
-      <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} ${label(r.compensationCurrency)}</span>`}</div>
+      <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
       ${r.rare ? `<div class="rc-rare">Rare asset · ${pct(r.chance)}</div>` : ''}
       <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)} · duplicate refunded`}</div>`;
     if (this.results.length === 1) {
@@ -247,7 +260,7 @@ export class SummoningView {
     const dupes = this.results.filter((r) => !r.isNew).length;
     el.summary.innerHTML = `
       <h2>Requisition complete</h2>
-      ${comp ? `<div class="rs-comp-total">Duplicate compensation: +${formatNumber(comp)} ${label(this.results[0].compensationCurrency)} (${dupes} × ${this.results.find((r) => !r.isNew).compensation})</div>` : ''}
+      ${comp ? `<div class="rs-comp-total">Duplicate compensation: +${formatNumber(comp)} Tokens (${dupes} × ${this.results.find((r) => !r.isNew).compensation})</div>` : ''}
       <div class="rs-tally">${[...tally.entries()].sort((a, b) => getUnit(b[0]).tier - getUnit(a[0]).tier).map(([id, n]) => `<span style="color:${getTier(getUnit(id).tier).color}">${esc(getUnit(id).name)} ×${n}</span>`).join('')}${fresh ? `<span>${fresh} new</span>` : ''}</div>
       <div class="rs-grid">${sorted
         .map((r, i) => {
@@ -256,7 +269,7 @@ export class SummoningView {
           return `<div class="rs-item ${r.rare ? 'rare' : ''}" style="--c:${tier.color}; animation-delay:${Math.min(i, 30) * 25}ms">
             ${r.isNew ? '<span class="rc-new">New</span>' : ''}
             <img alt="" src="${portrait(def, 160)}" /><div class="rs-name">${esc(def.name)}</div><div class="rs-tier">${esc(tier.label)}</div>
-            ${r.isNew ? '' : `<div class="rs-comp">+${r.compensation} ${label(r.compensationCurrency)}</div>`}</div>`;
+            ${r.isNew ? '' : `<div class="rs-comp">+${r.compensation} Tokens</div>`}</div>`;
         })
         .join('')}</div>`;
     el.summary.hidden = false;

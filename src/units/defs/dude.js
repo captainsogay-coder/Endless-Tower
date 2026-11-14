@@ -1,6 +1,7 @@
 // DUDE — Tier 1. An ordinary dude who somehow became a tower-defense unit.
 // Cheap, short-ranged, weak alone; strong in numbers thanks to Dude Power.
 // All numbers live in this table so they can be tuned in one place.
+import { tierUnit } from '../levels.js';
 
 export const DUDE_POWER_PER_DUDE = 0.1;
 
@@ -13,18 +14,10 @@ export default {
   tier: 1,
   role: 'Cheap basic damage dealer',
   description: 'Just a regular guy with a good arm and a pocket full of rocks. One Dude is barely a speed bump. A crowd of Dudes is a problem.',
-  price: 15,
   targeting: 'first',
   projectile: { kind: 'pebble', speed: 360 },
-  // Level 0 is the base unit; levels 1–5 are bought per Dude during battle.
-  levels: [
-    { damage: 4, range: 64, rate: 1.25 },
-    { cost: 25, damage: 6, range: 64, rate: 1.25 },
-    { cost: 45, damage: 8, range: 64, rate: 1.4 },
-    { cost: 80, damage: 11, range: 72, rate: 1.4 },
-    { cost: 130, damage: 15, range: 72, rate: 1.6 },
-    { cost: 210, damage: 21, range: 80, rate: 1.8 },
-  ],
+  // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
+  ...tierUnit(1, { rate: 1.25, range: 64, power: 0.75, price: 0.75 }),
   passive: {
     id: 'dude-power',
     name: 'Dude Power',

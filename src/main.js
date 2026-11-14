@@ -13,6 +13,7 @@ import { registerRoster, STARTER_UNITS } from './units/roster.js';
 import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
 import './render/castArt.js';
+import { initResponsive } from './ui/responsive.js';
 
 registerRoster();
 
@@ -28,7 +29,6 @@ if (!profile.plan.units.length && !profile.data.battles) {
 }
 
 if (LOCAL && params.get('tokens')) profile.earn('tokens', Number(params.get('tokens')));
-if (LOCAL && params.get('gems')) profile.earn('gems', Number(params.get('gems')));
 
 const canvas = document.getElementById('game');
 const appEl = document.getElementById('app');
@@ -78,7 +78,7 @@ function showPage(page) {
 
 const lastBalance = {};
 function updateWallet() {
-  for (const cur of ['tokens', 'gems']) {
+  for (const cur of ['tokens']) {
     const n = profile.balance(cur);
     const el = document.getElementById(`wallet-${cur}`);
     el.textContent = formatNumber(n);
@@ -191,7 +191,6 @@ game.on('waveStart', (plan) => hud.onWaveStart(plan, game));
 game.on('waveClear', (d) => {
   // Tokens are persisted the moment a wave is completed.
   profile.earn('tokens', d.tokens);
-  if (d.gems) profile.earn('gems', d.gems);
   profile.recordWaveCleared();
   profile.save();
   hud.onWaveClear(d, game);
@@ -320,6 +319,7 @@ window.addEventListener('keydown', (ev) => {
 });
 
 window.addEventListener('resize', () => settings.inBattle && renderer.resize());
+initResponsive({ onChange: () => settings.inBattle && requestAnimationFrame(() => renderer.resize()) });
 new ResizeObserver(() => settings.inBattle && renderer.resize()).observe(canvas.parentElement);
 
 // ----------------------------------------------------------------- loop

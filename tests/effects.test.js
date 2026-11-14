@@ -131,7 +131,7 @@ test('exactly 250 Tokens per completed early wave; none for a wave in progress o
   assert.equal(g.tokensEarned, 750);
 });
 
-test('Coins, Tokens and Gems are separate: coins live in the battle, tokens and gems in the profile', () => {
+test('Coins and Tokens are separate: coins live in the battle, tokens in the profile (no other currency)', () => {
   const p = new Profile({ storage: memoryStorage(), starterUnits: ['dude'] });
   const g = new Game({ seed: 8, loadout: ['dude'] });
   p.earn('tokens', 100);
@@ -143,8 +143,10 @@ test('Coins, Tokens and Gems are separate: coins live in the battle, tokens and 
   assert.ok(g.coins < coins);
   assert.equal(p.spend('tokens', 101), false);
   assert.equal(p.balance('tokens'), 100);
-  assert.equal(p.balance('gems'), 0, 'gems start at zero and are separate');
-  p.earn('gems', 50);
-  assert.equal(p.balance('tokens'), 100, 'earning gems never touches tokens');
-  assert.equal(p.spend('gems', 51), false);
+  assert.deepEqual(Object.keys(p.data.wallet), ['tokens'], 'Tokens are the only saved currency');
+  // an old save carrying a stray Gem balance loads with Tokens only
+  const st = memoryStorage();
+  st.setItem('endless-tower/profile/v1', JSON.stringify({ wallet: { tokens: 7, gems: 999 } }));
+  const old = new Profile({ storage: st, starterUnits: ['dude'] });
+  assert.deepEqual(old.data.wallet, { tokens: 7 });
 });

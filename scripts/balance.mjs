@@ -16,7 +16,7 @@ import { Game } from '../src/game/Game.js';
 import { registerRoster, ROSTER } from '../src/units/roster.js';
 import { maxLevel, upgradeCost } from '../src/units/unitStats.js';
 import { waveScaling } from '../src/waves/scaling.js';
-import { BALANCE, tokensForWave } from '../src/balance.js';
+import { BALANCE, tokensForWave, tierPower } from '../src/balance.js';
 import { getBanner, listBanners } from '../src/units/summoning.js';
 
 registerRoster();
@@ -40,12 +40,12 @@ function investment(def, level) {
 }
 
 /** Damage per second of one copy against wave-`wave` Regulars. */
-function measure(def, wave, scenario) {
-  const g = new Game({ seed: 11, loadout: [def.id], weatherEnabled: false });
+function measure(def, wave, scenario, opts = {}) {
+  const g = new Game({ seed: 11, loadout: [def?.id ?? 'cadet', 'cadet'], weatherEnabled: false });
   g.coins = 1e12;
   g.towerHp = g.towerMaxHp = 1e15;
   g.stats.wavesCleared = wave - 1;
-  const level = Math.min(levelFor(wave), maxLevel(def));
+  const level = def ? Math.min(opts.level ?? levelFor(wave), maxLevel(def)) : 0;
   const route = g.map.routes[0];
   // stand next to the road a third of the way along it
   const mid = route.tiles[Math.floor(route.tiles.length * 0.35)];
@@ -54,8 +54,20 @@ function measure(def, wave, scenario) {
     const d = Math.hypot(c - mid.x, r - mid.y);
     if (!best || d < best.d) best = { c, r, d };
   }
-  const u = g.deploy(def.id, best.c, best.r);
-  while (u.level < level) g.upgrade(u);
+  // team scenario: a reference squad of six Cadets around the spot (same level as the unit)
+  if (opts.team) {
+    const near = [];
+    for (let r = 0; r < g.map.rows; r++) for (let c = 0; c < g.map.cols; c++) if (g.canPlace(c, r) && !(c === best.c && r === best.r)) near.push([c, r, Math.hypot(c - mid.x, r - mid.y)]);
+    near.sort((a, b) => a[2] - b[2]);
+    for (const [c, r] of near.slice(0, 6)) {
+      const cu = g.deploy('cadet', c, r);
+      while (cu.level < (opts.level ?? levelFor(wave))) g.upgrade(cu);
+    }
+  }
+  if (def) {
+    const u = g.deploy(def.id, best.c, best.r);
+    while (u.level < level) g.upgrade(u);
+  }
   const s = waveScaling(wave);
   const plan = { scaling: s };
   const wv = { number: wave, alive: 0, plan };
@@ -87,10 +99,36 @@ function measure(def, wave, scenario) {
     g.update(step);
   }
   for (const [e, h] of hp0) total += h - e.hp;
-  return { dps: total / T, level, cost: investment(def, level), hp: 62 * s.hp };
+  return { dps: total / T, level, cost: def ? investment(def, level) : 0, hp: 62 * s.hp };
 }
 
-if (mode === 'tokens') {
+if (mode === 'tiers') {
+  // Tier hierarchy at wave 1 (no wave scaling), level 0 and level 5:
+  //   single – own DPS on one target (boss-like)
+  //   team   – battlefield contribution: (6 Cadets + unit) − (6 Cadets) on a crowd,
+  //            so buffs, summons and area damage all count
+  //   value  – geometric mean of single and team, normalised to the T1 average
+  const res = [];
+  const lv = nums[0] ?? 0;
+  const baseTeam = measure(null, 1, 'crowd', { team: true, level: lv }).dps;
+  for (const def of ROSTER) {
+    const single = measure(def, 1, 'single', { level: lv }).dps;
+    const team = measure(def, 1, 'crowd', { team: true, level: lv }).dps - baseTeam;
+    res.push({ id: def.id, tier: def.tier, price: def.price, single, team });
+  }
+  // reference: the Cadet – the plain T1 rifleman with no ability (1.0× by definition)
+  const ref = res.find((r) => r.id === 'cadet');
+  const n1s = ref.single;
+  const n1t = ref.team;
+  for (const r of res) r.value = Math.sqrt(Math.max(0, r.single / n1s) * Math.max(0, r.team / n1t));
+  console.log(`${before ? 'BEFORE' : 'AFTER'} – level ${lv}, wave 1. single/team relative to the Cadet (plain T1); value = √(single × team)`);
+  for (const r of res.sort((a, b) => a.tier - b.tier || a.value - b.value)) {
+    console.log(`T${String(r.tier).padStart(2)} ${r.id.padEnd(24)} price ${String(r.price).padStart(5)}  single ${(r.single / n1s).toFixed(2).padStart(6)}×  team ${(r.team / n1t).toFixed(2).padStart(6)}×  value ${r.value.toFixed(2).padStart(6)}×  target ${tierPower(r.tier).toFixed(1)}×`);
+  }
+  const tiers = [...new Set(res.map((r) => r.tier))];
+  console.log('tier averages (value):', tiers.map((t) => `T${t} ${(res.filter((r) => r.tier === t).reduce((a, r) => a + r.value, 0) / res.filter((r) => r.tier === t).length).toFixed(2)}`).join('  '));
+  if (args.includes('--json')) console.log(JSON.stringify(res));
+} else if (mode === 'tokens') {
   console.log(before ? 'BEFORE' : 'AFTER', 'token formula', JSON.stringify(BALANCE.tokens));
   let cum = 0;
   const marks = [1, 5, 10, 25, 50, 100, 250];
@@ -138,7 +176,8 @@ if (mode === 'tokens') {
   const { TileType, tileIndex } = await import('../src/maps/mapGenerator.js');
   const { getUnit } = await import('../src/units/unitRegistry.js');
   const ALL = [['dude'], ['cadet'], ['drunkard'], ['gunnerman'], ['bandit'], ['special-forces'], ['gambler'], ['dude', 'grenade-launcher'], ['dude', 'tank'], ['dude', 'drone'], ['dude', 'commander'], ['dude', 'outlaw'], ['dude', 'bounty-hunter'], ['dude', 'special-force-battalion'], ['dude', 'missile-launcher'], ['dude', 'night-dancer'], ['dude', 'dealer'], ['dude', 'general'], ['dude', 'gunslinger'], ['dude', 'desperate-gambler'], ['dude', 'icbm'], ['dude', 'bomber'], ['dude', 'sheriff'], ['dude', 'outlaw-leader'], ['dude', 'pit-boss'], ['dude', 'b2'], ['dude', 'fortress'], ['dude', 'high-roller'], ['dude', 'fastest-hand'], ['dude', 'marshal'], ['dude', 'the-house'], ['dude', 'glorious-leader'], ['dude', 'nuclear-warhead'], ['dude', 'antimatter-warhead']];
-  const loadouts = args.includes('--all') ? ALL : ALL.filter((l) => ['dude', 'cadet', 'gunnerman', 'special-forces', 'grenade-launcher', 'general', 'fortress', 'the-house'].includes(l.at(-1)));
+  const MIXED = ALL.filter((l) => l.length > 1).map((l) => (l[1] === 'gunslinger' ? ['dude', 'gunslinger'] : ['dude', 'gunslinger', l[1]]));
+  const loadouts = args.includes('--mixed') ? MIXED : args.includes('--all') ? ALL : ALL.filter((l) => ['dude', 'cadet', 'gunnerman', 'special-forces', 'grenade-launcher', 'general', 'fortress', 'the-house'].includes(l.at(-1)));
   const marks = [10, 25, 50, 100, 250];
   console.log(before ? 'BEFORE' : 'AFTER', 'bot: ≤40 units near the road, waves called one at a time');
   for (const lo of loadouts) {
@@ -157,12 +196,18 @@ if (mode === 'tokens') {
     const defs = lo.map(getUnit).sort((a, b) => b.price - a.price);
     const atWave = {};
     const main = defs[0];
+    // with three unit types: the most expensive is the main unit; one single-target escort per three mains
+    const escort = defs.length > 2 ? defs[1] : null;
     const spend = () => {
       for (let guard = 0; guard < 500; guard++) {
         const free = spots.find(([x, y]) => g.canPlace(x, y));
         const room = g.units.length < 60 && free;
         const mains = g.units.filter((u) => u.def === main);
-        // 1. the loadout's best unit whenever affordable
+        // 1. the loadout's best unit whenever affordable (keeping an escort ratio of 1 : 3)
+        if (escort && room && g.coins >= escort.price && g.units.filter((u) => u.def === escort).length * 3 < Math.max(1, g.units.filter((u) => u.def === main).length)) {
+          g.deploy(escort.id, free[0], free[1]);
+          continue;
+        }
         if (room && g.coins >= main.price) {
           g.deploy(main.id, free[0], free[1]);
           continue;

@@ -39,11 +39,79 @@ export const BALANCE = {
    * share of the unit's base damage (linear – it never compounds). The first
    * matching tier band applies.
    */
+  /** Area damage: enemies other than the one a shot was aimed at take this share. */
+  splashFalloff: 0.6,
+
   waveScaling: [
     { maxTier: 3, perWave: 0.02 },
     { maxTier: 6, perWave: 0.01 },
   ],
 };
+
+/**
+ * TIER STAT GENERATION. Every unit's base stats come from its tier, not from
+ * hand-picked numbers. A unit only states its identity (attack speed, range,
+ * splash, hits per attack, role); the generator spends the tier's combat-power
+ * budget on damage after charging for the extras that budget buys:
+ *
+ *   DPS(L0)  = baseDps × power[tier] × role × splashCost × rangeCost × unit.power
+ *   damage   = DPS / (attacks per second × hits per attack)
+ *   price    = basePrice × power[tier]^priceExponent × unit.price
+ *   upgrades = price × upgradeCosts[i]; damage grows damageGrowth(tier) per level
+ *
+ * - power: overall combat budget relative to T1 (T16+ keeps growing by a step
+ *   that widens by `stepGrowth` each tier).
+ * - Area damage, long range and team-wide utility are paid for out of the same
+ *   budget, so an AOE unit hits many targets for less each (and is weaker
+ *   against bosses), and a support unit trades its own damage for its buffs.
+ * - Higher tiers also grow faster per upgrade, so the order holds at every level.
+ */
+export const TIERS = {
+  power: [1.0, 1.5, 2.1, 2.8, 3.6, 4.5, 5.5, 6.6, 7.8, 9.1, 10.5, 12, 13.7, 15.5, 17.5],
+  stepGrowth: 0.2,
+  baseDps: 12, // T1 single-target DPS at level 0, before the global layer
+  /** share of the budget a role spends on its own damage (the rest is its utility) */
+  roles: { gunner: 1, summoner: 0.8, support: 0.85, economy: 0.75 },
+  /** area damage: DPS × 1 / (1 + splashCost × splashTiles^0.75) */
+  splashCost: 0.6,
+  /** range beyond the tier's reference range costs DPS: × 1 / (1 + rangeCost × min(2, excess)) */
+  refRange: 80, // px at T1 (2.5 tiles)
+  refRangePerTier: 0.04,
+  rangeCost: 0.3,
+  basePrice: 20, // T1 deploy price
+  priceExponent: 1.3, // price = basePrice × power^1.3: higher tiers cost more per point of power, but stay worth it
+  upgradeCosts: [0.8, 1.3, 2, 3, 4.5], // × deploy price
+  damageGrowth: { base: 1.2, perTier: 0.006, max: 1.32 }, // × per upgrade level
+  rangeGrowth: 1.03,
+  rateGrowth: 1.04,
+};
+
+/** Combat-power budget of a tier relative to T1 (unbounded, controlled growth past T15). */
+export function tierPower(tier) {
+  const p = TIERS.power;
+  if (tier <= p.length) return p[Math.max(1, tier) - 1];
+  let value = p[p.length - 1];
+  let step = p[p.length - 1] - p[p.length - 2];
+  for (let t = p.length + 1; t <= tier; t++) {
+    step += TIERS.stepGrowth;
+    value += step;
+  }
+  return value;
+}
+
+export const tierPrice = (tier) => TIERS.basePrice * Math.pow(tierPower(tier), TIERS.priceExponent);
+export const tierDamageGrowth = (tier) => Math.min(TIERS.damageGrowth.max, TIERS.damageGrowth.base + TIERS.damageGrowth.perTier * (tier - 1));
+export const tierRefRange = (tier) => TIERS.refRange * (1 + TIERS.refRangePerTier * (tier - 1));
+
+/** The DPS a unit's profile buys from its tier budget (level 0, before the global layer). */
+export function profileDps(tier, { range, splash = 0, role = 'gunner', power = 1 }) {
+  const roleShare = TIERS.roles[role] ?? 1;
+  const splashTiles = splash / 32;
+  const splashF = splashTiles > 0 ? 1 / (1 + TIERS.splashCost * Math.pow(splashTiles, 0.75)) : 1;
+  const excess = Math.max(0, range / tierRefRange(tier) - 1);
+  const rangeF = 1 / (1 + TIERS.rangeCost * Math.min(2, excess));
+  return TIERS.baseDps * tierPower(tier) * roleShare * splashF * rangeF * power;
+}
 
 /** Tokens paid for completing wave `wave`. */
 export function tokensForWave(wave, cfg = BALANCE.tokens) {

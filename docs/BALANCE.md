@@ -9,7 +9,7 @@ All knobs live in `src/balance.js` (`BALANCE`); per-unit values live in the unit
 - The formula lives in `BALANCE.tokens`.
 - Rewards are paid by the wave's own completion, so single calls, multi-wave queues and Auto Skip each pay exactly once per wave (unit-tested).
 - The next-encounter panel and the wave banner show the reward before the wave; the clear banner shows it after.
-- Gems are unchanged: 50 per boss wave.
+- Tokens are the only summon currency; every circle (Nuclear War included, 500 Tokens) is priced in Tokens.
 
 **How a unit's damage is built** (the same for every unit, including units added later):
 
@@ -33,7 +33,183 @@ damage   = base × (1 + additive) × Π buffs (each id once) × weather (one at 
 - **Upgrades:** on top of each unit's table, every level adds +8% damage, +2% range and +2% speed. Every upgrade of every unit is at least +20% DPS (unit-tested).
 - **Timers:** ability timers (drone launches, special shots, payouts) are not shortened by the global cooldown cut. Attacks are, so the Drone station now launches every 1.35 s, the Bomber flies every 4 s and the B-2 every 10.8 s.
 
-## Individual adjustments
+## Tier system
+
+The previous balance let ability-heavy and area units run far over their tier: for example, the Fortress had about 14× a Tier I's damage *plus* a 3.75-tile blast. Now every unit's stats are generated from its tier's combat-power budget (`TIERS` in `src/balance.js`, `tierUnit` in `src/units/levels.js`).
+
+- **What a unit declares:** only its identity – attack speed, range, splash, hits per attack and role.
+- **What it pays for:** area damage (`1 / (1 + 0.6 × tiles^0.75)`), range beyond its tier's reference range, and the share of its budget a support, summoner or economy role spends on utility. These all come out of the same budget.
+- **Splash falloff:** secondary targets in a blast take 60%, so area units keep useful single-target damage without dominating crowds.
+- **Price:** `20 × budget^1.3`.
+- **Upgrades:** costs are `price × [0.8, 1.3, 2, 3, 4.5]`, and damage grows ×1.2 per level at Tier I, up to ×1.32 at high tiers.
+- **Trims:** a per-unit `power` trim was set by measurement, so every unit lands within ±12% of its tier target.
+
+### Measured: battlefield value per unit (level 0 and level 5)
+
+Value is the geometric mean of single-target DPS and battlefield contribution (a six-Cadet squad's crowd damage with the unit minus without it), relative to the Cadet. Reproduce with `node scripts/balance.mjs tiers 0` (or `5`).
+
+```
+AFTER – level 0, wave 1. single/team relative to the Cadet (plain T1); value = √(single × team)
+T 1 dude                     price    15  single   0.79×  team   0.78×  value   0.78×  target 1.0×
+T 1 cadet                    price    30  single   1.00×  team   1.00×  value   1.00×  target 1.0×
+T 1 drunkard                 price    25  single   0.75×  team   1.57×  value   1.09×  target 1.0×
+T 2 gunnerman                price    35  single   1.40×  team   1.44×  value   1.42×  target 1.5×
+T 3 special-forces           price    50  single   2.06×  team   2.12×  value   2.09×  target 2.1×
+T 3 grenade-launcher         price    50  single   0.72×  team   6.51×  value   2.16×  target 2.1×
+T 3 gambler                  price    50  single   2.35×  team   2.18×  value   2.26×  target 2.1×
+T 3 bandit                   price    50  single   2.58×  team   2.12×  value   2.33×  target 2.1×
+T 4 missile-launcher         price    75  single   0.83×  team   9.99×  value   2.87×  target 2.8×
+T 5 commander                price   105  single   2.59×  team   4.03×  value   3.23×  target 3.6×
+T 5 bounty-hunter            price   105  single   3.50×  team   3.59×  value   3.55×  target 3.6×
+T 5 outlaw                   price   105  single   2.14×  team   6.26×  value   3.66×  target 3.6×
+T 5 drone                    price   105  single   1.23×  team  11.04×  value   3.68×  target 3.6×
+T 5 tank                     price   105  single   1.07×  team  13.36×  value   3.78×  target 3.6×
+T 5 special-force-battalion  price   105  single   3.72×  team   4.15×  value   3.93×  target 3.6×
+T 6 colonel                  price    40  single   3.16×  team   5.10×  value   4.02×  target 4.5×
+T 6 dealer                   price   140  single   3.74×  team   4.85×  value   4.26×  target 4.5×
+T 6 night-dancer             price   140  single   1.75×  team  15.07×  value   5.14×  target 4.5×
+T 7 desperate-gambler        price   185  single   5.42×  team   5.67×  value   5.54×  target 5.5×
+T 7 gunslinger               price   185  single   5.32×  team   5.87×  value   5.59×  target 5.5×
+T 7 icbm                     price   185  single   1.29×  team  25.59×  value   5.75×  target 5.5×
+T 7 general                  price   185  single   1.47×  team  22.45×  value   5.75×  target 5.5×
+T 7 bomber                   price   185  single   1.05×  team  32.18×  value   5.82×  target 5.5×
+T 9 sheriff                  price   290  single   6.54×  team   8.51×  value   7.46×  target 7.8×
+T 9 pit-boss                 price   290  single   6.51×  team   8.98×  value   7.64×  target 7.8×
+T 9 b2                       price   290  single   2.11×  team  32.01×  value   8.22×  target 7.8×
+T 9 outlaw-leader            price   290  single   5.06×  team  15.18×  value   8.77×  target 7.8×
+T10 fortress                 price   350  single   1.92×  team  45.86×  value   9.39×  target 9.1×
+T10 high-roller              price   350  single   9.11×  team  10.79×  value   9.92×  target 9.1×
+T12 marshal                  price   510  single   3.89×  team  37.29×  value  12.04×  target 12.0×
+T12 fastest-hand             price   510  single  11.49×  team  13.23×  value  12.33×  target 12.0×
+T15 glorious-leader          price   830  single  14.49×  team  18.92×  value  16.55×  target 17.5×
+T15 the-house                price   830  single   4.03×  team  80.85×  value  18.06×  target 17.5×
+T17 nuclear-warhead          price  1120  single   4.14×  team 127.21×  value  22.94×  target 22.1×
+T19 antimatter-warhead       price  1490  single   5.29×  team 150.74×  value  28.23×  target 27.5×
+tier averages (value): T1 0.96  T2 1.42  T3 2.21  T4 2.87  T5 3.64  T6 4.47  T7 5.69  T9 8.02  T10 9.65  T12 12.19  T15 17.31  T17 22.94  T19 28.23
+```
+
+```
+AFTER – level 5, wave 1. single/team relative to the Cadet (plain T1); value = √(single × team)
+T 1 dude                     price    15  single   0.75×  team   0.74×  value   0.74×  target 1.0×
+T 1 drunkard                 price    25  single   0.72×  team   1.35×  value   0.98×  target 1.0×
+T 1 cadet                    price    30  single   1.00×  team   1.00×  value   1.00×  target 1.0×
+T 2 gunnerman                price    35  single   1.22×  team   1.30×  value   1.26×  target 1.5×
+T 3 bandit                   price    50  single   2.52×  team   2.11×  value   2.31×  target 2.1×
+T 3 special-forces           price    50  single   2.25×  team   2.38×  value   2.32×  target 2.1×
+T 3 gambler                  price    50  single   2.45×  team   2.61×  value   2.53×  target 2.1×
+T 3 grenade-launcher         price    50  single   0.73×  team   8.79×  value   2.53×  target 2.1×
+T 4 missile-launcher         price    75  single   0.88×  team   9.57×  value   2.90×  target 2.8×
+T 5 commander                price   105  single   2.77×  team   4.03×  value   3.34×  target 3.6×
+T 5 bounty-hunter            price   105  single   3.67×  team   3.99×  value   3.83×  target 3.6×
+T 5 special-force-battalion  price   105  single   3.74×  team   4.32×  value   4.02×  target 3.6×
+T 5 tank                     price   105  single   1.10×  team  15.88×  value   4.19×  target 3.6×
+T 5 outlaw                   price   105  single   2.38×  team   7.83×  value   4.31×  target 3.6×
+T 5 drone                    price   105  single   1.47×  team  17.78×  value   5.11×  target 3.6×
+T 6 colonel                  price    40  single   3.58×  team   5.52×  value   4.45×  target 4.5×
+T 6 dealer                   price   140  single   3.99×  team   5.64×  value   4.74×  target 4.5×
+T 6 night-dancer             price   140  single   1.95×  team  18.06×  value   5.93×  target 4.5×
+T 7 gunslinger               price   185  single   5.85×  team   6.67×  value   6.25×  target 5.5×
+T 7 general                  price   185  single   1.55×  team  25.93×  value   6.34×  target 5.5×
+T 7 desperate-gambler        price   185  single   6.20×  team   6.96×  value   6.57×  target 5.5×
+T 7 icbm                     price   185  single   1.41×  team  31.71×  value   6.68×  target 5.5×
+T 7 bomber                   price   185  single   1.28×  team  41.63×  value   7.30×  target 5.5×
+T 9 sheriff                  price   290  single   7.54×  team  10.38×  value   8.85×  target 7.8×
+T 9 b2                       price   290  single   2.49×  team  32.86×  value   9.05×  target 7.8×
+T 9 pit-boss                 price   290  single   7.79×  team  11.68×  value   9.54×  target 7.8×
+T 9 outlaw-leader            price   290  single   5.45×  team  17.29×  value   9.71×  target 7.8×
+T10 fortress                 price   350  single   2.21×  team  47.69×  value  10.27×  target 9.1×
+T10 high-roller              price   350  single  10.27×  team  12.37×  value  11.27×  target 9.1×
+T12 marshal                  price   510  single   4.89×  team  38.80×  value  13.77×  target 12.0×
+T12 fastest-hand             price   510  single  13.00×  team  16.32×  value  14.57×  target 12.0×
+T15 the-house                price   830  single   5.36×  team  80.84×  value  20.82×  target 17.5×
+T15 glorious-leader          price   830  single  20.21×  team  26.88×  value  23.31×  target 17.5×
+T17 nuclear-warhead          price  1120  single   5.75×  team 197.85×  value  33.72×  target 22.1×
+T19 antimatter-warhead       price  1490  single   8.01×  team 309.79×  value  49.81×  target 27.5×
+tier averages (value): T1 0.91  T2 1.26  T3 2.42  T4 2.90  T5 4.13  T6 5.04  T7 6.63  T9 9.29  T10 10.77  T12 14.17  T15 22.07  T17 33.72  T19 49.81
+```
+
+At level 5 the higher tiers pull further ahead, because their upgrades grow faster.
+
+### Full games (bot, ≤60 units, waves one at a time, cap 300)
+
+| Army | Wave | Avg level |
+| --- | --- | --- |
+| dude | 88 | 5.0 |
+| cadet | 69 | 5.0 |
+| drunkard | 61 | 5.0 |
+| gunnerman | 88 | 5.0 |
+| bandit | 103 | 5.0 |
+| special-forces | 131 | 5.0 |
+| gambler | 106 | 5.0 |
+| dude + grenade-launcher | 71 | 5.0 |
+| dude + tank | 88 | 5.0 |
+| dude + drone | 106 | 5.0 |
+| dude + commander | 99 | 5.0 |
+| dude + outlaw | 97 | 5.0 |
+| dude + bounty-hunter | 103 | 5.0 |
+| dude + special-force-battalion | 112 | 5.0 |
+| dude + missile-launcher | 80 | 5.0 |
+| dude + night-dancer | 97 | 5.0 |
+| dude + dealer | 103 | 5.0 |
+| dude + general | 97 | 5.0 |
+| dude + gunslinger | 103 | 5.0 |
+| dude + desperate-gambler | 99 | 5.0 |
+| dude + icbm | 88 | 5.0 |
+| dude + bomber | 97 | 5.0 |
+| dude + sheriff | 107 | 5.0 |
+| dude + outlaw-leader | 122 | 5.0 |
+| dude + pit-boss | 112 | 5.0 |
+| dude + b2 | 94 | 5.0 |
+| dude + fortress | 116 | 5.0 |
+| dude + high-roller | 112 | 5.0 |
+| dude + fastest-hand | 129 | 5.0 |
+| dude + marshal | 129 | 5.0 |
+| dude + the-house | 144 | 5.0 |
+| dude + glorious-leader | 131 | 5.0 |
+| dude + nuclear-warhead | 106 | 3.7 |
+| dude + antimatter-warhead | 182 | 5.0 |
+
+With a single-target escort (Dude filler + Gunslinger + main unit):
+
+| Army | Wave | Avg level |
+| --- | --- | --- |
+| dude + gunslinger + grenade-launcher | 112 | 5.0 |
+| dude + gunslinger + tank | 112 | 5.0 |
+| dude + gunslinger + drone | 112 | 5.0 |
+| dude + gunslinger + commander | 99 | 5.0 |
+| dude + gunslinger + outlaw | 112 | 5.0 |
+| dude + gunslinger + bounty-hunter | 103 | 5.0 |
+| dude + gunslinger + special-force-battalion | 103 | 5.0 |
+| dude + gunslinger + missile-launcher | 112 | 5.0 |
+| dude + gunslinger + night-dancer | 112 | 5.0 |
+| dude + gunslinger + dealer | 103 | 5.0 |
+| dude + gunslinger + general | 122 | 5.0 |
+| dude + gunslinger | 103 | 5.0 |
+| dude + gunslinger + desperate-gambler | 103 | 5.0 |
+| dude + gunslinger + icbm | 113 | 5.0 |
+| dude + gunslinger + bomber | 106 | 5.0 |
+| dude + gunslinger + sheriff | 103 | 5.0 |
+| dude + gunslinger + outlaw-leader | 113 | 5.0 |
+| dude + gunslinger + pit-boss | 112 | 5.0 |
+| dude + gunslinger + b2 | 106 | 5.0 |
+| dude + gunslinger + fortress | 117 | 5.0 |
+| dude + gunslinger + high-roller | 112 | 5.0 |
+| dude + gunslinger + fastest-hand | 129 | 5.0 |
+| dude + gunslinger + marshal | 126 | 5.0 |
+| dude + gunslinger + the-house | 144 | 5.0 |
+| dude + gunslinger + glorious-leader | 129 | 5.0 |
+| dude + gunslinger + nuclear-warhead | 106 | 3.5 |
+| dude + gunslinger + antimatter-warhead | 182 | 5.0 |
+
+**Findings:**
+- **Tier order holds in play:** Tier III armies (Bandit, Gambler, Special Forces) outlast Tier I armies, and the high-tier armies (Marshal, THE HOUSE, Glorious Leader, Antimatter) last longest.
+- **Area armies need single-target help.** Pure area-damage armies (Grenade Launcher, Tank, Missile Launcher, warheads) fall to armoured or shielded bosses without it. That's intended: area damage is cheap per target but weak against one big enemy.
+- **Expensive upgrades limit the warheads in a bot.** They often aren't fully upgraded (average level 2–3), because their upgrades are the most expensive in the game.
+- **The late game is shorter than in the previous update,** when over-budget units carried armies to wave 200–300. Strong armies now stop around wave 100–150 because enemy HP grows with the cube of the wave (×76 at 100, ×620 at 250). A +30% boost to every unit only moved that wall by about 10 waves, so late-game length is a question for the enemy curve, not unit power.
+
+## Individual adjustments (previous update – superseded by the tier generator)
+
+These hand edits were replaced by the tier system below: every unit's stats are now generated from its tier, and remaining outliers are corrected by a measured `power` trim in the unit's profile.
 
 These are made after the global changes, based on the measurements below.
 
@@ -82,7 +258,7 @@ Wild West                    first ×1 after wave 2, first ×10 after wave 12, p
 Gambino                      first ×1 after wave 2, first ×10 after wave 12, pulls by wave 50: 46
 ```
 
-## Kill time of one Regular (single target, one copy at a typical level)
+## Kill time of one Regular – previous update (before the tier generator)
 
 The level by wave is: wave 1 → Lv 0, wave 10 → Lv 2, wave 25 → Lv 4, wave 50+ → Lv 5. Enemy HP grows ×2.5 by wave 10, ×20 by wave 50, ×76 by wave 100 and ×620 by wave 250. Values are before → **after**.
 
@@ -124,7 +300,7 @@ The level by wave is: wave 1 → Lv 0, wave 10 → Lv 2, wave 25 → Lv 4, wave 
 | nuclear-warhead | 17 | 0.1s → **0.1s** | 0.1s → **0.1s** | 0.2s → **0.1s** | 0.4s → **0.2s** | 1.7s → **0.8s** | 13.6s → **6.5s** |
 | antimatter-warhead | 19 | 0.1s → **0.1s** | 0.1s → **0.1s** | 0.2s → **0.1s** | 0.4s → **0.2s** | 1.5s → **0.7s** | 12.1s → **5.6s** |
 
-## Crowd damage per second (a dense column of Regulars, one copy)
+## Crowd damage per second – previous update (before the tier generator)
 
 | Unit | Tier | w1 | w10 | w25 | w50 | w100 | w250 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -164,7 +340,7 @@ The level by wave is: wave 1 → Lv 0, wave 10 → Lv 2, wave 25 → Lv 4, wave 
 | nuclear-warhead | 17 | 28k → **37k** | 48k → **68k** | 71k → **137k** | 93k → **174k** | 86k → **156k** | 82k → **153k** |
 | antimatter-warhead | 19 | 39k → **44k** | 58k → **95k** | 99k → **185k** | 118k → **234k** | 109k → **227k** | 105k → **216k** |
 
-## Full games
+## Full games – previous update (before the tier generator)
 
 A bot keeps up to 60 units on the best tiles, fills with Dudes until it can afford the army's main unit, then saves for it and upgrades. It calls waves one at a time until the Tower falls (cap 300). The table shows the wave reached.
 

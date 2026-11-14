@@ -8,55 +8,34 @@ import { getUnit } from './unitRegistry.js';
 
 const banners = new Map();
 
+/** The one and only summon currency. Every circle is priced in Tokens. */
+export const SUMMON_CURRENCY = 'tokens';
+
 export const SUMMON_CONFIG = {
-  /** Duplicates refund this fraction of the circle's per-summon value. */
+  /** Duplicates refund this fraction of the circle's per-summon price, in Tokens. */
   duplicateCompensation: 0.3,
   /** Results at or below this chance get the rare presentation. */
   rareThreshold: 0.01,
-  /**
-   * Token value of one unit of another currency, used ONLY to pay duplicate
-   * compensation in Tokens for circles priced in that currency. null = no rate
-   * is configured: such circles compensate in their own currency instead
-   * (e.g. 30% of a 500-Gem summon = 150 Gems). No rate is ever assumed.
-   */
-  tokenValue: { gems: null },
 };
 
-/** Configured Token value of one unit of a banner's currency, or null. */
-export function tokenRate(banner) {
-  if (banner.currency === 'tokens') return 1;
-  const r = banner.tokenValuePerUnit ?? SUMMON_CONFIG.tokenValue[banner.currency] ?? null;
-  return r > 0 ? r : null;
-}
+/** Value of one summon in Tokens (= its price). */
+export const summonValueInTokens = (banner) => banner.price;
 
-/** Value of one summon in Tokens, or null when no conversion is configured. */
-export function summonValueInTokens(banner) {
-  const r = tokenRate(banner);
-  return r === null ? null : banner.price * r;
-}
-
-/** Currency duplicates from this circle are paid in: Tokens when a rate exists, else the circle's own. */
-export function compensationCurrency(banner) {
-  return tokenRate(banner) === null ? banner.currency : 'tokens';
-}
-
-/** Amount (in compensationCurrency) granted for each duplicate pulled from this circle. */
+/** Tokens granted for each duplicate pulled from this circle. */
 export function duplicateCompensation(banner) {
-  const inTokens = summonValueInTokens(banner);
-  return Math.round((inTokens ?? banner.price) * SUMMON_CONFIG.duplicateCompensation);
+  return Math.round(banner.price * SUMMON_CONFIG.duplicateCompensation);
 }
-
-export const CURRENCY_LABEL = { tokens: 'Tokens', gems: 'Gems' };
 
 export const isRare = (chance) => chance <= SUMMON_CONFIG.rareThreshold;
 
 export function registerBanner(def) {
   const total = def.pool.reduce((s, p) => s + p.chance, 0);
   if (Math.abs(total - 1) > 1e-9) throw new Error(`Banner "${def.id}" odds sum to ${total}, expected 1`);
-  if (!def.currency) throw new Error(`Banner "${def.id}" needs a currency`);
   if (def.pool.some((p) => !(p.chance > 0))) throw new Error(`Banner "${def.id}" has a non-positive chance`);
-  if (!CURRENCY_LABEL[def.currency]) throw new Error(`Banner "${def.id}" uses unknown currency ${def.currency}`);
-  banners.set(def.id, Object.freeze({ ...def, pool: Object.freeze(def.pool.map((p) => Object.freeze({ ...p }))) }));
+  // Tokens are the only summon currency: a circle can't be registered with anything else.
+  if ((def.currency ?? SUMMON_CURRENCY) !== SUMMON_CURRENCY) throw new Error(`Banner "${def.id}" must be priced in Tokens`);
+  if (!(def.price > 0)) throw new Error(`Banner "${def.id}" needs a Token price`);
+  banners.set(def.id, Object.freeze({ ...def, currency: SUMMON_CURRENCY, pool: Object.freeze(def.pool.map((p) => Object.freeze({ ...p }))) }));
 }
 
 export const getBanner = (id) => banners.get(id);
@@ -144,8 +123,8 @@ export const NUCLEAR_WAR_CIRCLE = 'nuclear-war-circle';
 registerBanner({
   id: NUCLEAR_WAR_CIRCLE,
   name: 'Nuclear War',
-  tagline: 'Arcade armageddon. Premium hardware, paid in Gems.',
-  currency: 'gems',
+  tagline: 'Arcade armageddon. Top-shelf hardware.',
+  currency: 'tokens',
   price: 500,
   counts: [1, 5, 10, 25],
   pool: [
@@ -184,7 +163,6 @@ export function summon(profile, banner, count, rng = createRng()) {
   profile.spend(banner.currency, cost);
   const results = [];
   const perDuplicate = duplicateCompensation(banner);
-  const compCurrency = compensationCurrency(banner);
   let compensation = 0;
   for (let i = 0; i < count; i++) {
     const entry = pull(banner, rng);
@@ -194,9 +172,9 @@ export function summon(profile, banner, count, rng = createRng()) {
     profile.recordSummon(entry.unit);
     const comp = isNew ? 0 : perDuplicate;
     compensation += comp;
-    results.push({ unit: entry.unit, name: def?.name ?? entry.unit, tier: def?.tier ?? 1, chance: entry.chance, isNew, compensation: comp, compensationCurrency: compCurrency, rare: isRare(entry.chance) });
+    results.push({ unit: entry.unit, name: def?.name ?? entry.unit, tier: def?.tier ?? 1, chance: entry.chance, isNew, compensation: comp, rare: isRare(entry.chance) });
   }
-  profile.data.wallet[compCurrency] = profile.balance(compCurrency) + compensation;
+  profile.data.wallet.tokens = profile.balance('tokens') + compensation;
   profile.save();
-  return { ok: true, cost, currency: banner.currency, results, compensation, compensationCurrency: compCurrency };
+  return { ok: true, cost, results, compensation };
 }

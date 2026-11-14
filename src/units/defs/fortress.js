@@ -1,6 +1,7 @@
 // FORTRESS — Tier 10. A fortified gun emplacement with an enormous blast
 // radius. Launches Explosive Drones every 5 s whose blasts Cripple enemies
 // (+20% damage taken, −10% speed), and raises battle-wide coin income.
+import { tierUnit } from '../levels.js';
 export const FORTRESS_LOGISTICS = { id: 'fortress-logistics', label: 'Fortress Logistics', coinMult: 1.25 };
 export const FORTRESS_DRONE_INTERVAL = 5;
 
@@ -10,17 +11,10 @@ export default {
   tier: 10,
   role: 'Fortification · massive area damage',
   description: 'Poured concrete, a siege gun, and a hangar full of drones. The rarest thing the military will requisition.',
-  price: 3000,
   targeting: 'first',
   projectile: { kind: 'siege', speed: 480 },
-  levels: [
-    { damage: 380, range: 272, rate: 0.3, splash: 120 },
-    { cost: 2800, damage: 470, range: 280, rate: 0.31, splash: 124 },
-    { cost: 4200, damage: 580, range: 288, rate: 0.33, splash: 128 },
-    { cost: 6200, damage: 720, range: 296, rate: 0.35, splash: 132 },
-    { cost: 9000, damage: 890, range: 304, rate: 0.37, splash: 136 },
-    { cost: 13000, damage: 1100, range: 320, rate: 0.4, splash: 144 },
-  ],
+  // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
+  ...tierUnit(10, { rate: 0.3, range: 272, splash: 120, role: 'summoner', power: 0.53 }),
   summon: {
     every: FORTRESS_DRONE_INTERVAL,
     kind: 'drone',

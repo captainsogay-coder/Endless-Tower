@@ -88,7 +88,6 @@ export class Game {
     this.battleBonus = { damage: 0 };
     this.houseKills = 0;
     this.tokensEarned = 0;
-    this.gemsEarned = 0;
     this.deployed = new Map(); // defId -> number of copies on the field
     this.unitByTile = new Array(COLS * ROWS).fill(null);
     this.enemySeq = 0;
@@ -662,9 +661,12 @@ export class Game {
   impact(p) {
     const def = p.source?.def;
     const onHit = p.onHit !== undefined ? p.onHit : def?.onHit;
+    // splash falloff: the enemy the shot was aimed at takes full damage, others in the blast less
+    const primary = p.splash > 0 && p.target && p.target.alive ? p.target : null;
+    const falloff = BALANCE.splashFalloff;
     const hit = (e) => {
       if (!e.alive || e.invulnerable) return;
-      this.damageEnemy(e, p.damage, p.source);
+      this.damageEnemy(e, primary && e !== primary ? p.damage * falloff : p.damage, p.source);
       if (onHit && e.alive) this.applyOnHit(e, onHit);
     };
     if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
@@ -789,18 +791,16 @@ export class Game {
     // Tokens are only granted for fully completed waves.
     const tokens = plan.tokens ?? tokensForWave(plan.wave);
     this.tokensEarned += tokens;
-    const gems = plan.isBoss ? GAME_CONFIG.gemsPerBossWave : 0;
-    this.gemsEarned += gems;
     this.stats.wavesCleared++;
     // wave scaling changed: re-derive stats (once per completed wave, never per frame)
     if (this.units.some((u) => this.waveBonus(u.def) > 0)) this.refreshAll();
-    this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, gems, plan });
+    this.emit('waveClear', { wave: plan.wave, reward: coins, tokens, plan });
   }
 
   gameOver() {
     if (this.phase === 'gameover') return;
     this.phase = 'gameover';
-    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome, tokens: this.tokensEarned, gems: this.gemsEarned });
+    this.emit('gameOver', { wave: this.wave, stats: this.stats, biome: this.biome, tokens: this.tokensEarned });
   }
 
   // ------------------------------------------------------------------ units
