@@ -12,7 +12,7 @@ export default {
   targeting: 'strongest',
   projectile: { kind: 'bullet', speed: 1400, color: '#f2e2a8' },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(5, { rate: 2.4, range: 320, role: 'support', power: 1.05 }),
+  ...tierUnit(5, { rate: 2.4, range: 320, role: 'support', power: 1.07 }),
   buffs: [COMMANDER_AURA],
   passive: {
     id: 'commander-presence',

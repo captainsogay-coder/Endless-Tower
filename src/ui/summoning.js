@@ -1,7 +1,7 @@
 // SUMMONING page: banner, pool odds, x1/x5/x10/x25 with confirmation, and the
 // reveal sequence (skippable) followed by a results summary.
 
-import { getBanner, listCirclesByPrice, summon, summonCost, duplicateCompensation, isRare, SUMMON_CONFIG } from '../units/summoning.js';
+import { getBanner, listCirclesByPrice, summon, summonCost, duplicateCompensation, isRare, isRareEntry, SUMMON_CONFIG } from '../units/summoning.js';
 import { BALANCE } from '../balance.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
@@ -124,7 +124,7 @@ export class SummoningView {
         const top = [...b.pool].sort((x, y) => getUnit(y.unit).tier - getUnit(x.unit).tier).slice(0, 3);
         return `<button class="circle-card ${b.id === banner.id ? 'active' : ''}" role="tab" aria-selected="${b.id === banner.id}" data-banner="${esc(b.id)}">
           <span class="cc-name">${esc(b.name)}</span>
-          <span class="cc-price">${tokenIcon}${formatNumber(b.price)} Tokens</span>
+          <span class="cc-price">${tokenIcon}${b.price.toLocaleString('en-US')} Tokens</span>
           <span class="cc-units">${top.map((p) => `<img alt="" src="${portrait(getUnit(p.unit), 60)}" />`).join('')}<span>${b.pool.length} units</span></span>
         </button>`;
       })
@@ -136,7 +136,7 @@ export class SummoningView {
         const def = getUnit(p.unit);
         const tier = getTier(def.tier);
         const owned = profile.ownedCount(p.unit);
-        return `<li class="pool-item ${isRare(p.chance) ? 'rare' : ''}" style="--c:${tier.color}">
+        return `<li class="pool-item ${isRareEntry(p) ? 'rare' : ''}" style="--c:${tier.color}">
           <img alt="" src="${portrait(def, 104)}" />
           <div class="pi-main"><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span>, ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div>${sideTierStrip(def, { label: false })}</div>
           <div class="pi-chance">${pct(p.chance)}<span>Chance</span></div>
@@ -169,7 +169,7 @@ export class SummoningView {
     el.confirmBody.innerHTML = `
       <dt>Banner</dt><dd>${esc(banner.name)}</dd>
       <dt>Price per summon</dt><dd>${banner.price} Tokens</dd>
-      <dt>Total cost</dt><dd>${formatNumber(cost)} Tokens</dd>
+      <dt>Total cost</dt><dd>${cost.toLocaleString('en-US')} Tokens</dd>
       <dt>Balance</dt><dd>${formatNumber(bal)} Tokens</dd>
       <dt>Balance after</dt><dd class="after">${formatNumber(bal - cost)}</dd>`;
     el.confirm.hidden = false;

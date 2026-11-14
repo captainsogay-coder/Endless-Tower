@@ -23,9 +23,14 @@ function withBench(over, fn) {
   }
 }
 
-const groups = (rows, key) => {
+/** Tier bands for specialist comparisons (one area unit per tier says more about its blast size than its tier). */
+const band = (t) => (t <= 3 ? 1 : t <= 6 ? 4 : t <= 9 ? 7 : t <= 12 ? 10 : t <= 15 ? 13 : t <= 18 ? 16 : 19);
+const groups = (rows, key, byBand = false) => {
   const m = new Map();
-  for (const r of rows) (m.get(r.tier) ?? m.set(r.tier, []).get(r.tier)).push(r[key] / (TIERS.roles[r.role] ?? 1));
+  for (const r of rows) {
+    const k = byBand ? band(r.tier) : r.tier;
+    (m.get(k) ?? m.set(k, []).get(k)).push(r[key] / (TIERS.roles[r.role] ?? 1));
+  }
   return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => [t, v.reduce((a, b) => a + b, 0) / v.length]);
 };
 
@@ -44,7 +49,7 @@ test('at equal upgrade level (all at max), tiers still climb – single target (
     // single-target averages compare single-target dealers, swarm averages compare area units:
     // each specialist trades the other for its strength
     const aoe = (r) => getUnit(r.id).profile?.splash > 0;
-    const g = groups(key === 'single' ? rows.filter((r) => !aoe(r)) : key === 'pack' ? rows.filter(aoe) : rows, key);
+    const g = groups(key === 'single' ? rows.filter((r) => !aoe(r)) : key === 'pack' ? rows.filter(aoe) : rows, key, key !== 'value');
     // averages rise tier over tier (bosses: single; swarms: pack)
     for (let i = 1; i < g.length; i++) assert.ok(g[i][1] > g[i - 1][1] * (key === 'value' ? 1.12 : 1), `${key}: T${g[i][0]} ${g[i][1].toFixed(2)} vs T${g[i - 1][0]} ${g[i - 1][1].toFixed(2)}`);
   }

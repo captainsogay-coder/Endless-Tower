@@ -253,9 +253,62 @@ export function shot(kind, v = 1) {
     case 'bombball':
       tone('triangle', 500, 900, 0.12, 0.04 * v);
       break;
-    default:
-      burst(0.05, 0.08 * v, 'highpass', 1500);
+    default: {
+      const sp = PACK2_SHOTS[kind];
+      if (sp) sp(v);
+      else burst(0.05, 0.08 * v, 'highpass', 1500);
+    }
   }
+}
+
+/**
+ * Circle Pack 2 attack sounds, one recipe per projectile kind (all synthesized):
+ * throws whoosh, clockwork clicks and ticks, jungle darts puff, sky bolts hiss,
+ * starlight chimes.
+ */
+const PACK2_SHOTS = {
+  parcel: (v) => tone('triangle', 420, 760, 0.1, 0.035 * v),
+  pan: (v) => tone('triangle', 380, 700, 0.1, 0.035 * v),
+  trinket: (v) => tone('sine', 1300, 1700, 0.07, 0.03 * v),
+  inkshot: (v) => burst(0.04, 0.05 * v, 'bandpass', 1200, 900, 3),
+  coinshot: (v) => tone('sine', 1500, 1900, 0.09, 0.035 * v),
+  rivet: (v) => (burst(0.03, 0.08 * v, 'highpass', 2600), tone('square', 600, 400, 0.03, 0.025 * v)),
+  spring: (v) => tone('sawtooth', 300, 900, 0.07, 0.03 * v),
+  steamfist: (v) => (burst(0.18, 0.07 * v, 'lowpass', 900, 300), tone('sine', 90, 50, 0.15, 0.12 * v)),
+  clockhand: (v) => tone('square', 1800, 1800, 0.02, 0.03 * v),
+  piston: (v) => (burst(0.05, 0.1 * v, 'bandpass', 700, 400, 2), tone('square', 180, 120, 0.05, 0.04 * v)),
+  vine: (v) => burst(0.08, 0.04 * v, 'bandpass', 900, 500, 2),
+  dart: (v) => burst(0.03, 0.05 * v, 'bandpass', 2500, 1800, 3),
+  claw: (v) => burst(0.06, 0.08 * v, 'highpass', 1800, 3000),
+  spore: (v) => burst(0.12, 0.04 * v, 'lowpass', 800, 400),
+  seedpod: (v) => tone('sine', 220, 120, 0.15, 0.06 * v),
+  leaf: (v) => burst(0.06, 0.04 * v, 'bandpass', 1800, 2400, 2),
+  thornburst: (v) => (burst(0.1, 0.05 * v, 'bandpass', 1000, 600, 2), tone('sine', 300, 180, 0.12, 0.04 * v)),
+  windbolt: (v) => burst(0.09, 0.05 * v, 'bandpass', 2200, 3400, 2),
+  gale: (v) => burst(0.16, 0.07 * v, 'bandpass', 1400, 2600, 1.5),
+  feather: (v) => burst(0.06, 0.05 * v, 'bandpass', 2600, 2000, 2),
+  spark: (v) => burst(0.04, 0.07 * v, 'highpass', 3200),
+  stormball: (v) => (burst(0.2, 0.06 * v, 'lowpass', 1200, 300), tone('sine', 140, 70, 0.2, 0.06 * v)),
+  starbolt: (v) => tone('sine', 1760, 2200, 0.12, 0.03 * v),
+  comet: (v) => tone('triangle', 1200, 300, 0.4, 0.04 * v),
+  moonray: (v) => tone('sine', 2200, 2000, 0.15, 0.03 * v),
+  shade: (v) => tone('sine', 300, 180, 0.15, 0.04 * v),
+  void: (v) => tone('sine', 120, 60, 0.4, 0.06 * v),
+};
+
+/** Piercing lines, sky strikes and blessings (Circle Pack 2 abilities). */
+export function pierce(kind, v = 1) {
+  if (kind === 'moonbeam') tone('sine', 900, 1600, 0.45, 0.06 * v);
+  else if (kind === 'gear') (tone('sawtooth', 300, 800, 0.35, 0.04 * v), burst(0.3, 0.04 * v, 'bandpass', 1500, 2500, 3));
+  else burst(0.1, 0.07 * v, 'bandpass', 1800, 2800, 2);
+}
+export function zap(gold = false, v = 1) {
+  burst(0.08, 0.12 * v, 'highpass', 2600);
+  tone('square', gold ? 900 : 600, gold ? 300 : 200, 0.1, 0.035 * v);
+}
+export function blessing(v = 1) {
+  tone('sine', 660, 990, 0.35, 0.05 * v);
+  tone('sine', 990, 1320, 0.3, 0.035 * v, 'sfx', 0.08);
 }
 
 /** Coins: a bright little arpeggio (jackpots, bounties, payouts). */

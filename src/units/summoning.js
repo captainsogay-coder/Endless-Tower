@@ -28,6 +28,9 @@ export function duplicateCompensation(banner) {
 
 export const isRare = (chance) => chance <= SUMMON_CONFIG.rareThreshold;
 
+/** A pool entry gets the rare reveal when it is very unlikely, or when its circle names it the chase unit. */
+export const isRareEntry = (entry) => !!entry.chase || isRare(entry.chance);
+
 export function registerBanner(def) {
   const total = def.pool.reduce((s, p) => s + p.chance, 0);
   if (Math.abs(total - 1) > 1e-9) throw new Error(`Banner "${def.id}" odds sum to ${total}, expected 1`);
@@ -238,9 +241,109 @@ export function summon(profile, banner, count, rng = createRng()) {
     profile.recordSummon(entry.unit);
     const comp = isNew ? 0 : perDuplicate;
     compensation += comp;
-    results.push({ unit: entry.unit, name: def?.name ?? entry.unit, tier: def?.tier ?? 1, chance: entry.chance, isNew, compensation: comp, rare: isRare(entry.chance) });
+    results.push({ unit: entry.unit, name: def?.name ?? entry.unit, tier: def?.tier ?? 1, chance: entry.chance, isNew, compensation: comp, rare: isRareEntry(entry) });
   }
   profile.data.wallet.tokens = profile.balance('tokens') + compensation;
   profile.save();
   return { ok: true, cost, results, compensation };
 }
+
+
+// ================================================================ CIRCLE PACK 2
+// Each circle: 7 units, odds total exactly 100%, Tokens only. The 2% chase unit
+// is flagged so it gets the rare reveal even though it is above the 1% threshold.
+
+export const TRAVELING_CARAVAN_CIRCLE = 'traveling-caravan-circle';
+registerBanner({
+  id: TRAVELING_CARAVAN_CIRCLE,
+  name: 'Traveling Caravan',
+  tagline: 'Merchants, travellers and the guards who keep them paid.',
+  currency: 'tokens',
+  price: 180,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'porter', chance: 0.3 },
+    { unit: 'caravan-scout', chance: 0.25 },
+    { unit: 'camp-cook', chance: 0.18 },
+    { unit: 'traveling-trader', chance: 0.12 },
+    { unit: 'cartographer', chance: 0.08 },
+    { unit: 'caravan-master', chance: 0.05 },
+    { unit: 'golden-merchant', chance: 0.02, chase: true },
+  ],
+});
+
+export const CLOCKWORK_ATELIER_CIRCLE = 'clockwork-atelier-circle';
+registerBanner({
+  id: CLOCKWORK_ATELIER_CIRCLE,
+  name: 'Clockwork Atelier',
+  tagline: 'Brass, steam and inventions that fight back.',
+  currency: 'tokens',
+  price: 500,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'tin-sentry', chance: 0.3 },
+    { unit: 'springling', chance: 0.23 },
+    { unit: 'gearshot', chance: 0.18 },
+    { unit: 'steam-golem', chance: 0.13 },
+    { unit: 'chrono-mechanic', chance: 0.09 },
+    { unit: 'grand-automaton', chance: 0.05 },
+    { unit: 'eternal-engine', chance: 0.02, chase: true },
+  ],
+});
+
+export const JUNGLE_COVENANT_CIRCLE = 'jungle-covenant-circle';
+registerBanner({
+  id: JUNGLE_COVENANT_CIRCLE,
+  name: 'Jungle Covenant',
+  tagline: 'An ancient green kingdom that controls the field.',
+  currency: 'tokens',
+  price: 850,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'vine-tender', chance: 0.3 },
+    { unit: 'dartkeeper', chance: 0.23 },
+    { unit: 'panther', chance: 0.18 },
+    { unit: 'spore-shaman', chance: 0.13 },
+    { unit: 'elder-treant', chance: 0.09 },
+    { unit: 'canopy-warden', chance: 0.05 },
+    { unit: 'heart-of-the-wild', chance: 0.02, chase: true },
+  ],
+});
+
+export const SKYBOUND_ORDER_CIRCLE = 'skybound-order-circle';
+registerBanner({
+  id: SKYBOUND_ORDER_CIRCLE,
+  name: 'Skybound Order',
+  tagline: 'Aerial knights of the floating kingdoms. Storms on command.',
+  currency: 'tokens',
+  price: 1200,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'cloud-courier', chance: 0.3 },
+    { unit: 'gale-lancer', chance: 0.23 },
+    { unit: 'roc-rider', chance: 0.18 },
+    { unit: 'stormcaller', chance: 0.13 },
+    { unit: 'sky-admiral', chance: 0.09 },
+    { unit: 'tempest-sovereign', chance: 0.05 },
+    { unit: 'eye-of-the-zenith', chance: 0.02, chase: true },
+  ],
+});
+
+export const ASTRAL_OBSERVATORY_CIRCLE = 'astral-observatory-circle';
+registerBanner({
+  id: ASTRAL_OBSERVATORY_CIRCLE,
+  name: 'Astral Observatory',
+  tagline: 'Starlight, gravity and the weak points of everything.',
+  currency: 'tokens',
+  price: 1800,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'star-reader', chance: 0.3 },
+    { unit: 'comet-scribe', chance: 0.23 },
+    { unit: 'moon-prism', chance: 0.18 },
+    { unit: 'eclipse-adept', chance: 0.13 },
+    { unit: 'nebula-architect', chance: 0.09 },
+    { unit: 'celestial-oracle', chance: 0.05 },
+    { unit: 'singularity-monarch', chance: 0.02, chase: true },
+  ],
+});

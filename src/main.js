@@ -16,6 +16,7 @@ import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
 import './render/castArt.js';
 import './render/medievalArt.js';
+import './render/pack2Art.js';
 import { initResponsive } from './ui/responsive.js';
 
 registerRoster();

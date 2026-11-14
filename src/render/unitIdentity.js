@@ -21,6 +21,11 @@ export const CIRCLE_TRIM = {
   'village-militia-circle': '#b8a25c',
   'town-guard-circle': '#4f75c4',
   'siege-workshop-circle': '#9b6a3a',
+  'traveling-caravan-circle': '#d9a54a',
+  'clockwork-atelier-circle': '#b8733a',
+  'jungle-covenant-circle': '#4f9a3a',
+  'skybound-order-circle': '#6fa8d8',
+  'astral-observatory-circle': '#8a6ad8',
 };
 const STARTER_TRIM = '#8f8a80';
 
@@ -45,7 +50,7 @@ export function trimOf(defId) {
 }
 
 /** Arts whose own drawing is a vehicle/emplacement footprint: they grow less. */
-const LARGE = new Set(['tank', 'fortress', 'theHouse', 'icbm', 'nuclearWarhead', 'antimatter', 'bomber', 'b2', 'missileLauncher', 'catapult', 'trebuchet', 'ballista', 'miniBallista', 'drone', 'battalion']);
+const LARGE = new Set(['tank', 'fortress', 'theHouse', 'icbm', 'nuclearWarhead', 'antimatter', 'bomber', 'b2', 'missileLauncher', 'catapult', 'trebuchet', 'ballista', 'miniBallista', 'drone', 'battalion', 'steamGolem', 'grandAutomaton', 'eternalEngine', 'elderTreant', 'heartOfTheWild', 'rocRider', 'eyeOfTheZenith', 'gearshot', 'panther']);
 
 /** Figure scale: a touch larger than the old art for legibility, + up to ~25% by tier. */
 export function unitScale(def) {

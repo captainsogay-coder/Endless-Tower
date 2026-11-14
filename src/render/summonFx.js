@@ -33,6 +33,11 @@ const CIRCLE_STYLES = {
   // workshop floor: timber and a cog
   'siege-workshop-circle': { paint: '#d99a5a', accent: '#c9a24a', text: 'SIEGE WORKSHOP · TIMBER · ROPE · COUNTERWEIGHT · ', chevrons: 6, emblem: 'gear', floorTint: 'rgba(100,60,20,0.3)', planks: true, stampText: 'MASTERWORK', beacon: '230,160,80' },
   'nuclear-war-circle': { paint: '#d9a12a', accent: '#2fb39a', text: 'ARCADE ARMAGEDDON · PREMIUM HARDWARE · LAUNCH CONTROL · ', doubleRing: true, chevrons: 3, emblem: 'atom', floorTint: 'rgba(20,50,40,0.3)', hazard: true, stampText: 'OMEGA CLEARANCE', beacon: '60,220,180' },
+  'traveling-caravan-circle': { paint: '#e0c38a', accent: '#2f8a8a', text: 'TRAVELING CARAVAN · SILK · SPICE · SAFE ROADS · ', chevrons: 4, emblem: 'compass', floorTint: 'rgba(120,90,40,0.3)', planks: true, stampText: 'FORTUNE', beacon: '230,190,110' },
+  'clockwork-atelier-circle': { paint: '#c9a24a', accent: '#b8733a', text: 'CLOCKWORK ATELIER · BRASS · STEAM · PRECISION · ', doubleRing: true, chevrons: 6, emblem: 'clock', floorTint: 'rgba(90,60,30,0.3)', stampText: 'PERPETUAL', beacon: '230,170,90' },
+  'jungle-covenant-circle': { paint: '#8fbf5a', accent: '#2fae8a', text: 'JUNGLE COVENANT · ROOT · VINE · CANOPY · ', chevrons: 5, emblem: 'leaf', floorTint: 'rgba(30,80,40,0.35)', stampText: 'WILD HEART', beacon: '140,220,120' },
+  'skybound-order-circle': { paint: '#cfe4ff', accent: '#6fa8d8', text: 'SKYBOUND ORDER · WIND · WING · THUNDER · ', doubleRing: true, chevrons: 4, emblem: 'wings', floorTint: 'rgba(40,70,110,0.3)', stampText: 'ZENITH', beacon: '170,210,255' },
+  'astral-observatory-circle': { paint: '#d8c9ff', accent: '#f2d38a', text: 'ASTRAL OBSERVATORY · STAR · MOON · GRAVITY · ', doubleRing: true, chevrons: 7, emblem: 'moon', floorTint: 'rgba(40,30,80,0.38)', stampText: 'EVENT HORIZON', beacon: '190,170,255' },
 };
 export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
 const STEEL = '#9aa1aa';
@@ -276,6 +281,85 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     circle(ctx, 0, 0, R * 0.07);
     ctx.fill();
     ctx.restore();
+  } else if (st.emblem === 'compass') {
+    // compass rose: four long points, four short
+    ctx.save();
+    ctx.rotate((s.rotInner ?? 0) * 0.5);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU;
+      const rr = i % 2 ? R * 0.12 : R * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      ctx.lineTo(Math.cos(a + 0.35) * R * 0.05, Math.sin(a + 0.35) * R * 0.05);
+      ctx.lineTo(Math.cos(a - 0.35) * R * 0.05, Math.sin(a - 0.35) * R * 0.05);
+      ctx.closePath();
+      ctx.fillStyle = i % 2 ? st.paint : st.accent;
+      ctx.fill();
+    }
+    ctx.restore();
+  } else if (st.emblem === 'clock') {
+    ctx.lineWidth = R * 0.012;
+    ctx.strokeStyle = st.paint;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * R * 0.17, Math.sin(a) * R * 0.17);
+      ctx.lineTo(Math.cos(a) * R * 0.22, Math.sin(a) * R * 0.22);
+      ctx.stroke();
+    }
+    const a1 = (s.rotInner ?? 0) * 6;
+    ctx.lineWidth = R * 0.02;
+    ctx.strokeStyle = st.accent;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a1) * R * 0.18, Math.sin(a1) * R * 0.18);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(Math.cos(a1 / 12) * R * 0.11, Math.sin(a1 / 12) * R * 0.11);
+    ctx.stroke();
+  } else if (st.emblem === 'leaf') {
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.22);
+    ctx.quadraticCurveTo(R * 0.17, -R * 0.05, 0, R * 0.2);
+    ctx.quadraticCurveTo(-R * 0.17, -R * 0.05, 0, -R * 0.22);
+    ctx.fill();
+    ctx.strokeStyle = st.paint;
+    ctx.lineWidth = R * 0.012;
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.18);
+    ctx.lineTo(0, R * 0.2);
+    for (let i = 0; i < 4; i++) {
+      const y = -R * 0.12 + i * R * 0.07;
+      ctx.moveTo(0, y + R * 0.03);
+      ctx.lineTo(-R * 0.07, y - R * 0.01);
+      ctx.moveTo(0, y + R * 0.03);
+      ctx.lineTo(R * 0.07, y - R * 0.01);
+    }
+    ctx.stroke();
+  } else if (st.emblem === 'wings') {
+    for (const sx of [-1, 1]) {
+      for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.ellipse(sx * (R * 0.06 + i * R * 0.04), -R * 0.02 + i * R * 0.025, R * 0.05, R * 0.13 - i * R * 0.02, sx * (0.6 + i * 0.2), 0, TAU);
+        ctx.fill();
+      }
+    }
+    ctx.fillStyle = st.paint;
+    circle(ctx, 0, R * 0.02, R * 0.04);
+    ctx.fill();
+  } else if (st.emblem === 'moon') {
+    ctx.fillStyle = st.paint;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.19, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = '#16122a';
+    ctx.beginPath();
+    ctx.arc(R * 0.08, -R * 0.04, R * 0.17, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = st.accent;
+    for (const [x, y, r] of [[0.13, 0.1, 0.03], [0.05, 0.16, 0.018], [0.17, -0.12, 0.02]]) {
+      circle(ctx, x * R, y * R, r * R);
+      ctx.fill();
+    }
   } else if (st.emblem === 'badge') {
     // six-pointed sheriff star with ball tips
     ctx.beginPath();

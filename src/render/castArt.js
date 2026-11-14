@@ -14,6 +14,15 @@ import { registerPainter, shadow, limb, legs, torso, levelStripes, muzzleFlash }
 
 // ---------------------------------------------------------------- figure parts
 
+/**
+ * Extension points for newer circles: extra hat types, extra hand-held props
+ * and layers drawn behind the body (packs, wings, capes, auras). Each is a
+ * painter in the same house style; see src/render/pack2Art.js.
+ */
+export const EXTRA_HATS = {};
+export const EXTRA_PROPS = {};
+export const EXTRA_BEHIND = {};
+
 function hat(ctx, h, o) {
   if (!h) return;
   const c = h.color;
@@ -266,6 +275,7 @@ function hat(ctx, h, o) {
       break;
     }
     default:
+      EXTRA_HATS[h.type]?.(ctx, h, o);
   }
 }
 
@@ -705,6 +715,7 @@ function prop(ctx, f, frame, o) {
         break;
       }
       default:
+        EXTRA_PROPS[w]?.(ctx, f, frame, o, hx, hy, aim);
     }
   };
   draw();
@@ -730,6 +741,7 @@ export function figure(f) {
     if (f.scale) {
       ctx.scale(f.scale, f.scale);
     }
+    if (f.behind) EXTRA_BEHIND[f.behind]?.(ctx, f, o, frame);
     // legs (a dress hides most of them)
     if (f.dress) {
       limb(ctx, -2, -6, -2.4, -1, f.skin, o, 1.8);

@@ -10,6 +10,7 @@ import { TAU } from '../core/math.js';
 import { circle, drawGlow } from './canvas.js';
 import { drawUnit } from './unitArt.js';
 import { impactWeight } from './impact.js';
+import { Pack2Fx } from './pack2Fx.js';
 
 const BLAST_STYLE = {
   dynamite: { palette: 'hot', max: 0.3 },
@@ -19,6 +20,7 @@ const BLAST_STYLE = {
   bankruptcy: { palette: 'gold', max: 0.5 },
   warhead: { palette: 'energy', max: 0.7 },
   antimatter: { palette: 'antimatter', max: 0.7 },
+  singularity: { palette: 'antimatter', max: 0.8 },
   icbm: { palette: 'hot', max: 0.5 },
   missile: { palette: null, max: 0.28 },
   sequin: { palette: 'pink', max: 0.22 },
@@ -37,12 +39,14 @@ export const BLAST_PALETTES = {
 export class CastFx {
   constructor(renderer) {
     this.r = renderer;
+    this.p2 = new Pack2Fx(renderer);
     this.planes = [];
     this.pulses = [];
     this.popups = [];
   }
 
   reset() {
+    this.p2.reset();
     this.planes = [];
     this.pulses = [];
     this.popups = [];
@@ -50,6 +54,7 @@ export class CastFx {
 
   attach(game, on) {
     this.game = game;
+    this.p2.attach(game, on);
     on('blast', (b) => this.blast(b.x, b.y, b.radius, b.kind, b.focus, b.damage));
     on('flyover', (f) => this.planes.push({ ...f, t: 0 }));
     on('pulse', (p) => this.pulses.push({ ...p, t: 0, max: p.radius === Infinity ? 0.9 : 0.6 }));
@@ -60,7 +65,7 @@ export class CastFx {
       this.r.fx.ring(unit.x, unit.y, 6, 60, 0.6, '#f2d38a', 2.5);
     });
     on('houseEdge', (v) => this.popups.push({ x: game.house?.x ?? 0, y: (game.house?.y ?? 0) - 50, text: `House Edge +${Math.round(v * 100)}%`, t: 0, big: true }));
-    on('mark', ({ enemy }) => this.r.fx.ring(enemy.x, enemy.y, 4, enemy.radius * 2.4, 0.5, '#e3a33b', 2));
+    on('mark', ({ enemy, kind }) => this.r.fx.ring(enemy.x, enemy.y, 4, enemy.radius * 2.4, 0.5, kind === 'eclipse' ? '#8a7ad8' : '#e3a33b', 2));
     on('field', (f) => this.r.fx.ring(f.x, f.y, f.radius, 6, 0.8, '#b79cff', 2));
     // summons: a green ground ring (the Summon side-tier colour) and a little dust
     on('allySpawn', (a) => {
@@ -78,7 +83,7 @@ export class CastFx {
     const st = BLAST_STYLE[kind] ?? { palette: null, max: 0.32 };
     const r = this.r;
     const w = damage == null ? 0.6 : impactWeight(this.game, damage, target);
-    const heavy = kind === 'warhead' || kind === 'antimatter' || kind === 'bankruptcy';
+    const heavy = kind === 'warhead' || kind === 'antimatter' || kind === 'singularity' || kind === 'bankruptcy';
     if (r.blasts.length < 110 || (heavy && w > 0.6)) {
       r.blasts.push({ x, y, r: radius, t: 0, max: st.max * (0.5 + 0.5 * Math.min(1, w)), seed: Math.random() * 6, palette: st.palette, w });
       if (r.blasts.length > 130) r.blasts.shift();
@@ -164,7 +169,7 @@ export class CastFx {
         this.blast(p.x, p.y, p.splash, 'dynamite', null, p.damage, p.target);
         return true;
       default:
-        return false;
+        return this.p2.onImpact(p);
     }
   }
 
@@ -378,7 +383,7 @@ export class CastFx {
         return true;
       }
       default:
-        return false;
+        return this.p2.drawProjectile(ctx, p, k);
     }
   }
 
@@ -503,6 +508,7 @@ export class CastFx {
 
   /** Above everything: planes on bombing runs and coin pop-ups. */
   drawOver(ctx, dt) {
+    this.p2.draw(ctx, dt);
     let w = 0;
     for (let i = 0; i < this.planes.length; i++) {
       const pl = this.planes[i];

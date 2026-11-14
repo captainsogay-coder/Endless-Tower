@@ -98,3 +98,38 @@ They also drive the collection filters and sorting, and Auto Pick priorities.
 | Siege Commander | VI | 5 | N/A | N/A | 6 | N/A | 5 |  |
 | Trebuchet | VIII | 4 | 8 | N/A | N/A | N/A | 7 |  |
 | The Master Engineer | X | 6 | 11 | 1 | N/A | N/A | 9 |  |
+| Porter | I | 1 | N/A | N/A | N/A | 1 | 1 | 2 coins/min, net -3 |
+| Caravan Scout | I | 1 | N/A | N/A | N/A | N/A | 1 |  |
+| Camp Cook | II | 1 | N/A | N/A | N/A | 2 | 1 | 24 coins/min, net 36 |
+| Traveling Trader | III | 2 | N/A | N/A | N/A | 5 | 2 | 55 coins/min, net 116 |
+| Cartographer | IV | 3 | N/A | N/A | N/A | N/A | 3 |  |
+| Caravan Master | VI | 5 | N/A | N/A | 2 | 1 | 5 | 37 coins/min, net -29 |
+| The Golden Merchant | IX | 8 | N/A | N/A | N/A | 13 | 8 | 369 coins/min, net 798 |
+| Tin Sentry | III | 3 | N/A | N/A | N/A | N/A | 3 |  |
+| Springling | IV | 4 | N/A | N/A | N/A | N/A | 4 |  |
+| Gearshot | V | 3 | 4 | N/A | N/A | N/A | 5 |  |
+| Steam Golem | VII | 4 | 8 | N/A | N/A | N/A | 7 |  |
+| Chrono Mechanic | IX | 8 | N/A | N/A | 3 | N/A | 8 |  |
+| Grand Automaton | XII | 10 | 9 | N/A | N/A | N/A | 11 |  |
+| The Eternal Engine | XVI | 16 | N/A | N/A | N/A | N/A | 16 |  |
+| Vine Tender | IV | 4 | N/A | N/A | N/A | N/A | 4 |  |
+| Dartkeeper | V | 4 | 2 | N/A | N/A | N/A | 5 |  |
+| Panther | VII | 7 | N/A | N/A | N/A | N/A | 7 |  |
+| Spore Shaman | VIII | 5 | 7 | N/A | N/A | N/A | 7 |  |
+| Elder Treant | X | 6 | 12 | N/A | N/A | N/A | 9 |  |
+| Canopy Warden | XIV | 13 | N/A | N/A | 7 | N/A | 13 |  |
+| Heart of the Wild | XVIII | 13 | 19 | N/A | 1 | N/A | 17 |  |
+| Cloud Courier | V | 5 | N/A | N/A | N/A | N/A | 5 |  |
+| Gale Lancer | VII | 6 | 4 | N/A | N/A | N/A | 7 |  |
+| Roc Rider | IX | 9 | N/A | N/A | N/A | N/A | 9 |  |
+| Stormcaller | XI | 9 | 8 | N/A | N/A | N/A | 11 |  |
+| Sky Admiral | XIV | 13 | N/A | N/A | 5 | N/A | 13 |  |
+| Tempest Sovereign | XVII | 12 | 20 | N/A | N/A | N/A | 16 |  |
+| Eye of the Zenith | XXI | 19 | 7 | N/A | N/A | N/A | 20 |  |
+| Star Reader | VII | 7 | N/A | N/A | N/A | N/A | 7 |  |
+| Comet Scribe | IX | 6 | 9 | N/A | N/A | N/A | 8 |  |
+| Moon Prism | XII | 10 | 8 | N/A | N/A | N/A | 11 |  |
+| Eclipse Adept | XIV | 13 | N/A | N/A | N/A | N/A | 13 |  |
+| Nebula Architect | XVI | 14 | N/A | N/A | 7 | N/A | 14 |  |
+| Celestial Oracle | XIX | 18 | N/A | N/A | 2 | N/A | 18 |  |
+| Singularity Monarch | XXIII | 17 | 24 | N/A | 1 | N/A | 21 |  |

@@ -20,7 +20,7 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the collection, filter by role, or let **Auto Pick** choose your strongest types, optionally by DPS, AOE, Summon, Empower or Economy (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at eight circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
+4. **Summoning:** spend Tokens at thirteen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
 
 ### Upgrading and range
 
@@ -220,20 +220,126 @@ Fictional, arcade-style sci-fi: toy-like hardware and stylised energy blasts.
 | Glorious Leader | XV | 1.5% |
 | Nuclear Warhead | XVII | 0.4% |
 | Antimatter Warhead | XIX | 0.1% |
+| Porter | I | 10 | 13.2 | 2.48 | 1.22 | 16.13 | Very cheap to deploy. Every 12th attack finds 1 coin. |
+| Caravan Scout | I | 20 | 5.88 | 3.85 | 2.44 | 14.37 | Fast attacks at medium range. +15% damage against enemies near the exit (the last 30% of the road). |
+| Camp Cook | II | 35 | 19.8 | 2.2 | 1 | 19.8 | Generates 3 coins every 10 s. |
+| Traveling Trader | III | 50 | 21.6 | 3.3 | 1.22 | 26.4 | Every 15 s: 0.5 coins for each enemy defeated anywhere since the last payout (at most 20 per payout). |
+| Cartographer | IV | 70 | 34.8 | 4.68 | 1.11 | 38.67 | Allies within 4 tiles gain +12% range (more per upgrade). Always targets the enemy furthest along the road. |
+| Caravan Master | VI | 140 | 53.4 | 4.4 | 1.33 | 71.2 | Every 20 s: allies within 5 tiles gain +15% damage for 6 s, and the caravan earns 10 coins. |
+| The Golden Merchant | IX | 310 | 97.8 | 5.5 | 1.33 | 130.4 | Every 5 s: 8 coins plus 1 coin per enemy eliminated anywhere since (at most 20). Every 30 s: an extra 50 coins. |
+| Tin Sentry | III | 50 | 21.6 | 4.13 | 1.56 | 33.6 | Affordable, steady single-target damage. No tricks. |
+| Springling | IV | 70 | 14.4 | 3.3 | 2.89 | 41.6 | Very fast attacks. Every 8th attack releases the spring for 3× damage. |
+| Gearshot | V | 100 | 40.2 | 7.15 | 0.78 | 31.27 | Long range. Every shot pierces up to 3 enemies in a line. |
+| Steam Golem | VII | 185 | 90 | 3.03 | 0.67 | 60 | Heavy area blows. Every 12 s vents steam that slows enemies within 3 tiles by 15% for 3 s. |
+| Chrono Mechanic | IX | 310 | 108.6 | 4.4 | 1.33 | 144.8 | Every 15 s: allies within 5 tiles get 25% shorter cooldowns for 5 s. |
+| Grand Automaton | XII | 650 | 228 | 5.5 | 1 | 228 | Every 10th attack launches a spinning gear that cuts through up to 6 enemies for 2.5× damage. |
+| The Eternal Engine | XVI | 1,500 | 346.8 | 6.05 | 1.78 | 616.5 | Every 25 s: Overdrive for 8 s (+60% attack speed, +30% damage). Each kill during Overdrive adds 0.5 s, up to 5 s more. |
+| Vine Tender | IV | 60 | 34.2 | 4.4 | 1.33 | 45.6 | Cheap ranged attacker. Every hit slows the enemy by 5% for 2 s. |
+| Dartkeeper | V | 100 | 16.8 | 4.68 | 3.33 | 56 | Rapid attacks. Every 7th dart pierces up to 4 enemies. |
+| Panther | VII | 185 | 93 | 1.93 | 1.56 | 144.7 | High single-target damage. +20% damage to enemies below 50% health. |
+| Spore Shaman | VIII | 240 | 55.8 | 4.95 | 1.11 | 62 | Spore clouds infect every enemy they touch: infected enemies take +5% damage from all sources for 4 s (does not stack with stronger weaknesses). |
+| Elder Treant | X | 400 | 205.2 | 4.13 | 0.5 | 102.6 | Large area attacks. Every 15 s grows a root field (3 tiles) that slows enemies inside by 25% for 4 s. |
+| Canopy Warden | XIV | 1,010 | 408 | 5.5 | 1.11 | 453.3 | Jungle Covenant units within 6 tiles gain +20% damage and +10% range (more per upgrade; Wardens do not stack). |
+| Heart of the Wild | XVIII | 2,200 | 435.6 | 6.6 | 0.89 | 387.2 | Every 25 s: an overgrowth zone for 8 s – enemies inside take continuous damage and +20% damage from all allies. Every 50 eliminations: +1% damage for the battle (max +30%). |
+| Cloud Courier | V | 85 | 32.4 | 5.5 | 1.78 | 57.6 | Affordable ranged attacker; its bolts fly very fast and rarely miss moving targets. |
+| Gale Lancer | VII | 185 | 67.8 | 4.95 | 1.22 | 82.87 | Every 6th attack is a wind lance that hits up to 5 enemies in a line. |
+| Roc Rider | IX | 310 | 157.2 | 7.7 | 1 | 157.2 | Very long range. +25% damage to bosses. |
+| Stormcaller | XI | 510 | 157.2 | 6.05 | 1.11 | 174.7 | Every 10 s: lightning strikes up to 6 enemies in range for 2.5× damage each. |
+| Sky Admiral | XIV | 1,010 | 354 | 6.05 | 1.22 | 432.7 | All allies on the map: +12% range and +12% damage (more per upgrade; Admirals do not stack). |
+| Tempest Sovereign | XVII | 1,820 | 504 | 6.6 | 0.56 | 280 | Large area storm bolts. Every 20 s calls a storm (3.5 tiles) that damages enemies inside for 5 s. |
+| Eye of the Zenith | XXI | 3,920 | 1128 | 7.7 | 0.89 | 1002.7 | Every 30 s: a storm zone for 8 s that strikes a random enemy inside every 1.5 s for 4× damage – bosses first. |
+| Star Reader | VII | 185 | 70.8 | 4.95 | 1.33 | 94.4 | Medium range. Every 10th attack deals 2.5× damage. |
+| Comet Scribe | IX | 310 | 72.6 | 6.05 | 0.67 | 48.4 | Comets explode in a small area and leave stardust that burns enemies for 3 s. |
+| Moon Prism | XII | 650 | 174 | 6.05 | 1.11 | 193.3 | Every 12 s fires a beam that pierces up to 8 enemies for 4× damage. |
+| Eclipse Adept | XIV | 1,010 | 330 | 6.05 | 1.22 | 403.3 | Every 10 s marks the strongest enemy in range: it takes +20% damage from all sources for 10 s. |
+| Nebula Architect | XVI | 1,500 | 592.8 | 5.5 | 1.11 | 658.7 | Allies within 5 tiles attack 20% faster (more per upgrade; nebulae do not stack). |
+| Celestial Oracle | XIX | 2,670 | 937.2 | 6.6 | 1.11 | 1041.3 | Every 25 s: every ally on the map gains +25% damage for 6 s. |
+| Singularity Monarch | XXIII | 5,740 | 1542 | 7.7 | 0.44 | 685.3 | Every 35 s: a singularity pulls enemies toward its centre for 3 s, then detonates for massive area damage; enemies hit take +25% damage for 8 s. |
+
+### Traveling Caravan: 180 Tokens per summon
+
+Merchants, travellers and the guards who keep them paid.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Porter | I | 30% |
+| Caravan Scout | I | 25% |
+| Camp Cook | II | 18% |
+| Traveling Trader | III | 12% |
+| Cartographer | IV | 8% |
+| Caravan Master | VI | 5% |
+| The Golden Merchant | IX | 2% |
+
+### Clockwork Atelier: 500 Tokens per summon
+
+Brass, steam and inventions that fight back.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Tin Sentry | III | 30% |
+| Springling | IV | 23% |
+| Gearshot | V | 18% |
+| Steam Golem | VII | 13% |
+| Chrono Mechanic | IX | 9% |
+| Grand Automaton | XII | 5% |
+| The Eternal Engine | XVI | 2% |
+
+### Jungle Covenant: 850 Tokens per summon
+
+An ancient green kingdom that controls the field.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Vine Tender | IV | 30% |
+| Dartkeeper | V | 23% |
+| Panther | VII | 18% |
+| Spore Shaman | VIII | 13% |
+| Elder Treant | X | 9% |
+| Canopy Warden | XIV | 5% |
+| Heart of the Wild | XVIII | 2% |
+
+### Skybound Order: 1,200 Tokens per summon
+
+Aerial knights of the floating kingdoms. Storms on command.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Cloud Courier | V | 30% |
+| Gale Lancer | VII | 23% |
+| Roc Rider | IX | 18% |
+| Stormcaller | XI | 13% |
+| Sky Admiral | XIV | 9% |
+| Tempest Sovereign | XVII | 5% |
+| Eye of the Zenith | XXI | 2% |
+
+### Astral Observatory: 1,800 Tokens per summon
+
+Starlight, gravity and the weak points of everything.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Star Reader | VII | 30% |
+| Comet Scribe | IX | 23% |
+| Moon Prism | XII | 18% |
+| Eclipse Adept | XIV | 13% |
+| Nebula Architect | XVI | 9% |
+| Celestial Oracle | XIX | 5% |
+| Singularity Monarch | XXIII | 2% |
 
 Every pool is checked at start-up to total exactly 100%.
 
 ### Duplicates and rare units
 
 - **Duplicate compensation:** a pull of a unit you already own refunds **30% of one summon**. This includes a unit pulled earlier in the same multi-summon. It is shown on each reveal card and totalled in the results.
-  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War.
-- **Rare units:** any result with a chance of 1% or less gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, or a Siege Workshop gear.
+  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War and Clockwork Atelier, 54 at Traveling Caravan, 255 at Jungle Covenant, 360 at Skybound Order and 540 at Astral Observatory.
+- **Rare units:** any result with a chance of 1% or less, and every Pack 2 chase unit (2%), gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, a Siege Workshop gear, a caravan compass, a clockwork dial, a jungle leaf, Skybound wings or an Astral moon.
   - **Fastest Hand In The West:** "High Noon". At sundown a revolver cylinder spins in silence, then six shots ring out around the circle.
   - **THE HOUSE:** the circle becomes a slot machine. The reels stop one by one on 7-7-7, then coins pour down.
   - **High Roller:** a chip shower.
   - **Nuclear Warhead:** a launch countdown.
   - **Antimatter Warhead:** space folding into the centre.
   - **The Village Hero / The King's Champion / The Master Engineer:** HERO, CHAMPION and MASTERWORK stamps.
+  - **The Golden Merchant / The Eternal Engine / Heart of the Wild / Eye of the Zenith / Singularity Monarch:** FORTUNE, PERPETUAL, WILD HEART, ZENITH and EVENT HORIZON stamps.
 
   Odds are never adjusted. Every pull is a plain independent draw, and the outcome is decided before the animation starts. Normal summons keep their short reveal.
 
@@ -303,14 +409,14 @@ Every unit has a base level plus 5 upgrades, bought per copy in battle. Stats co
 | Tank | V | 100 | 44.4 | 5.5 | 0.44 | 19.73 | Blast 1.5 tiles. Leaves **flames** for 3 s (8% of shell damage per second). **Command Presence:** allies within 2.5 tiles attack 10% faster; overlapping Tanks don't stack |
 | Special Forces | III | 50 | 10.92 | 3.85 | 3.33 | 36.4 | **Squad Tactics:** +15% damage per other Special Forces deployed, up to +300% (`SQUAD_TACTICS_PER_UNIT`, `SQUAD_TACTICS_CAP`) |
 | Drone | V | 100 | 34.2 | 6.88 | 0.74 | 25.35 | Launches a drone every 1.5 s (1.35 s with the global cooldown cut) that hunts a target and detonates (1-tile blast). 10% are **Explosive Drones**: 5× damage, 2× blast radius |
-| Commander | V | 100 | 15.6 | 11 | 2.67 | 41.6 | Extreme range, targets the strongest enemy. **Field Command:** allies within 5.5 tiles get +8% range and 8% cooldown reduction |
+| Commander | V | 100 | 16.2 | 11 | 2.67 | 43.2 | Extreme range, targets the strongest enemy. **Field Command:** allies within 5.5 tiles get +8% range and 8% cooldown reduction |
 | Colonel | VI | 70 | 48 | 4.4 | 1.33 | 64 | Cheap. **Orders:** every unit on the map gets +15% damage, 10% cooldown reduction and +5% range. **Requisitions:** +15% coins |
 | General | VII | 185 | 64.8 | 7.15 | 0.56 | 36 | Artillery (1.75-tile blast). **High Command:** allies within 6.5 tiles get +25% damage, 15% cooldown reduction and +10% range. Launches a regular drone every 4 s |
 | Fortress | X | 400 | 144 | 9.35 | 0.33 | 48 | Siege guns with an enormous 3.75-tile blast. Launches an Explosive Drone every 5 s that inflicts **Crippled** (+20% damage taken, −10% speed for 5 s). **Logistics:** +25% coins |
 
 ### Circle units
 
-Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/medieval.js`, `wildWest.js`, `gambino.js`, `nuclearWar.js`), the behaviour in `src/game/abilities.js`.
+Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/medieval.js`, `wildWest.js`, `gambino.js`, `nuclearWar.js`, `pack2.js`), the behaviour in `src/game/abilities.js`.
 
 | Unit | Tier | Price | Damage | Range | Atk/s | DPS | Ability |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -368,7 +474,7 @@ Selling refunds 70% of everything spent on that copy.
 - Every buff and coin bonus has an id and applies **at most once per unit**, however many copies are on the map. If several copies reach the same unit, the highest-level one counts.
 - Different buffs multiply together, so a stack is bounded. This covers Tank, Commander, Colonel, General, Sheriff, Dealer, Pit Boss, THE HOUSE, Marshal, Glorious Leader and weather.
 - A unit never buffs itself.
-- Self-bonuses are capped per unit: Bandit +30%, High Roller +25%, Fastest Hand +40% attack speed, Battalion +15%. House Edge is capped at +20% for the battle and resets every battle.
+- Self-bonuses are capped per unit: Bandit +30%, High Roller +25%, Fastest Hand +40% attack speed, Battalion +15%. House Edge is capped at +20% for the battle and resets every battle. Heart of the Wild is capped at +30%, the Eternal Engine's Overdrive extension at +5 s, the Golden Merchant at 20 kill coins and the Traveling Trader at 20 coins per payout. Timed buffs (Caravan Master, Chrono Mechanic, Celestial Oracle, Overdrive) refresh rather than stack and go through the same global buff caps as auras.
 - Stats are re-derived from scratch: level, then passive, then buffs, then bonuses, then weather. Nothing ever accumulates beyond its cap.
 - Statuses don't stack. Wounded, Crippled, Exposed (+X% damage taken) and Slowed each keep only their strongest active strength. Damage-taken statuses don't multiply each other: the strongest one applies.
 - Drone and ability timers are fixed and not affected by cooldown buffs.

@@ -8,6 +8,14 @@ import { impactWeight } from '../render/impact.js';
 import * as sfx from './sfx.js';
 
 const MIN_GAP = {
+  pierce: 0.08,
+  zap: 0.06,
+  blessing: 0.4,
+  rivet: 0.04,
+  dart: 0.04,
+  spark: 0.05,
+  windbolt: 0.05,
+  claw: 0.06,
   pebble: 0.06,
   bullet: 0.035,
   grenade: 0.09,
@@ -86,8 +94,20 @@ export class AudioDirector {
       const v = this.allow(p.kind);
       if (v) sfx.shot(p.kind, v);
     });
+    game.on('beam', (b) => {
+      const v = this.allow('pierce');
+      if (v) sfx.pierce(b.kind, v);
+    });
+    game.on('zap', (z) => {
+      const v = this.allow('zap');
+      if (v) sfx.zap(z.kind === 'zenith', v);
+    });
+    game.on('buffPulse', () => {
+      const v = this.allow('blessing');
+      if (v) sfx.blessing(v);
+    });
     game.on('impact', (p) => {
-      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball'].includes(p.kind)) return;
+      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball', 'seedpod', 'stormball', 'comet', 'void', 'thornburst'].includes(p.kind)) return;
       const v = this.allow('explosion');
       // louder and deeper only when the hit really matters
       const w = Math.min(1, impactWeight(game, p.damage, p.target));

@@ -520,7 +520,7 @@ export class Game {
       const f = this.fields[i];
       f.t += dt;
       if (f.t >= f.duration) {
-        this.explode(f.x, f.y, f.radius, f.damage, f.source, { kind: 'antimatter', onHit: f.onHit });
+        this.explode(f.x, f.y, f.radius, f.damage, f.source, { kind: f.kind ?? 'antimatter', onHit: f.onHit });
         continue;
       }
       this.hash.each(f.x, f.y, f.radius, (e) => {
@@ -691,9 +691,87 @@ export class Game {
     this.emit('impact', p);
   }
 
+  /**
+   * Ability zone (root fields, overgrowth, storms, stardust trails): a hazard
+   * with an optional damage per second and an optional status with its own
+   * strength, e.g. { status: 'slowed', statusOpts: { amount: 0.25, duration: 4 } }.
+   */
+  addZone({ x, y, radius, duration, dps = 0, kind, status = null, statusOpts = null, source = null }) {
+    return this.addHazard(x, y, { kind, radius, duration, dpsFactor: 1, status, statusOpts }, dps, source);
+  }
+
+  /**
+   * Piercing line attack (piercing bolts, wind lances, beams, spinning gears):
+   * hits up to `count` enemies lying within `width` px of the line from the unit
+   * through its target, nearest first, out to `length` px.
+   */
+  pierce(u, target, { count = 3, mult = 1, width = 12, length = null, kind = 'pierce', onHit = null } = {}) {
+    const ang = Math.atan2(target.y - u.y, target.x - u.x);
+    const L = length ?? Math.max(u.stats.range * 1.15, Math.hypot(target.x - u.x, target.y - u.y) + 16);
+    const dx = Math.cos(ang);
+    const dy = Math.sin(ang);
+    const hits = [];
+    this.hash.each(u.x + (dx * L) / 2, u.y + (dy * L) / 2, L / 2 + width, (e) => {
+      if (!e.alive || e.invulnerable) return;
+      const rx = e.x - u.x;
+      const ry = e.y - u.y;
+      const along = rx * dx + ry * dy;
+      if (along < 0 || along > L) return;
+      if (Math.abs(rx * dy - ry * dx) > width + e.radius) return;
+      hits.push([along, e]);
+    });
+    hits.sort((a, b) => a[0] - b[0]);
+    const struck = hits.slice(0, count).map((h) => h[1]);
+    if (!struck.includes(target) && target.alive) struck.splice(Math.max(0, count - 1), 1, target);
+    for (const e of struck) {
+      this.damageEnemy(e, u.stats.damage * mult, u);
+      if (onHit && e.alive) this.applyOnHit(e, onHit);
+    }
+    this.emit('beam', { x0: u.x, y0: u.y - 6, x1: u.x + dx * L, y1: u.y - 6 + dy * L, kind, width, source: u, hits: struck.length });
+    return struck;
+  }
+
+  /** Instant strikes from the sky (storms, lightning abilities) on the given enemies. */
+  zap(u, enemies, mult, kind = 'zap') {
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      this.damageEnemy(e, u.stats.damage * mult, u);
+      this.emit('zap', { x: e.x, y: e.y, kind, source: u });
+    }
+  }
+
+  /**
+   * Temporary buff from an ability (rally cries, time warps, blessings): every
+   * deployed unit within `radius` (Infinity = map-wide) gets `buff` for
+   * `duration` s. Same id never stacks (re-casting refreshes it), it counts
+   * inside the global buff caps, and it is removed on expiry.
+   */
+  timedBuff(source, buff, duration, radius = Infinity) {
+    const until = this.time + duration;
+    const hit = [];
+    for (const u of this.units) {
+      if (radius !== Infinity && (u.x - source.x) ** 2 + (u.y - source.y) ** 2 > radius * radius) continue;
+      if (buff.faction && u.def.faction !== buff.faction) continue;
+      u.timed ??= {};
+      u.timed[buff.id] = { buff, until };
+      this.refreshUnit(u);
+      hit.push(u);
+    }
+    this.after(duration + 1e-3, () => {
+      for (const u of hit) {
+        if (u.timed?.[buff.id] && u.timed[buff.id].until <= this.time + 1e-6) {
+          delete u.timed[buff.id];
+          if (u.placed) this.refreshUnit(u);
+        }
+      }
+    });
+    this.emit('buffPulse', { x: source.x, y: source.y, radius, color: buff.color ?? '#6d9ad8', label: buff.label, source });
+    return hit.length;
+  }
+
   /** Ground hazard such as flames: periodic damage to enemies standing in it. */
   addHazard(x, y, spec, baseDamage, source) {
-    const h = { x, y, kind: spec.kind, status: spec.status ?? 'burning', radius: spec.radius, ttl: spec.duration, max: spec.duration, dps: baseDamage * spec.dpsFactor, source };
+    const h = { x, y, kind: spec.kind, status: spec.status ?? 'burning', statusOpts: spec.statusOpts ?? null, radius: spec.radius, ttl: spec.duration, max: spec.duration, dps: baseDamage * (spec.dpsFactor ?? 0), source };
     this.hazards.push(h);
     if (this.hazards.length > 400) this.hazards.shift();
     this.emit('hazard', h);
@@ -713,8 +791,8 @@ export class Game {
       if (tick) {
         this.hash.each(h.x, h.y, h.radius, (e) => {
           if (!e.alive || e.invulnerable) return;
-          applyStatus(e, h.status, this.time);
-          this.damageEnemy(e, h.dps * HAZARD_TICK, h.source);
+          if (h.status) applyStatus(e, h.status, this.time, h.statusOpts);
+          if (h.dps > 0) this.damageEnemy(e, h.dps * HAZARD_TICK, h.source);
         });
       }
       this.hazards[w++] = h;
@@ -999,12 +1077,14 @@ export class Game {
     const defs = this.buffDefs();
     // every distinct buff id once, then the combined effect is capped (power creep)
     const agg = { damageMult: 1, cooldownMult: 1, rangeMult: 1 };
-    for (const id of u.auras ?? []) {
-      const b = scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0);
+    const add = (b) => {
       if (b?.damageMult) agg.damageMult *= b.damageMult;
       if (b?.cooldownMult) agg.cooldownMult *= b.cooldownMult;
       if (b?.rangeMult) agg.rangeMult *= b.rangeMult;
-    }
+    };
+    for (const id of u.auras ?? []) add(scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0));
+    // temporary ability buffs (one per id, only while active) share the same caps
+    for (const t of Object.values(u.timed ?? {})) if (t.until > this.time) add(t.buff);
     const C = BALANCE.caps;
     agg.damageMult = Math.min(C.buffDamage, agg.damageMult);
     agg.cooldownMult = Math.max(1 / C.buffRate, agg.cooldownMult);

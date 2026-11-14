@@ -65,7 +65,7 @@ await page.click('#btn-retreat-confirm');
 await page.click('.tab[data-page="summon"]');
 await page.waitForTimeout(200);
 const order = await page.$$eval('.circle-card', (els) => els.map((e) => ({ id: e.dataset.banner, price: Number(e.querySelector('.cc-price').textContent.replace(/[^0-9]/g, '')), active: e.classList.contains('active') })));
-check('all 8 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 8 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,250,250,300,300,400,500', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
+check('all 13 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 13 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,180,250,250,300,300,400,500,500,850,1200,1800', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
 const poolStrips = await page.$$eval('.pool-item', (els) => els.every((e) => e.querySelectorAll('.st-cell').length === 5));
 check('drop-rate list shows each unit\'s five side tiers', poolStrips);
 await page.click('[data-banner="military-circle"]');
@@ -366,6 +366,34 @@ const vm = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) 
 await page.click('#btn-reveal-done');
 check('Village Militia ×10 charges 1,000 Tokens (30 back per duplicate), nothing else', vm.t === vm.res.reduce((a, r) => a + r.comp, 0) && vm.res.every((r) => [0, 30].includes(r.comp)) && vm.w.join() === 'tokens', `tokens ${vm.t}`);
 
+// 12b. Summoning Circle Pack 2: five circles, 35 units, Tokens only, chase reveals, deploy + abilities
+const p2 = [];
+for (const id of ['traveling-caravan-circle', 'clockwork-atelier-circle', 'jungle-covenant-circle', 'skybound-order-circle', 'astral-observatory-circle']) {
+  await page.click(`[data-banner="${id}"]`);
+  const rows = await ev(() => window.endlessTower.summoning.banner.pool.map((e) => ({ id: e.unit, chance: Math.round(e.chance * 1e5) / 1e3, chase: !!e.chase })));
+  p2.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, card: (await page.textContent(`[data-banner="${id}"] .cc-price`)).trim() });
+}
+check('Pack 2: five circles, 7 units each, odds total 100%, priced 180/500/850/1200/1800 Tokens', p2.every((c) => c.sum === 100 && c.rows.length === 7) && p2.map((c) => c.card).join('|') === '180 Tokens|500 Tokens|850 Tokens|1,200 Tokens|1,800 Tokens', p2.map((c) => `${c.rows.length}/${c.sum}% ${c.card}`).join(' · '));
+check('Pack 2 chase units are 2% and flagged for a rare reveal', p2.every((c) => c.rows.at(-1).chance === 2 && c.rows.at(-1).chase && c.rows.filter((r) => r.chase).length === 1), p2.map((c) => c.rows.at(-1).id).join(', '));
+await page.click('[data-banner="astral-observatory-circle"]');
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 1800 * 25; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="25"]');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const astral = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation })), t: window.endlessTower.profile.balance('tokens'), w: Object.keys(window.endlessTower.profile.data.wallet), pool: window.endlessTower.summoning.banner.pool.map((e) => e.unit) }));
+await page.click('#btn-reveal-done');
+check('Astral ×25 charges 45,000 Tokens, gives 25 Astral units, duplicates refund Tokens only', astral.res.length === 25 && astral.res.every((r) => astral.pool.includes(r.unit)) && astral.t === astral.res.reduce((a, r) => a + r.comp, 0) && astral.w.join() === 'tokens', `tokens back ${astral.t}`);
+const p2deploy = await ev((pulled) => {
+  const g = window.endlessTower.game; const ids = [pulled, 'golden-merchant', 'eternal-engine', 'heart-of-the-wild', 'eye-of-the-zenith', 'singularity-monarch'];
+  g.newRun({ loadout: ids }); g.coins = 1e7; const placed = [];
+  for (const id of ids) { let done = false; for (let y = 0; y < 22 && !done; y++) for (let x = 0; x < 40 && !done; x++) if (g.map.pathDist[y * 40 + x] <= 2 && g.canPlace(x, y)) { const u = g.deploy(id, x, y); if (u) { placed.push(u); done = true; } } }
+  for (const u of placed) g.upgrade(u);
+  g.towerHp = g.towerMaxHp = 1e12; g.callWaves(3); for (let i = 0; i < 20 * 60; i++) g.update(1 / 20);
+  return { placed: placed.map((u) => u.def.id), levels: placed.map((u) => u.level), kills: g.stats.kills ?? null, wave: g.wave };
+}, astral.res[0].unit);
+check('a summoned Astral unit and every Pack 2 chase unit deploy, upgrade and fight', p2deploy.placed.length === 6 && p2deploy.levels.every((l) => l >= 1) && p2deploy.kills > 0, `${p2deploy.placed.join(', ')} · lv ${p2deploy.levels.join(',')} · wave ${p2deploy.wave} kills ${p2deploy.kills}`);
+
 // 13. Battle Plans: favorites, sorting, Auto Build + Undo, manual editing
 await page.click('.tab[data-page="plans"]');
 await page.waitForTimeout(200);
@@ -435,7 +463,7 @@ check("circle + ownership filters combine (Wild West · not owned · Economy)", 
 await page.click('#roster-reset');
 await page.waitForTimeout(100);
 const reset = await ev(() => ({ f: window.endlessTower.profile.data.rosterFilter, n: document.querySelectorAll('.roster-grid .unit-card').length, sort: window.endlessTower.profile.data.rosterSort }));
-check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 55 && reset.sort === 'tier', JSON.stringify(reset));
+check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 90 && reset.sort === 'tier', JSON.stringify(reset));
 // combat sheet + comparison in the unit details panel
 await ev(() => { window.endlessTower.plans.focusId = 'glorious-leader'; window.endlessTower.plans.compare = null; window.endlessTower.plans.render(); });
 const sheet = await ev(() => ({ rows: [...document.querySelectorAll('#dossier .cmp-sheet tbody th')].map((e) => e.textContent.trim()), against: document.getElementById('compare-with').value, verdict: document.querySelector('#dossier .cmp-verdict')?.textContent ?? '' }));

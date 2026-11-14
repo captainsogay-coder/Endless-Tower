@@ -28,6 +28,8 @@ export const STATUSES = {
   exposed: { id: 'exposed', label: 'Exposed', variable: 'damageTaken', slow: 0, damageTaken: 1, duration: 4, color: '#e0a23a' },
   // variable strength: `amount` = speed removed (0.15 = −15%)
   slowed: { id: 'slowed', label: 'Slowed', variable: 'slow', slow: 0, damageTaken: 1, duration: 3, color: '#6fb6d9' },
+  // Jungle Covenant spores: a little extra damage from every source (never stacks with stronger weakness)
+  infected: { id: 'infected', label: 'Infected', slow: 0, damageTaken: 1.05, duration: 4, color: '#8fbf4a' },
   // visual-only: radiation-free arcade "energy" scorch from warheads
   charged: { id: 'charged', label: 'Charged', slow: 0, damageTaken: 1, duration: 0.6, color: '#7af0d2' },
 };

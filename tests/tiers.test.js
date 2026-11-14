@@ -45,14 +45,18 @@ test('same profile, higher tier: more damage, and upgrades grow faster', () => {
   assert.ok(tierDamageGrowth(1) > 1.15);
 });
 
-/** Raw stat value without abilities or passives: single-target DPS, and a crowd model for splash. */
+/**
+ * Raw stat value without abilities or passives: single-target DPS with area
+ * and reach valued exactly as the tier generator charges for them – i.e. the
+ * baseline budget the unit's stats actually received.
+ */
 function rawValue(def, level = 0) {
   const s = levelStats(def, level);
-  const hits = def.profile.hits;
-  const single = s.damage * s.rate * hits;
-  const tiles = s.splash / 32;
-  const crowd = single * (1 + BALANCE.splashFalloff * Math.min(8, Math.PI * tiles * tiles));
-  return Math.sqrt(single * crowd);
+  const single = s.damage * s.rate * def.profile.hits;
+  const tiles = (s.splash ?? 0) / 32;
+  const area = tiles > 0 ? 1 + TIERS.splashCost * Math.pow(tiles, 0.75) : 1;
+  const reach = 1 + TIERS.rangeCost * Math.min(2, Math.max(0, s.range / (TIERS.refRange * BALANCE.global.rangeMult * (1 + TIERS.refRangePerTier * (def.tier - 1))) - 1));
+  return single * area * reach;
 }
 
 test('raw combat stats: every T3 unit beats every T1 unit, at level 0 and at max level', () => {

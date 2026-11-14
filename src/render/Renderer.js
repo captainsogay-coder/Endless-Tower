@@ -286,6 +286,7 @@ export class Renderer {
     const hz = this.game.hazards;
     if (!hz.length) return;
     for (const h of hz) {
+      if (this.castFx.p2.drawHazard(ctx, h, t)) continue;
       const life = Math.min(1, h.ttl / h.max, (h.max - h.ttl) * 6 + 0.2);
       if (h.kind === 'energy') {
         // arcade energy zone: a humming teal disc with drifting rings
