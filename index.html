@@ -7,9 +7,9 @@
   <meta name="description" content="Endless Tower — an endless tower-defense game. There is no final wave." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <meta name="theme-color" content="#0f1115" />
+  <meta name="theme-color" content="#15140f" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -28,6 +28,12 @@
     <symbol id="i-mute" viewBox="0 0 16 16"><path d="M2 6h3l4-3v10L5 10H2z"/><path d="M11 6l3.5 4M14.5 6 11 10" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 16 16"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .3-5.6A4 4 0 0 0 4.3 7.6 2.5 2.5 0 0 0 4.5 12.5z"/></symbol>
     <symbol id="i-cloud-off" viewBox="0 0 16 16"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .3-5.6A4 4 0 0 0 4.3 7.6 2.5 2.5 0 0 0 4.5 12.5z" opacity="0.45"/><path d="M2.5 2.5l11 11" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-st-dps" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 1v4M8 11v4M1 8h4M11 8h4" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-st-aoe" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><circle cx="8" cy="8" r="4.6" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1" fill="none" opacity="0.6"/></symbol>
+    <symbol id="i-st-summon" viewBox="0 0 16 16"><circle cx="6" cy="4.5" r="2.3"/><path d="M2 14c0-3.3 1.8-5.2 4-5.2s4 1.9 4 5.2z"/><path d="M12.5 5.5v5M10 8h5" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-st-empower" viewBox="0 0 16 16"><path d="M3 8.5 8 4l5 4.5M3 13 8 8.5l5 4.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></symbol>
+    <symbol id="i-st-economy" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M9.8 5.6C9.3 5 8.7 4.8 8 4.8c-1.2 0-2 .6-2 1.5 0 2 4 1.2 4 3.3 0 .9-.9 1.6-2 1.6-.8 0-1.5-.3-2-.9M8 3.5v9" stroke="#1d1606" stroke-width="1.2" fill="none"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 16 16"><path d="M8 1.5l1.9 4.2 4.6.4-3.5 3 1.1 4.5L8 11.2l-4.1 2.4L5 9.1l-3.5-3 4.6-.4z"/></symbol>
     <symbol id="i-tower" viewBox="0 0 16 16"><path d="M3 14V6h1.5V4H6v2h1.2V4h1.6v2H10V4h1.5v2H13v8z"/></symbol>
   </svg>
 
@@ -78,21 +84,44 @@
         <div id="plan-state" class="state-tag">Empty plan</div>
       </div>
       <div class="bp-tools">
-        <button id="btn-autobuild" class="btn-secondary" type="button" title="Fill the plan with your strongest owned unit types (asks before changing anything)">Auto Build</button>
-        <button id="btn-undo-build" class="btn-secondary" type="button" hidden title="Restore the plan you had before the last Auto Build">Undo Auto Build</button>
+        <button id="btn-autobuild" class="btn-secondary" type="button" title="Fill the plan with your strongest owned unit types, optionally by DPS, AOE, Summon, Empower or Economy (shows a preview first)">Auto Pick</button>
+        <button id="btn-undo-build" class="btn-secondary" type="button" hidden title="Restore the plan you had before the last Auto Pick">Undo Auto Pick</button>
       </div>
     </header>
 
     <div class="bp-body">
       <section class="bp-roster">
-        <div class="section-head roster-head"><h2>Roster</h2><span id="roster-count" class="muted"></span>
-          <div class="roster-sort" role="group" aria-label="Sort roster">
-            <span class="label">Sort</span>
-            <button type="button" data-sort="tier" aria-pressed="true">Tier</button>
-            <button type="button" data-sort="acquired" aria-pressed="false">Acquired</button>
+        <div class="section-head roster-head"><h2>Collection</h2><span id="roster-count" class="muted"></span></div>
+        <div class="roster-tools">
+          <div class="rt-focus" role="group" aria-label="Show units strong in">
+            <button type="button" data-side="" aria-pressed="true">All roles</button>
+            <button type="button" data-side="dps" title="Units that deal damage to single targets"><svg class="st-ico"><use href="#i-st-dps" /></svg>DPS</button>
+            <button type="button" data-side="aoe" title="Units that damage or slow groups"><svg class="st-ico"><use href="#i-st-aoe" /></svg>AOE</button>
+            <button type="button" data-side="summon" title="Units that create allies or drones"><svg class="st-ico"><use href="#i-st-summon" /></svg>Summon</button>
+            <button type="button" data-side="empower" title="Units that buff allies or weaken enemies"><svg class="st-ico"><use href="#i-st-empower" /></svg>Empower</button>
+            <button type="button" data-side="economy" title="Units that generate coins"><svg class="st-ico"><use href="#i-st-economy" /></svg>Economy</button>
+          </div>
+          <div class="rt-row">
+            <label class="rt-field"><span class="label">Sort</span>
+              <select id="roster-sort" aria-label="Sort collection">
+                <option value="tier">Overall tier</option>
+                <option value="acquired">Acquired</option>
+                <option value="dps">DPS</option>
+                <option value="aoe">AOE</option>
+                <option value="summon">Summon</option>
+                <option value="empower">Empower</option>
+                <option value="economy">Economy</option>
+              </select></label>
+            <label class="rt-field"><span class="label">Circle</span><select id="roster-circle" aria-label="Filter by summoning circle"></select></label>
+            <div class="rt-own" role="group" aria-label="Ownership">
+              <button type="button" data-own="all" aria-pressed="true">All</button>
+              <button type="button" data-own="owned">Owned</button>
+              <button type="button" data-own="locked">Not owned</button>
+            </div>
+            <button type="button" id="roster-reset" class="rt-reset" hidden>Clear filters</button>
           </div>
         </div>
-        <p class="roster-hint muted small">★ pins a unit type to the front of this list. Pinning never uses a plan slot.</p>
+        <p class="roster-hint muted small"><svg class="st-ico"><use href="#i-pin" /></svg> pins a unit type to the front. Pinning never uses a plan slot. Side tiers (DPS · AOE · SUM · EMP · ECO) are measured in battle; hover a number for details.</p>
         <div id="roster-grid" class="roster-grid"></div>
       </section>
       <aside id="dossier" class="bp-dossier" aria-live="polite"></aside>
@@ -152,8 +181,15 @@
 
   <div id="screen-autobuild" class="overlay" hidden>
     <div class="modal autobuild-modal" role="dialog" aria-modal="true" aria-labelledby="autobuild-title">
-      <h2 id="autobuild-title">Auto Build</h2>
-      <p class="muted small">Your strongest owned unit types, highest tier first (up to 12). Nothing is bought, summoned or spent.</p>
+      <h2 id="autobuild-title">Auto Pick</h2>
+      <p class="muted small">Fills the plan with your strongest owned unit types (up to 12). Nothing is bought, summoned or spent.</p>
+      <div class="ab-prio">
+        <div class="ab-prio-row"><span class="label">Priority</span>
+          <div id="ab-primary" class="seg" role="radiogroup" aria-label="Priority"></div></div>
+        <div class="ab-prio-row"><span class="label">Then</span>
+          <div id="ab-secondary" class="seg" role="radiogroup" aria-label="Secondary priority"></div></div>
+        <p id="ab-rule" class="muted small"></p>
+      </div>
       <div id="autobuild-body" class="autobuild-body"></div>
       <div class="modal-actions">
         <button id="btn-autobuild-cancel" class="btn-secondary" type="button">Cancel</button>

@@ -4,6 +4,7 @@
 //   - a global voice budget per 100 ms; beyond it, quieter sounds are dropped
 //   - loudness scales down as the budget fills
 // Also runs the realm ambience and the weather layer.
+import { impactWeight } from '../render/impact.js';
 import * as sfx from './sfx.js';
 
 const MIN_GAP = {
@@ -88,11 +89,14 @@ export class AudioDirector {
     game.on('impact', (p) => {
       if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball'].includes(p.kind)) return;
       const v = this.allow('explosion');
-      if (v) sfx.explosion((p.splash || 32) / 32, v);
+      // louder and deeper only when the hit really matters
+      const w = Math.min(1, impactWeight(game, p.damage, p.target));
+      if (v) sfx.explosion(((p.splash || 32) / 32) * (0.5 + 0.5 * w), v * (0.4 + 0.6 * w));
     });
     game.on('blast', (b) => {
       const v = this.allow('explosion');
-      if (v) sfx.explosion(Math.min(4, b.radius / 32), v);
+      const w = b.damage == null ? 0.7 : Math.min(1, impactWeight(game, b.damage));
+      if (v) sfx.explosion(Math.min(4, b.radius / 32) * (0.5 + 0.5 * w), v * (0.4 + 0.6 * w));
     });
     game.on('bonusCoins', (c) => {
       const v = this.allow('coins');

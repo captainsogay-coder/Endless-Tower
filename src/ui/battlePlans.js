@@ -5,18 +5,22 @@ import { listUnits, getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
 import { levelStats, maxLevel } from '../units/unitStats.js';
 import { togglePlan, removeFromPlan, validatePlan, createPlan, MAX_PLAN_TYPES } from '../meta/battlePlan.js';
-import { sortRoster, autoBuildPlan, planDiff } from '../meta/rosterOrder.js';
-import { listBanners } from '../units/summoning.js';
+import { sortRoster, filterRoster, autoBuildPlan, planDiff, isSideMode } from '../meta/rosterOrder.js';
+import { listCirclesByPrice } from '../units/summoning.js';
+import { CATEGORIES, categoryOf, sideTiers, ratingKey } from '../meta/sideTiers.js';
+import { sideTierStrip, sideTierTable } from './sideTierView.js';
 import { unitPortrait } from '../render/unitArt.js';
 import { esc, tiles, upgradeRange, passiveScale } from './format.js';
 
 const $ = (id) => document.getElementById(id);
 /** Stats shown to players: one decimal at most (the global balance layer makes fractions). */
 const num = (v) => String(Math.round(v * 10) / 10);
+/** Drop chances keep sub-percent precision (0.5%, 2.5%). */
+const pctText = (c) => `${Math.round(c * 10000) / 100}%`;
 const portraitCache = new Map();
 export function portrait(def, size = 160) {
   const key = `${def.id}|${size}`;
-  if (!portraitCache.has(key)) portraitCache.set(key, unitPortrait(def.art, size));
+  if (!portraitCache.has(key)) portraitCache.set(key, unitPortrait(def.art, size, 0, def));
   return portraitCache.get(key);
 }
 
@@ -37,7 +41,14 @@ export class BattlePlansView {
       battle: $('btn-battle'),
       msg: $('battle-msg'),
       screen: $('screen-plans'),
-      sort: document.querySelector('.roster-sort'),
+      sort: $('roster-sort'),
+      side: document.querySelector('.rt-focus'),
+      circle: $('roster-circle'),
+      own: document.querySelector('.rt-own'),
+      reset: $('roster-reset'),
+      abPrimary: $('ab-primary'),
+      abSecondary: $('ab-secondary'),
+      abRule: $('ab-rule'),
       autobuild: $('btn-autobuild'),
       undo: $('btn-undo-build'),
       abModal: $('screen-autobuild'),
@@ -51,13 +62,25 @@ export class BattlePlansView {
     return this.profile.plan;
   }
 
-  /** Owned unit types in roster order: pinned first, then by tier or acquisition order. */
+  /** Owned unit types in roster order: pinned first, then by the chosen sort. */
   unlockedUnits() {
     const p = this.profile;
     return sortRoster(
       listUnits().filter((u) => p.isUnlocked(u.id)),
       { isFavorite: (id) => p.isFavorite(id), acquiredIndex: (id) => p.acquiredIndex(id), mode: p.data.rosterSort },
     );
+  }
+
+  /** The collection after the player's filters (ownership, circle, side tier). */
+  filtered(defs) {
+    const p = this.profile;
+    return filterRoster(defs, { ...p.data.rosterFilter, isOwned: (id) => p.isUnlocked(id), circleOf: (id) => this.sourceOf(id)?.banner ?? null });
+  }
+
+  setFilter(patch) {
+    Object.assign(this.profile.data.rosterFilter, patch);
+    this.profile.save();
+    this.render();
   }
 
   bind() {
@@ -97,13 +120,42 @@ export class BattlePlansView {
         ev.target.click();
       }
     });
-    el.sort.addEventListener('click', (ev) => {
-      const b = ev.target.closest('[data-sort]');
-      if (!b) return;
-      this.profile.data.rosterSort = b.dataset.sort;
+    el.sort.addEventListener('change', () => {
+      this.profile.data.rosterSort = el.sort.value;
       this.profile.save();
       this.render();
     });
+    el.side.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-side]');
+      if (!b) return;
+      const side = b.dataset.side || null;
+      // focusing a role also ranks by it; going back to all roles restores the overall-tier order
+      const d = this.profile.data;
+      if (side) d.rosterSort = side;
+      else if (isSideMode(d.rosterSort)) d.rosterSort = 'tier';
+      this.setFilter({ side });
+    });
+    el.circle.addEventListener('change', () => this.setFilter({ circle: el.circle.value }));
+    el.own.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-own]');
+      if (b) this.setFilter({ ownership: b.dataset.own });
+    });
+    el.reset.addEventListener('click', () => {
+      if (isSideMode(this.profile.data.rosterSort)) this.profile.data.rosterSort = 'tier';
+      this.setFilter({ ownership: 'all', circle: 'all', side: null });
+    });
+    const prio = (box, key) =>
+      box.addEventListener('click', (ev) => {
+        const b = ev.target.closest('[data-prio]');
+        if (!b) return;
+        const ap = this.profile.data.autoPick;
+        ap[key] = b.dataset.prio || null;
+        if (key === 'primary' && (!ap.primary || ap.secondary === ap.primary)) ap.secondary = null;
+        this.profile.save();
+        this.renderAutoBuild();
+      });
+    prio(el.abPrimary, 'primary');
+    prio(el.abSecondary, 'secondary');
     el.autobuild.addEventListener('click', () => this.openAutoBuild());
     el.undo.addEventListener('click', () => this.undoAutoBuild());
     $('btn-autobuild-cancel').addEventListener('click', () => this.closeAutoBuild());
@@ -154,33 +206,57 @@ export class BattlePlansView {
     this.render();
   }
 
-  // ---------------------------------------------------------- Auto Build
+  // ---------------------------------------------------------- Auto Pick
 
   proposedBuild() {
     const p = this.profile;
     const owned = listUnits().filter((u) => p.isUnlocked(u.id));
-    return autoBuildPlan(owned, { acquiredIndex: (id) => p.acquiredIndex(id) });
+    const { primary, secondary } = p.data.autoPick;
+    return autoBuildPlan(owned, { acquiredIndex: (id) => p.acquiredIndex(id), primary, secondary });
   }
 
   openAutoBuild() {
+    this.renderAutoBuild();
+    this.el.abModal.hidden = false;
+    this.el.abOk.focus();
+  }
+
+  /** Priority buttons + live preview of the plan Auto Pick would build. */
+  renderAutoBuild() {
+    const { primary, secondary } = this.profile.data.autoPick;
+    const seg = (key, current, noneLabel, disabled = false) =>
+      [{ id: '', name: noneLabel, color: null }, ...CATEGORIES]
+        .map((c) => {
+          const on = (current ?? '') === c.id;
+          const off = disabled || (key === 'secondary' && c.id && c.id === primary);
+          return `<button type="button" role="radio" aria-checked="${on}" data-prio="${c.id}" ${off ? 'disabled' : ''} ${c.color ? `style="--c:${c.color}"` : ''}>${c.id ? `<svg class="st-ico"><use href="#i-st-${c.id}" /></svg>` : ''}${esc(c.name)}</button>`;
+        })
+        .join('');
+    this.el.abPrimary.innerHTML = seg('primary', primary, 'Balanced');
+    this.el.abSecondary.innerHTML = seg('secondary', secondary, 'None', !primary);
+    const pc = categoryOf(primary);
+    const sc = categoryOf(secondary);
+    this.el.abRule.textContent = pc
+      ? `Ranked by ${pc.name} side tier${sc ? `, then ${sc.name}` : ''}, then overall tier, then measured strength; units without ${pc.name} (N/A) fill the remaining slots.`
+      : 'Ranked by overall tier, then measured strength, then the order you got them.';
     const next = this.proposedBuild();
     this.pendingBuild = next;
     const diff = planDiff(this.plan.units, next);
     const chip = (id, cls) => {
       const d = getUnit(id);
-      return `<li class="ab-unit ${cls}" style="--c:${getTier(d.tier).color}"><img alt="" src="${portrait(d, 64)}" /><span class="ab-name">${esc(d.name)}</span><span class="ab-tier">${esc(getTier(d.tier).label)}</span></li>`;
+      const v = primary ? sideTiers(d)[primary] : null;
+      const tag = primary ? `<span class="ab-side" style="--c:${pc.color}">${pc.label} ${v == null ? '–' : Math.max(1, Math.round(v))}</span>` : '';
+      const mark = cls === 'added' ? '<span class="ab-mark">New</span>' : cls === 'kept' ? '<span class="ab-mark">Kept</span>' : '<span class="ab-mark">Out</span>';
+      return `<li class="ab-unit ${cls}" style="--c:${getTier(d.tier).color}"><img alt="" src="${portrait(d, 64)}" /><span class="ab-name">${esc(d.name)}</span><span class="ab-tier">${esc(getTier(d.tier).label)}</span>${tag}${mark}</li>`;
     };
     const same = diff.added.length === 0 && diff.removed.length === 0 && next.every((id, i) => this.plan.units[i] === id);
     this.el.abBody.innerHTML = `
-      <div class="ab-section"><h3>New plan · ${next.length} / ${MAX_PLAN_TYPES}</h3><ol class="ab-list">${next.map((id) => chip(id, diff.added.includes(id) ? 'added' : 'kept')).join('')}</ol></div>
-      ${diff.added.length ? `<div class="ab-section"><h3>Will be added (${diff.added.length})</h3><ul class="ab-list">${diff.added.map((id) => chip(id, 'added')).join('')}</ul></div>` : ''}
+      <div class="ab-section"><h3>New plan · ${next.length} / ${MAX_PLAN_TYPES}<span class="ab-sum">${diff.added.length} new · ${diff.kept.length} kept · ${diff.removed.length} replaced</span></h3><ol class="ab-list">${next.map((id) => chip(id, diff.added.includes(id) ? 'added' : 'kept')).join('')}</ol></div>
       ${diff.removed.length ? `<div class="ab-section"><h3>Will be replaced (${diff.removed.length})</h3><ul class="ab-list">${diff.removed.map((id) => chip(id, 'removed')).join('')}</ul></div>` : ''}
-      ${same ? '<p class="muted">Your plan already is the strongest selection.</p>' : ''}
+      ${same ? '<p class="muted">Your plan already matches this selection.</p>' : ''}
       ${next.length < MAX_PLAN_TYPES ? `<p class="muted small">You own ${next.length} unit type${next.length === 1 ? '' : 's'}; all of them are included.</p>` : ''}
       <p class="muted small">Your current plan is kept for Undo.</p>`;
     this.el.abOk.disabled = same;
-    this.el.abModal.hidden = false;
-    this.el.abOk.focus();
   }
 
   closeAutoBuild() {
@@ -197,7 +273,7 @@ export class BattlePlansView {
     p.save();
     this.closeAutoBuild();
     this.focusId = next[0] ?? this.focusId;
-    this.message('Auto Build applied. Use Undo Auto Build to restore your previous plan.');
+    this.message('Auto Pick applied. Use Undo Auto Pick to restore your previous plan.');
     this.render();
   }
 
@@ -260,7 +336,16 @@ export class BattlePlansView {
     const { el } = this;
     el.undo.hidden = !this.profile.data.planBackup;
     el.autobuild.disabled = !listUnits().some((u) => this.profile.isUnlocked(u.id));
-    for (const b of el.sort.querySelectorAll('[data-sort]')) b.setAttribute('aria-pressed', String(b.dataset.sort === this.profile.data.rosterSort));
+    const d = this.profile.data;
+    el.sort.value = d.rosterSort;
+    const f = d.rosterFilter;
+    for (const b of el.side.querySelectorAll('[data-side]')) b.setAttribute('aria-pressed', String((b.dataset.side || null) === f.side));
+    for (const b of el.own.querySelectorAll('[data-own]')) b.setAttribute('aria-pressed', String(b.dataset.own === f.ownership));
+    const circles = listCirclesByPrice();
+    if (f.circle !== 'all' && f.circle !== 'starter' && !circles.some((c) => c.id === f.circle)) f.circle = 'all';
+    el.circle.innerHTML = [`<option value="all">All circles</option>`, `<option value="starter">Starter units</option>`, ...circles.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} · ${c.price} Tokens</option>`)].join('');
+    el.circle.value = f.circle;
+    el.reset.hidden = f.ownership === 'all' && f.circle === 'all' && !f.side;
     const n = this.plan.units.length;
     if (document.activeElement !== el.name) el.name.value = this.plan.name;
     el.count.textContent = n;
@@ -278,28 +363,38 @@ export class BattlePlansView {
     else if (n > 0 && !el.msg.classList.contains('error')) this.message(`${n} unit type${n > 1 ? 's' : ''} ready. Copies are unlimited in battle.`);
   }
 
-  /** Where a locked unit can be obtained: banner name and per-pull chance. */
+  /** Where a unit can be obtained: circle and per-pull chance (null for starter units). */
   sourceOf(id) {
-    for (const b of listBanners()) {
+    for (const b of listCirclesByPrice()) {
       const entry = b.pool.find((p) => p.unit === id);
       if (entry) return { banner: b, chance: entry.chance };
     }
     return null;
   }
 
-  renderRoster(units) {
-    const locked = listUnits().filter((u) => !this.profile.isUnlocked(u.id)).sort((a, b) => a.tier - b.tier);
-    this.el.rosterCount.textContent = `${units.length} of ${units.length + locked.length} unlocked`;
+  renderRoster(allOwned) {
+    const p = this.profile;
+    const f = p.data.rosterFilter;
+    const mode = p.data.rosterSort;
+    const hl = isSideMode(mode) ? mode : f.side;
+    const units = this.filtered(allOwned);
+    const lockedAll = listUnits().filter((u) => !p.isUnlocked(u.id));
+    // locked units follow the same sort (minus pins), so "best Economy I don't own yet" is easy to find
+    const locked = sortRoster(this.filtered(lockedAll), { acquiredIndex: () => 0, mode: mode === 'acquired' ? 'tier' : mode });
+    const total = allOwned.length + lockedAll.length;
+    const shown = units.length + locked.length;
+    this.el.rosterCount.textContent = `${allOwned.length} of ${total} owned${shown < total ? ` · ${shown} shown` : ''}`;
     const cards = units.map((def) => {
       const tier = getTier(def.tier);
       const s = levelStats(def, 0);
       const selected = this.plan.units.includes(def.id);
-      const pinned = this.profile.isFavorite(def.id);
-      return `<div class="unit-card ${selected ? 'selected' : ''} ${pinned ? 'pinned' : ''} ${def.id === this.focusId ? 'focused' : ''}" role="button" tabindex="0" data-id="${esc(def.id)}" aria-pressed="${selected}">
+      const pinned = p.isFavorite(def.id);
+      return `<div class="unit-card ${selected ? 'selected' : ''} ${pinned ? 'pinned' : ''} ${def.id === this.focusId ? 'focused' : ''}" role="button" tabindex="0" data-id="${esc(def.id)}" aria-pressed="${selected}" style="--tc:${tier.color}">
         <div class="uc-art"><img alt="" src="${portrait(def)}" /><span class="uc-tier">${esc(tier.label)}</span><span class="uc-pick">${selected ? 'In plan' : 'Add'}</span>
-          <button type="button" class="uc-fav ${pinned ? 'on' : ''}" data-fav="${esc(def.id)}" aria-pressed="${pinned}" aria-label="${pinned ? 'Unpin' : 'Pin'} ${esc(def.name)}" title="${pinned ? 'Unpin' : 'Pin to the front'}">${pinned ? '★' : '☆'}</button></div>
+          <button type="button" class="uc-fav ${pinned ? 'on' : ''}" data-fav="${esc(def.id)}" aria-pressed="${pinned}" aria-label="${pinned ? 'Unpin' : 'Pin'} ${esc(def.name)}" title="${pinned ? 'Unpin' : 'Pin to the front'}"><svg><use href="#i-pin" /></svg></button></div>
         <div class="uc-head"><h3>${esc(def.name)}</h3><span class="uc-price"><span class="coin sm"></span>${def.price}</span></div>
         <div class="uc-role">${esc(def.role ?? '')}</div>
+        ${sideTierStrip(def, { highlight: hl, label: false })}
         <dl class="uc-stats">
           <div><dt>Damage</dt><dd>${num(s.damage)}</dd></div>
           <div><dt>Range</dt><dd>${tiles(s.range)}</dd></div>
@@ -311,22 +406,35 @@ export class BattlePlansView {
         </div>
       </div>`;
     });
-    const pinnedCount = units.filter((d) => this.profile.isFavorite(d.id)).length;
+    const pinnedCount = units.filter((d) => p.isFavorite(d.id)).length;
     if (pinnedCount && pinnedCount < units.length) cards.splice(pinnedCount, 0, '<div class="roster-divider" aria-hidden="true"></div>');
+    if (!units.length && f.ownership !== 'locked') {
+      cards.push(`<div class="roster-empty">${allOwned.length ? 'No owned unit matches these filters.' : 'You do not own any units yet.'}${f.side ? ` <span class="muted">Units with N/A in ${esc(categoryOf(f.side).name)} are hidden.</span>` : ''}</div>`);
+    }
     if (locked.length) {
-      cards.push('<div class="section-head roster-sub"><h2>Not yet obtained</h2><span class="muted">Unlock these by summoning</span></div>');
+      cards.push(`<div class="section-head roster-sub"><h2>Not yet obtained</h2><span class="muted">Unlock these by summoning</span></div>`);
       for (const def of locked) {
         const tier = getTier(def.tier);
         const src = this.sourceOf(def.id);
-        cards.push(`<button class="unit-card locked ${def.id === this.focusId ? 'focused' : ''}" data-id="${esc(def.id)}" data-name="${esc(def.name)}" aria-disabled="true">
+        cards.push(`<button class="unit-card locked ${def.id === this.focusId ? 'focused' : ''}" data-id="${esc(def.id)}" data-name="${esc(def.name)}" aria-disabled="true" style="--tc:${tier.color}">
           <div class="uc-art"><img alt="" src="${portrait(def)}" /><span class="uc-tier">${esc(tier.label)}</span><span class="uc-pick">Locked</span></div>
           <div class="uc-head"><h3>${esc(def.name)}</h3><span class="uc-price"><span class="coin sm"></span>${def.price}</span></div>
           <div class="uc-role">${esc(def.role ?? '')}</div>
-          <div class="uc-foot"><div class="uc-line"><span class="k">Obtain</span><span class="v">${src ? `${esc(src.banner.name)} · ${Math.round(src.chance * 100)}% per summon` : 'Not available yet'}</span></div></div>
+          ${sideTierStrip(def, { highlight: hl, label: false })}
+          <div class="uc-foot"><div class="uc-line"><span class="k">Obtain</span><span class="v">${src ? `${esc(src.banner.name)} · ${pctText(src.chance)} per summon` : 'Not available yet'}</span></div></div>
         </button>`);
       }
     }
     this.el.roster.innerHTML = cards.join('');
+  }
+
+  /** "#2 of 14 owned" – where a unit stands among the player's units in one side tier. */
+  rankAmongOwned(def, cat) {
+    const owned = listUnits().filter((u) => this.profile.isUnlocked(u.id) && sideTiers(u)[cat] != null);
+    const mine = ratingKey(sideTiers(def)[cat]);
+    if (mine < 0) return '';
+    const better = owned.filter((u) => ratingKey(sideTiers(u)[cat]) > mine).length;
+    return this.profile.isUnlocked(def.id) ? `#${better + 1} of ${owned.length} owned` : owned.length ? `would rank #${better + 1} of ${owned.length + 1}` : '';
   }
 
   renderDossier() {
@@ -358,6 +466,10 @@ export class BattlePlansView {
       </div>
       <p class="ds-desc">${esc(def.description ?? '')}</p>
       <div class="ds-section">
+        <h3>Side tiers <span class="muted small">vs overall ${esc(tier.label)}</span></h3>
+        ${sideTierTable(def, { rank: (c) => this.rankAmongOwned(def, c) })}
+      </div>
+      <div class="ds-section">
         <h3>Base statistics</h3>
         <dl class="kv">
           <dt>Purchase price</dt><dd>${def.price} coins</dd>
@@ -387,7 +499,7 @@ export class BattlePlansView {
         <dl class="kv">
           <dt>Status</dt><dd>${unlocked ? 'Unlocked' : 'Locked'}</dd>
           <dt>Source</dt><dd>${src ? esc(src.banner.name) : 'Starter unit'}</dd>
-          ${src ? `<dt>Summon chance</dt><dd>${Math.round(src.chance * 100)}%</dd><dt>Times obtained</dt><dd>${this.profile.ownedCount(def.id)}</dd>` : ''}
+          ${src ? `<dt>Summon chance</dt><dd>${pctText(src.chance)}</dd><dt>Times obtained</dt><dd>${this.profile.ownedCount(def.id)}</dd>` : ''}
         </dl>
       </div>
       <div class="ds-actions">${unlocked

@@ -1,7 +1,7 @@
 // SUMMONING page: banner, pool odds, x1/x5/x10/x25 with confirmation, and the
 // reveal sequence (skippable) followed by a results summary.
 
-import { getBanner, listBanners, MILITARY_CIRCLE, summon, summonCost, duplicateCompensation, isRare, SUMMON_CONFIG } from '../units/summoning.js';
+import { getBanner, listCirclesByPrice, summon, summonCost, duplicateCompensation, isRare, SUMMON_CONFIG } from '../units/summoning.js';
 import { BALANCE } from '../balance.js';
 import { getUnit } from '../units/unitRegistry.js';
 import { getTier } from '../units/tiers.js';
@@ -11,6 +11,7 @@ import { createRng } from '../core/rng.js';
 import * as sfx from '../audio/sfx.js';
 import { esc } from './format.js';
 import { portrait } from './battlePlans.js';
+import { sideTierStrip } from './sideTierView.js';
 
 const $ = (id) => document.getElementById(id);
 // keep sub-percent odds exact (0.5%, 7.5%)
@@ -21,7 +22,7 @@ export class SummoningView {
   constructor({ profile, onChange }) {
     this.profile = profile;
     this.onChange = onChange;
-    this.banner = getBanner(MILITARY_CIRCLE);
+    this.banner = listCirclesByPrice()[0];
     this.rng = createRng();
     this.pending = 0;
     this.stage = new SummonStage($('summon-stage'));
@@ -118,9 +119,9 @@ export class SummoningView {
     const pctComp = Math.round(SUMMON_CONFIG.duplicateCompensation * 100);
     $('pool-note').textContent = `Summoned units are unlocked permanently and appear in Battle Plans. Duplicates pay back ${duplicateCompensation(banner)} Tokens each (${pctComp}% of a summon).`;
     // circle cards: name, Token price and a preview of the units inside
-    el.tabs.innerHTML = listBanners()
+    el.tabs.innerHTML = listCirclesByPrice()
       .map((b) => {
-        const top = [...b.pool].sort((x, y) => getUnit(y.unit).tier - getUnit(x.unit).tier).slice(0, 4);
+        const top = [...b.pool].sort((x, y) => getUnit(y.unit).tier - getUnit(x.unit).tier).slice(0, 3);
         return `<button class="circle-card ${b.id === banner.id ? 'active' : ''}" role="tab" aria-selected="${b.id === banner.id}" data-banner="${esc(b.id)}">
           <span class="cc-name">${esc(b.name)}</span>
           <span class="cc-price">${tokenIcon}${formatNumber(b.price)} Tokens</span>
@@ -137,7 +138,7 @@ export class SummoningView {
         const owned = profile.ownedCount(p.unit);
         return `<li class="pool-item ${isRare(p.chance) ? 'rare' : ''}" style="--c:${tier.color}">
           <img alt="" src="${portrait(def, 104)}" />
-          <div><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span> · ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div></div>
+          <div class="pi-main"><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span> · ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div>${sideTierStrip(def, { label: false })}</div>
           <div class="pi-chance">${pct(p.chance)}<span>Chance</span></div>
         </li>`;
       })
@@ -229,7 +230,8 @@ export class SummoningView {
       <span class="rc-tier" style="--c:${tier.color}">${esc(tier.label)}</span>
       <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
       ${r.rare ? `<div class="rc-rare">Rare asset · ${pct(r.chance)}</div>` : ''}
-      <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)} · duplicate refunded`}</div>`;
+      <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)} · duplicate refunded`}</div>
+      ${sideTierStrip(def)}`;
     if (this.results.length === 1) {
       el.skip.hidden = true;
       el.done.hidden = false;
@@ -269,6 +271,7 @@ export class SummoningView {
           return `<div class="rs-item ${r.rare ? 'rare' : ''}" style="--c:${tier.color}; animation-delay:${Math.min(i, 30) * 25}ms">
             ${r.isNew ? '<span class="rc-new">New</span>' : ''}
             <img alt="" src="${portrait(def, 160)}" /><div class="rs-name">${esc(def.name)}</div><div class="rs-tier">${esc(tier.label)}</div>
+            ${sideTierStrip(def, { label: false })}
             ${r.isNew ? '' : `<div class="rs-comp">+${r.compensation} Tokens</div>`}</div>`;
         })
         .join('')}</div>`;

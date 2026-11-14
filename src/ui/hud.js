@@ -2,6 +2,7 @@
 // controller via callbacks. DOM work is keyed/throttled so it stays cheap with
 // hundreds of units on the field.
 
+import { sideTierStrip } from './sideTierView.js';
 import { formatNumber } from '../core/math.js';
 import { getTier } from '../units/tiers.js';
 import { getTrait } from '../waves/traits.js';
@@ -392,6 +393,7 @@ export class Hud {
       panel.innerHTML = `
         <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span> · <span class="up-lv"></span></div><div class="up-quick"></div></div>
           <button class="up-close" data-act="close" aria-label="Close" type="button">×</button></div>
+        ${sideTierStrip(def, { label: false })}
         <div class="up-body"></div>
         <div class="up-actions">
           <button class="btn-primary up-btn" data-act="upgrade" type="button" title="Upgrade (U)"></button>

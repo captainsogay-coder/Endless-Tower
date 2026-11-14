@@ -1,3 +1,4 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType, tileIndex } from '../mapGenerator.js';
 import { scatter, scatterWeighted, softBlob, dropShadow } from '../paint.js';
@@ -45,6 +46,7 @@ export default {
   name: 'Ancient Ruins',
   tagline: 'A forgotten empire still keeps its vigil',
   palette,
+  pathRuts: false,
   // late-afternoon sun, low from the west
   lighting: { pos: { x: -320, y: 300 }, strength: 0.22, vignette: 0.45, grade: '#f5eedb' },
   atmosphere: { cloudShadows: 4 },
@@ -59,6 +61,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 3 }, featureDensity: 0.06, rivers: [0, 0], noiseScale: 0.2 },
   decor: [
+    ...VIGNETTE_DECOR.ruins,
     { kind: 'colossus', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },
     { kind: 'monument', count: [0, 1], fp: 2, minPathDist: 2, size: 1.1 },
     { kind: 'pillar', count: [9, 14], fp: 1, minPathDist: 1, size: 0.55, clump: 0.8 },

@@ -1,3 +1,5 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
+import { featureField, isoFill, isoLines } from '../contour.js';
 import { TILE, WORLD_W, WORLD_H, COLS, ROWS } from '../../config.js';
 import { TileType, tileIndex } from '../mapGenerator.js';
 import { scatterWeighted, dropShadow, isType, blobPoints } from '../paint.js';
@@ -31,6 +33,7 @@ export default {
   name: 'Sky Islands',
   tagline: 'Shattered lands adrift above the clouds',
   palette,
+  swayKinds: ['cloudTree'],
   lighting: { strength: 0.12, vignette: 0.22, grade: '#fbf8ee' },
   atmosphere: { cloudShadows: 3 },
   enemyPalette: { body: '#4b3a8c', dark: '#1f1648', eye: '#ffef7a', glow: '#a58cff' },
@@ -43,6 +46,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 1, converge: 3 }, featureDensity: 0.3, edgeBias: 0.8, rivers: [0, 0], noiseScale: 0.16 },
   decor: [
+    ...VIGNETTE_DECOR.sky,
     { kind: 'skyShrine', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.4 },
     { kind: 'cloudTree', count: [8, 12], fp: 1, minPathDist: 1, size: 0.75, clump: 0.7 },
     { kind: 'cloudTree', count: [2, 4], fp: 2, minPathDist: 2, size: 1.25, clump: 0.7 },
@@ -69,28 +73,18 @@ export default {
   paintFeatures(ctx, map) {
     const tiles = map.featureTiles;
     const blobs = blobPoints(map);
-    // Cut the void out of the land.
+    // Cut the void out of the land along the noisy contour, then light the rim.
+    const f = featureField(map);
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    for (const t of blobs) {
-      const x = t.x * TILE + TILE / 2;
-      const y = t.y * TILE + TILE / 2;
-      ctx.moveTo(x + TILE * 0.72, y);
-      ctx.arc(x, y, TILE * 0.72, 0, TAU);
-    }
-    ctx.fill();
-    // Grass rim highlight
+    ctx.fill(isoFill(f, 0.5));
     ctx.globalCompositeOperation = 'source-atop';
     ctx.strokeStyle = 'rgba(220,255,170,0.55)';
     ctx.lineWidth = 3;
-    for (const t of tiles) {
-      const x = t.x * TILE + TILE / 2;
-      const y = t.y * TILE + TILE / 2;
-      ctx.beginPath();
-      ctx.arc(x, y, TILE * 0.74, 0, TAU);
-      ctx.stroke();
-    }
+    ctx.stroke(isoLines(f, 0.46));
+    ctx.strokeStyle = 'rgba(40,60,20,0.35)';
+    ctx.lineWidth = 2;
+    ctx.stroke(isoLines(f, 0.4));
     // Cliff faces hang beneath land, drawn only into transparent void.
     ctx.globalCompositeOperation = 'destination-over';
     for (let y = 0; y < ROWS; y++) {

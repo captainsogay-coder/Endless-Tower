@@ -13,6 +13,8 @@ import { drawUnit, unitSprite } from './unitArt.js';
 import { Effects } from './fx.js';
 import { WeatherFx } from './weatherFx.js';
 import { CastFx, BLAST_PALETTES } from './castFx.js';
+import { baseRadius } from './unitIdentity.js';
+import { impactWeight } from './impact.js';
 import { circle, drawGlow } from './canvas.js';
 import { rgba, shade } from '../core/color.js';
 import { getTrait } from '../waves/traits.js';
@@ -136,19 +138,21 @@ export class Renderer {
       case 'drone':
       case 'explosive-drone': {
         const big = p.kind !== 'grenade' && p.kind !== 'drone';
+        // the blast shows its true radius; how much fire fills it follows the damage dealt
         const r = p.splash || (big ? 48 : 36);
-        const max = p.kind === 'siege' ? 0.45 : big ? 0.32 : 0.26;
+        const w = impactWeight(this.game, p.damage, p.target);
+        const max = (p.kind === 'siege' ? 0.45 : big ? 0.32 : 0.26) * (0.55 + 0.45 * Math.min(1, w));
         // Under heavy AOE load, thin out repeated blasts rather than stacking hundreds of shapes.
-        if (this.blasts.length < 90 || p.kind === 'siege' || p.kind === 'explosive-drone') {
-          this.blasts.push({ x: p.x, y: p.y, r, t: 0, max, seed: Math.random() * 6, palette: p.kind === 'explosive-drone' ? 'hot' : null });
+        if (this.blasts.length < 90 || (w > 0.6 && (p.kind === 'siege' || p.kind === 'explosive-drone'))) {
+          this.blasts.push({ x: p.x, y: p.y, r, t: 0, max, seed: Math.random() * 6, palette: p.kind === 'explosive-drone' ? 'hot' : null, w });
           if (this.blasts.length > 120) this.blasts.shift();
         }
-        this.decals.push({ x: p.x, y: p.y, r: r * 0.55, t: 0, max: big ? 6 : 4, seed: Math.random() * 6 });
+        this.decals.push({ x: p.x, y: p.y, r: r * 0.55 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: big ? 6 : 4, seed: Math.random() * 6 });
         if (this.decals.length > 140) this.decals.shift();
-        this.fx.ring(p.x, p.y, r * 0.3, r * 1.05, 0.35, '#d8cbb0', 2);
-        if (p.kind === 'siege') this.fx.ring(p.x, p.y, r * 0.6, r * 1.6, 0.6, '#efe6d0', 3);
-        if (p.kind === 'explosive-drone') this.fx.ring(p.x, p.y, r * 0.2, r * 0.9, 0.3, '#d9533f', 2.5);
-        this.fx.burst(p.x, p.y, Math.round((big ? 8 : 5) * d), '#3a332c', { speed: 70 + r, life: 0.5, size: 2, glow: false, gravity: 120 });
+        this.fx.ring(p.x, p.y, r * 0.3, r * 1.0, 0.25 + 0.15 * w, '#d8cbb0', 1 + w);
+        if (p.kind === 'siege' && w > 0.5) this.fx.ring(p.x, p.y, r * 0.6, r * 1.3, 0.5, '#efe6d0', 1 + 2 * w);
+        if (p.kind === 'explosive-drone') this.fx.ring(p.x, p.y, r * 0.2, r * 0.9, 0.3, '#d9533f', 1.5 + w);
+        this.fx.burst(p.x, p.y, Math.round((big ? 8 : 5) * d * Math.min(1, w)), '#3a332c', { speed: 50 + r * w, life: 0.5, size: 2, glow: false, gravity: 120 });
         break;
       }
       default:
@@ -213,6 +217,7 @@ export class Renderer {
       if (!scene.terrain) return;
     }
     this.time += dt;
+    scene.setWind(this.game.weather?.current?.id ?? null);
     scene.update(dt);
     this.fx.update(gameDt);
     this.weatherFx.update(dt, this.game.weather?.current, this.effectsLevel);
@@ -343,7 +348,16 @@ export class Renderer {
       if (b.t >= b.max) continue;
       const k = b.t / b.max;
       const grow = k < 0.3 ? k / 0.3 : 1;
-      const r = b.r * (0.45 + 0.4 * grow) * (k > 0.5 ? 1 - (k - 0.5) * 0.6 : 1);
+      // weight (0.1–1.3): weak hits are a small core inside a dust outline of the real radius
+      const wt = Math.min(1, b.w ?? 1);
+      const r = b.r * (0.45 + 0.4 * grow) * (k > 0.5 ? 1 - (k - 0.5) * 0.6 : 1) * (0.3 + 0.7 * wt);
+      if (wt < 0.75) {
+        ctx.strokeStyle = `rgba(216,203,176,${0.55 * (1 - k)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(b.x, b.y, b.r * (0.8 + 0.2 * grow), b.r * (0.8 + 0.2 * grow) * 0.8, 0, 0, TAU);
+        ctx.stroke();
+      }
       const pts = 10;
       const shape = (rad, col) => {
         ctx.fillStyle = col;
@@ -357,10 +371,10 @@ export class Renderer {
         ctx.fill();
       };
       ctx.globalAlpha = 1 - Math.max(0, k - 0.4) / 0.6;
-      if (k < 0.15) drawGlow(ctx, '#ffd38a', b.x, b.y, b.r * 1.2, 0.35);
+      if (k < 0.15 && wt > 0.6) drawGlow(ctx, '#ffd38a', b.x, b.y, b.r * 1.1 * wt, 0.3 * wt);
       const pal = b.palette === 'lightning' ? ['#cfd8ff', '#ffffff'] : BLAST_PALETTES[b.palette] ?? ['#e8742c', '#ffd57a'];
       shape(r, k < 0.55 ? pal[0] : '#6d5e52');
-      shape(r * 0.62, k < 0.4 ? pal[1] : '#8b7d70');
+      if (wt > 0.3) shape(r * 0.62, k < 0.4 ? pal[1] : '#8b7d70');
       ctx.globalAlpha = 1;
       this.blasts[w++] = b;
     }
@@ -600,7 +614,8 @@ export class Renderer {
       ctx.strokeStyle = '#f2efe6';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.ellipse(sel.x, sel.y + 9, 10, 4.5, 0, 0, TAU);
+      const br = baseRadius(sel.def) + 3;
+      ctx.ellipse(sel.x, sel.y + 9, br, br * 0.44, 0, 0, TAU);
       ctx.stroke();
     }
     const enemies = game.enemies;

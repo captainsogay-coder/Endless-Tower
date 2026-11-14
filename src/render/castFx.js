@@ -9,6 +9,7 @@
 import { TAU } from '../core/math.js';
 import { circle, drawGlow } from './canvas.js';
 import { drawUnit } from './unitArt.js';
+import { impactWeight } from './impact.js';
 
 const BLAST_STYLE = {
   dynamite: { palette: 'hot', max: 0.3 },
@@ -49,7 +50,7 @@ export class CastFx {
 
   attach(game, on) {
     this.game = game;
-    on('blast', (b) => this.blast(b.x, b.y, b.radius, b.kind, b.focus));
+    on('blast', (b) => this.blast(b.x, b.y, b.radius, b.kind, b.focus, b.damage));
     on('flyover', (f) => this.planes.push({ ...f, t: 0 }));
     on('pulse', (p) => this.pulses.push({ ...p, t: 0, max: p.radius === Infinity ? 0.9 : 0.6 }));
     on('bonusCoins', (c) => this.popups.push({ x: c.x, y: c.y, text: `${c.label ? `${c.label} ` : ''}+${c.amount}`, t: 0, big: !!c.label }));
@@ -61,23 +62,34 @@ export class CastFx {
     on('houseEdge', (v) => this.popups.push({ x: game.house?.x ?? 0, y: (game.house?.y ?? 0) - 50, text: `House Edge +${Math.round(v * 100)}%`, t: 0, big: true }));
     on('mark', ({ enemy }) => this.r.fx.ring(enemy.x, enemy.y, 4, enemy.radius * 2.4, 0.5, '#e3a33b', 2));
     on('field', (f) => this.r.fx.ring(f.x, f.y, f.radius, 6, 0.8, '#b79cff', 2));
-    on('allySpawn', (a) => this.r.fx.burst(a.x, a.y + 6, 4, '#d9cdb5', { speed: 24, life: 0.3, size: 2, glow: false }));
+    // summons: a green ground ring (the Summon side-tier colour) and a little dust
+    on('allySpawn', (a) => {
+      this.r.fx.ring(a.x, a.y + 9, 3, 13, 0.45, '#6fae72', 1.6);
+      this.r.fx.burst(a.x, a.y + 6, 3, '#d9cdb5', { speed: 20, life: 0.3, size: 1.6, glow: false });
+    });
   }
 
-  blast(x, y, radius, kind, focus) {
+  /**
+   * Area blast. The radius is always the real one; the spectacle inside it
+   * (fireball size, duration, secondary shockwave, screen shake) follows the
+   * damage it dealt, so a heavy weapon doing chip damage stays modest.
+   */
+  blast(x, y, radius, kind, focus, damage = null, target = null) {
     const st = BLAST_STYLE[kind] ?? { palette: null, max: 0.32 };
     const r = this.r;
-    if (r.blasts.length < 110 || kind === 'warhead' || kind === 'antimatter') {
-      r.blasts.push({ x, y, r: radius, t: 0, max: st.max, seed: Math.random() * 6, palette: st.palette });
+    const w = damage == null ? 0.6 : impactWeight(this.game, damage, target);
+    const heavy = kind === 'warhead' || kind === 'antimatter' || kind === 'bankruptcy';
+    if (r.blasts.length < 110 || (heavy && w > 0.6)) {
+      r.blasts.push({ x, y, r: radius, t: 0, max: st.max * (0.5 + 0.5 * Math.min(1, w)), seed: Math.random() * 6, palette: st.palette, w });
       if (r.blasts.length > 130) r.blasts.shift();
     }
-    r.decals.push({ x, y, r: radius * 0.5, t: 0, max: 5, seed: Math.random() * 6 });
+    r.decals.push({ x, y, r: radius * 0.5 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: 5, seed: Math.random() * 6 });
     if (r.decals.length > 140) r.decals.shift();
     const col = { energy: '#9ff5dd', antimatter: '#cdb6ff', gold: '#f2d38a' }[st.palette] ?? '#d8cbb0';
-    r.fx.ring(x, y, radius * 0.25, radius * 1.05, 0.4, col, 2);
-    if (kind === 'warhead' || kind === 'antimatter' || kind === 'bankruptcy') {
-      r.fx.ring(x, y, radius * 0.5, radius * 1.5, 0.8, col, 3);
-      r.shake(kind === 'bankruptcy' ? 2 : 3);
+    r.fx.ring(x, y, radius * 0.25, radius * 1.0, 0.3 + 0.1 * w, col, 1 + w);
+    if (heavy && w > 0.5) {
+      r.fx.ring(x, y, radius * 0.5, radius * 1.25, 0.7, col, 1 + 2 * w);
+      if (w > 0.8 && radius > 60) r.shake(Math.min(3, (kind === 'bankruptcy' ? 1.5 : 2.5) * w));
     }
     if (focus) r.fx.ring(focus.x, focus.y, 3, 26, 0.5, '#ffffff', 2.5);
   }
@@ -101,29 +113,29 @@ export class CastFx {
         if (Math.random() < 0.5 * d) this.r.fx.burst(p.x, p.y, 2, '#f4efe6', { speed: 40, life: 0.25, size: 1.5, glow: false });
         return true;
       case 'dynamite':
-        this.blast(p.x, p.y, p.splash, 'dynamite');
+        this.blast(p.x, p.y, p.splash, 'dynamite', null, p.damage, p.target);
         this.r.fx.burst(p.x, p.y, Math.round(6 * d), '#3a332c', { speed: 90, life: 0.5, size: 2, glow: false, gravity: 120 });
         return true;
       case 'sequin':
-        this.blast(p.x, p.y, p.splash, 'sequin');
+        this.blast(p.x, p.y, p.splash, 'sequin', null, p.damage, p.target);
         return true;
       case 'chip':
-        if (p.splash > 0) this.blast(p.x, p.y, p.splash, 'chip');
+        if (p.splash > 0) this.blast(p.x, p.y, p.splash, 'chip', null, p.damage, p.target);
         else if (Math.random() < 0.4 * d) this.r.fx.burst(p.x, p.y, 2, '#e9c45a', { speed: 40, life: 0.25, size: 1.4, glow: false });
         if (p.crit) this.r.fx.ring(p.x, p.y, 2, 16, 0.3, '#f2d38a', 2);
         return true;
       case 'missile':
-        this.blast(p.x, p.y, p.splash || 36, 'missile');
+        this.blast(p.x, p.y, p.splash || 36, 'missile', null, p.damage, p.target);
         return true;
       case 'icbm':
-        this.blast(p.x, p.y, p.splash, 'icbm');
-        this.r.shake(1.5);
+        this.blast(p.x, p.y, p.splash, 'icbm', null, p.damage, p.target);
+        if (impactWeight(this.game, p.damage, p.target) > 0.8) this.r.shake(1.5);
         return true;
       case 'warhead':
-        this.blast(p.x, p.y, p.splash, 'warhead');
+        this.blast(p.x, p.y, p.splash, 'warhead', null, p.damage, p.target);
         return true;
       case 'antimatter':
-        this.blast(p.x, p.y, p.splash, 'antimatter');
+        this.blast(p.x, p.y, p.splash, 'antimatter', null, p.damage, p.target);
         return true;
       // ---- medieval
       case 'slash':
@@ -144,12 +156,12 @@ export class CastFx {
         return true;
       case 'boulder':
       case 'trebuchet':
-        this.blast(p.x, p.y, p.splash, 'aftershock');
-        this.r.fx.burst(p.x, p.y, Math.round((p.kind === 'trebuchet' ? 10 : 6) * d), '#8d877c', { speed: 80, life: 0.5, size: 2.2, glow: false, gravity: 160 });
-        if (p.kind === 'trebuchet') this.r.shake(1.2);
+        this.blast(p.x, p.y, p.splash, 'aftershock', null, p.damage, p.target);
+        this.r.fx.burst(p.x, p.y, Math.round((p.kind === 'trebuchet' ? 10 : 6) * d * Math.min(1, impactWeight(this.game, p.damage, p.target))) + 1, '#8d877c', { speed: 80, life: 0.5, size: 2.2, glow: false, gravity: 160 });
+        if (p.kind === 'trebuchet' && impactWeight(this.game, p.damage, p.target) > 0.8) this.r.shake(1.2);
         return true;
       case 'bombball':
-        this.blast(p.x, p.y, p.splash, 'dynamite');
+        this.blast(p.x, p.y, p.splash, 'dynamite', null, p.damage, p.target);
         return true;
       default:
         return false;

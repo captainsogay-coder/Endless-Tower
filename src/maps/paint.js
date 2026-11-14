@@ -7,6 +7,8 @@ import { TileType, tileIndex, inBounds } from './mapGenerator.js';
 import { rgba, shade } from '../core/color.js';
 import { createNoise2D, fbm } from '../core/rng.js';
 import { circle, roundedPolyline, makeCanvas } from '../render/canvas.js';
+import { VIGNETTES, VIGNETTE_SCALE } from './vignettes.js';
+import { featureField, roadField, roadLevel, isoFill, isoLines, sampleField, alongEdge } from './contour.js';
 
 export const tc = (t) => t * TILE + TILE / 2;
 
@@ -124,74 +126,175 @@ export function paintGroundBase(ctx, map, pal, rng, noise) {
     ctx.fillStyle = rgba(rng.chance(0.5) ? '#ffffff' : '#000000', rng.float(0.025, 0.06));
     ctx.fillRect(rng.float(0, WORLD_W), rng.float(0, WORLD_H), rng.float(1, 2), rng.float(1, 2));
   }
+  paintRelief(ctx, map, pal, noise, map.reliefStrength ?? 1);
 }
 
-/** Organic union-of-circles painting for feature tiles (water, lava, ice…). */
-export function paintFeatureBlobs(ctx, map, pal) {
-  const tiles = blobPoints(map);
-  if (!tiles.length) return;
-  const pass = (r, color, filter, dy = 0) => {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    for (const t of tiles) {
-      if (filter && !filter(t)) continue;
-      ctx.moveTo(tc(t.x) + r, tc(t.y) + dy);
-      ctx.arc(tc(t.x), tc(t.y) + dy, r, 0, Math.PI * 2);
+/**
+ * Relief: a height field (rolling noise, the road cut into the ground, pools
+ * sitting in hollows) lit from the top-left like the rest of the scene. Gives
+ * the ground real slopes and banks instead of a flat colour wash.
+ */
+export function paintRelief(ctx, map, pal, noise, strength = 1) {
+  const W = COLS * 4;
+  const H = ROWS * 4;
+  const rf = roadField(map);
+  const ff = map.featureTiles.length ? featureField(map) : null;
+  const h = new Float32Array((W + 2) * (H + 2));
+  for (let y = 0; y < H + 2; y++) {
+    for (let x = 0; x < W + 2; x++) {
+      const px = (x - 0.5) * 8;
+      const py = (y - 0.5) * 8;
+      let v = fbm(noise, px * 0.0036 + 13, py * 0.0036 + 29, 4) * 1.4;
+      const road = Math.max(0, sampleField(rf, px, py) + 0.15);
+      v -= 0.16 * Math.min(1, road * road);
+      if (ff) v -= 0.22 * Math.min(1, Math.max(0, sampleField(ff, px, py)));
+      h[y * (W + 2) + x] = v;
     }
-    ctx.fill();
-  };
-  pass(TILE * 0.9, rgba(pal.featureEdge, 0.35), null, 3);
-  pass(TILE * 0.84, pal.featureEdge);
-  pass(TILE * 0.7, pal.feature);
-  pass(TILE * 0.78, pal.featureDeep, (t) => isInterior(map, t));
-}
-
-export function featurePath(map, r = TILE * 0.7) {
-  const p = new Path2D();
-  for (const t of blobPoints(map)) {
-    p.moveTo(tc(t.x) + r, tc(t.y));
-    p.arc(tc(t.x), tc(t.y), r, 0, Math.PI * 2);
   }
-  return p;
-}
-
-export function paintPath(ctx, map, pal) {
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'butt';
-  const routes = map.routes.map((r) => r.drawPoints);
-  const stroke = (width, color, dy = 0) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    for (const pts of routes) {
-      ctx.save();
-      ctx.translate(0, dy);
-      roundedPolyline(ctx, pts, TILE * 0.55);
-      ctx.stroke();
-      ctx.restore();
-    }
-  };
-  stroke(TILE * 1.06, 'rgba(20,14,24,0.22)', 3);
-  stroke(TILE * 1.02, pal.pathEdge);
-  stroke(TILE * 0.86, pal.path);
-  stroke(TILE * 0.34, rgba(pal.pathCenter, 0.22));
-  ctx.restore();
-}
-
-/** Breaks up the road's ruler-straight edges with worn, irregular verges. */
-export function paintPathWear(ctx, map, pal, rng) {
-  for (const route of map.routes) {
-    for (const t of route.tiles) {
-      for (let k = 0; k < 3; k++) {
-        const a = rng.float(0, Math.PI * 2);
-        const x = t.x * TILE + TILE / 2 + Math.cos(a) * TILE * 0.5;
-        const y = t.y * TILE + TILE / 2 + Math.sin(a) * TILE * 0.5;
-        if (isType(map, Math.floor(x / TILE), Math.floor(y / TILE), TileType.GROUND)) {
-          softBlob(ctx, x, y, rng.float(4, 8), rng.chance(0.6) ? pal.path : pal.pathEdge, 0.5);
-        }
+  const c = makeCanvas(W, H);
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  const sh = pal.shadow ? [parseInt(pal.shadow.slice(1, 3), 16), parseInt(pal.shadow.slice(3, 5), 16), parseInt(pal.shadow.slice(5, 7), 16)] : [10, 8, 14];
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y + 1) * (W + 2) + x + 1;
+      const gx = h[i + 1] - h[i - 1];
+      const gy = h[i + W + 2] - h[i - W - 2];
+      // facing the top-left light = brighter; facing away = shadowed
+      const s = (gx + gy) * 9 * strength;
+      const o = (y * W + x) * 4;
+      if (s > 0) {
+        img.data[o] = 255;
+        img.data[o + 1] = 250;
+        img.data[o + 2] = 235;
+        img.data[o + 3] = Math.min(40, s * 40);
+      } else {
+        img.data[o] = sh[0];
+        img.data[o + 1] = sh[1];
+        img.data[o + 2] = sh[2];
+        img.data[o + 3] = Math.min(60, -s * 60);
       }
     }
   }
+  g.putImageData(img, 0, 0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(c, 0, 0, WORLD_W, WORLD_H);
+  ctx.restore();
+}
+
+/**
+ * Feature shapes (water, lava, ice…) as nested contour bands of one noisy
+ * field: a damp/scorched margin, the bank, the surface, the deep middle and a
+ * thin shoreline highlight. Biomes pass their own band colours.
+ */
+export function paintFeatureLayers(ctx, map, layers) {
+  if (!map.featureTiles.length) return;
+  const f = featureField(map);
+  for (const L of layers) {
+    if (L.stroke) {
+      ctx.strokeStyle = L.stroke;
+      ctx.lineWidth = L.width ?? 1;
+      ctx.lineCap = 'round';
+      ctx.stroke(isoLines(f, L.level, L.dx ?? 0, L.dy ?? 0));
+    } else {
+      ctx.fillStyle = L.color;
+      ctx.fill(isoFill(f, L.level, L.dx ?? 0, L.dy ?? 0));
+    }
+  }
+}
+
+export function paintFeatureBlobs(ctx, map, pal) {
+  paintFeatureLayers(ctx, map, [
+    { level: 0.3, color: rgba(pal.shadow ?? '#000000', 0.16), dy: 3 },
+    { level: 0.36, color: rgba(pal.featureEdge, 0.45) },
+    { level: 0.42, color: pal.featureEdge },
+    { level: 0.52, color: pal.feature },
+    { level: 0.82, color: pal.featureDeep },
+    { level: 0.52, stroke: rgba(pal.featureShine ?? '#ffffff', 0.35), width: 1, dy: 1.5 },
+  ]);
+}
+
+/** Clip path of the feature surface (water shimmer, lava glow…). */
+export function featurePath(map) {
+  return map.featureTiles.length ? isoFill(featureField(map), 0.5) : new Path2D();
+}
+
+/**
+ * The road: one noisy distance field gives irregular verges, a darker
+ * shoulder, the worn surface and a lighter crown; wheel ruts follow the
+ * route. Biomes can turn ruts off (rails, paving).
+ */
+export function paintPath(ctx, map, pal, { ruts = true } = {}) {
+  const f = roadField(map);
+  const fill = (half, color, dy = 0) => {
+    ctx.fillStyle = color;
+    ctx.fill(isoFill(f, roadLevel(half), 0, dy));
+  };
+  fill(TILE * 0.62, rgba(pal.shadow ?? '#140e18', 0.16), 2.5);
+  fill(TILE * 0.54, pal.pathEdge);
+  fill(TILE * 0.46, pal.path);
+  fill(TILE * 0.14, rgba(pal.pathCenter, 0.2));
+  if (!ruts) return;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  for (const route of map.routes) {
+    const pts = route.drawPoints;
+    for (const off of [-TILE * 0.2, TILE * 0.2]) {
+      const o = offsetLine(pts, off);
+      ctx.strokeStyle = rgba(shade(pal.path, -0.4), 0.32);
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([22, 5, 11, 7]);
+      roundedPolyline(ctx, o, TILE * 0.45);
+      ctx.stroke();
+      ctx.strokeStyle = rgba(shade(pal.path, 0.25), 0.25);
+      ctx.lineWidth = 0.8;
+      ctx.translate(0, 1.2);
+      roundedPolyline(ctx, o, TILE * 0.45);
+      ctx.stroke();
+      ctx.translate(0, -1.2);
+    }
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function offsetLine(pts, off) {
+  return pts.map((p, i) => {
+    const q = pts[Math.min(pts.length - 1, i + 1)];
+    const r = pts[Math.max(0, i - 1)];
+    const dx = q.x - r.x;
+    const dy = q.y - r.y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: p.x - (dy / len) * off, y: p.y + (dx / len) * off };
+  });
+}
+
+/**
+ * Where ground meets road: little tufts/lumps of the surrounding ground
+ * spill over the verge so the two materials interlock instead of meeting at
+ * a clean cut.
+ */
+export function paintPathWear(ctx, map, pal, rng, colors = null) {
+  const f = roadField(map);
+  const cols = colors ?? [shade(pal.ground, -0.18), shade(pal.ground, -0.06), shade(pal.ground, 0.08)];
+  alongEdge(f, roadLevel(TILE * 0.54), 5, (x, y, nx, ny) => {
+    if (rng.next() < 0.35) return;
+    const tx = Math.floor(x / TILE);
+    const ty = Math.floor(y / TILE);
+    if (map.bridge[tileIndex(Math.min(COLS - 1, Math.max(0, tx)), Math.min(ROWS - 1, Math.max(0, ty)))]) return;
+    const n = rng.int(1, 3);
+    for (let k = 0; k < n; k++) {
+      const sx = x + (rng.next() - 0.5) * 5 - nx * rng.float(0, 2.5);
+      const sy = y + (rng.next() - 0.5) * 5 - ny * rng.float(0, 2.5);
+      ctx.fillStyle = rng.pick(cols);
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, rng.float(1.2, 2.8), rng.float(0.9, 1.8), rng.float(0, Math.PI), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
 }
 
 export function paintPathGrain(ctx, map, pal, rng, density = 7) {
@@ -321,14 +424,28 @@ export function paintTerrain(ctx, map, biome, rng) {
   const noise = createNoise2D(rng.int(0, 1e9));
   // Detail density field shared by the biome's scatter passes (patches, not dustings).
   const density = (px, py) => Math.max(0, Math.min(1, (fbm(noise, px * 0.012 + 40, py * 0.012 + 40, 3) - 0.3) * 2.2));
+  map.reliefStrength = biome.lighting?.relief ?? 1;
   paintGroundBase(ctx, map, pal, rng, noise);
   biome.paintGroundDetail?.(ctx, map, rng, density);
   (biome.paintFeatures ?? paintFeatureBlobs)(ctx, map, pal, rng);
-  paintPathWear(ctx, map, pal, rng);
-  paintPath(ctx, map, pal);
+  paintPath(ctx, map, pal, { ruts: biome.pathRuts !== false });
   (biome.paintPathDetail ?? ((c, m, r) => paintPathGrain(c, m, pal, r)))(ctx, map, rng);
+  paintPathWear(ctx, map, pal, rng, biome.vergeColors);
   paintBridges(ctx, map, pal, biome.bridgeStyle);
   paintObjectivePad(ctx, map, pal);
-  for (const d of map.decor) biome.paintDecor?.(ctx, d, rng, map);
+  // set pieces have their own painters; swaying plants are drawn live by MapScene
+  const sway = new Set(biome.swayKinds ?? []);
+  for (const d of map.decor) {
+    if (sway.has(d.kind)) continue;
+    if (VIGNETTES[d.kind]) {
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.scale(VIGNETTE_SCALE, VIGNETTE_SCALE);
+      ctx.translate(-d.x, -d.y);
+      VIGNETTES[d.kind].paint(ctx, d, pal);
+      ctx.restore();
+    }
+    else biome.paintDecor?.(ctx, d, rng, map);
+  }
   paintLighting(ctx, pal, biome.lighting);
 }

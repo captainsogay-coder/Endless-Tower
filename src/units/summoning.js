@@ -41,6 +41,13 @@ export function registerBanner(def) {
 export const getBanner = (id) => banners.get(id);
 export const listBanners = () => [...banners.values()];
 
+/**
+ * Every circle in one collection, cheapest first. Purely data-driven: a new
+ * circle lands in the right place just by being registered. Equal prices keep
+ * their registration order (Array.prototype.sort is stable).
+ */
+export const listCirclesByPrice = () => listBanners().sort((a, b) => a.price - b.price);
+
 export const MILITARY_CIRCLE = 'military-circle';
 
 registerBanner({

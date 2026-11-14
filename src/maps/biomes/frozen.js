@@ -1,6 +1,7 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType } from '../mapGenerator.js';
-import { scatter, scatterWeighted, softBlob, dropShadow, isInterior, blobPoints } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow, paintFeatureLayers } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
@@ -28,7 +29,8 @@ export default {
   name: 'Frozen Frontier',
   tagline: 'Where the wind itself has teeth',
   palette,
-  lighting: { strength: 0.1, vignette: 0.32, grade: '#eef3fb' },
+  swayKinds: ['pine'],
+  lighting: { strength: 0.1, vignette: 0.32, grade: '#eef3fb', relief: 0.55 },
   atmosphere: { cloudShadows: 3 },
   enemyPalette: { body: '#3e2b63', dark: '#170e2e', eye: '#ff5fd2', glow: '#b06bff' },
   portalColor: '#5fd8ff',
@@ -41,6 +43,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.1, rivers: [0, 1], noiseScale: 0.14 },
   decor: [
+    ...VIGNETTE_DECOR.frozen,
     { kind: 'glacier', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.6 },
     { kind: 'pine', count: [12, 18], fp: 1, minPathDist: 1, size: 0.7, clump: 0.7 },
     { kind: 'pine', count: [3, 5], fp: 2, minPathDist: 2, size: 1.2, clump: 0.7 },
@@ -68,23 +71,15 @@ export default {
 
   paintFeatures(ctx, map, pal) {
     const tiles = map.featureTiles;
-    const blobs = blobPoints(map);
-    const pass = (r, color, filter) => {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      for (const t of blobs) {
-        if (filter && !filter(t)) continue;
-        const x = t.x * TILE + TILE / 2;
-        const y = t.y * TILE + TILE / 2;
-        ctx.moveTo(x + r, y);
-        ctx.arc(x, y, r, 0, TAU);
-      }
-      ctx.fill();
-    };
-    pass(TILE * 0.9, 'rgba(90,120,160,0.25)');
-    pass(TILE * 0.84, pal.featureEdge);
-    pass(TILE * 0.72, pal.feature);
-    pass(TILE * 0.74, pal.featureDeep, (t) => isInterior(map, t));
+    // frozen lake: drifted snow bank, a pale rim of shore ice, clear ice, dark deep ice
+    paintFeatureLayers(ctx, map, [
+      { level: 0.3, color: 'rgba(90,120,160,0.22)', dy: 2 },
+      { level: 0.38, color: pal.featureEdge },
+      { level: 0.5, color: pal.feature },
+      { level: 0.8, color: pal.featureDeep },
+      { level: 0.5, stroke: 'rgba(255,255,255,0.8)', width: 1.2 },
+      { level: 0.66, stroke: 'rgba(255,255,255,0.25)', width: 1 },
+    ]);
     // ice cracks
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 0.8;

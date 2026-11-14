@@ -1,3 +1,4 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
 import { TILE, WORLD_W, WORLD_H, COLS, ROWS } from '../../config.js';
 import { TileType, sampleRoute } from '../mapGenerator.js';
 import { scatter, scatterWeighted, softBlob, dropShadow } from '../paint.js';
@@ -41,6 +42,7 @@ export default {
   name: 'Mechanical Wasteland',
   tagline: 'The machines never stopped. Their makers did.',
   palette,
+  pathRuts: false,
   // cold overhead light with warm sodium-lamp tint
   lighting: { pos: { x: 640, y: -200 }, strength: 0.1, vignette: 0.5, grade: '#eceef2' },
   enemyPalette: { body: '#d4683a', dark: '#5a2414', eye: '#7ff7ff', glow: '#ff9a5a' },
@@ -54,6 +56,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 3, converge: 2 }, featureDensity: 0.05, rivers: [0, 1], noiseScale: 0.22 },
   decor: [
+    ...VIGNETTE_DECOR.mechanical,
     { kind: 'reactor', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 1.45 },
     { kind: 'bigGear', count: [3, 5], fp: 2, minPathDist: 2, size: 1.05, clump: 0.7 },
     { kind: 'bigGear', count: [3, 6], fp: 1, minPathDist: 1, size: 0.6, clump: 0.7 },

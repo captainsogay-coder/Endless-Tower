@@ -9,6 +9,7 @@
 
 import { makeCanvas, circle } from './canvas.js';
 import { shade } from '../core/color.js';
+import { baseSprite, unitScale, trimOf } from './unitIdentity.js';
 
 const RES = 2;
 
@@ -1139,7 +1140,63 @@ const ANIMS = {
   },
 };
 
-/** Draws a deployed unit. Feet sit slightly below the tile centre. */
+/**
+ * Body language shared by every unit, layered on top of its own animation:
+ *   breathing     – a slow 1–2% rise and fall
+ *   anticipation  – leans toward the target just before an attack
+ *   recoil        – rocks back and squashes after firing (heavier the bigger the kick)
+ *   ability       – a short hop when a special ability fires
+ */
+function pose(u, t, facing) {
+  const p = { lean: 0, sx: 1, sy: 1 + Math.sin(t * 2.1 + u.uid * 1.3) * 0.014, hop: 0 };
+  if (u.hasTarget && u.cooldown > 0 && u.cooldown < 0.16) p.lean = 0.07 * facing * (1 - u.cooldown / 0.16);
+  if (u.recoil > 0) {
+    p.lean -= 0.09 * u.recoil * facing;
+    p.sx *= 1 + 0.05 * u.recoil;
+    p.sy *= 1 - 0.06 * u.recoil;
+  }
+  const since = t - Math.max(u.lastSpecial ?? -99, u.lastSummon ?? -99);
+  if (since >= 0 && since < 0.45) p.hop = -3.2 * Math.sin((since / 0.45) * Math.PI);
+  return p;
+}
+
+/** Ground cue under a unit whose ability just fired: its faction colour, sized to the base. */
+function abilityCue(ctx, u, t, x, y) {
+  const since = t - Math.max(u.lastSpecial ?? -99, u.lastSummon ?? -99);
+  if (since < 0 || since > 0.6) return;
+  const k = since / 0.6;
+  ctx.strokeStyle = trimOf(u.def.id);
+  ctx.globalAlpha = 0.9 * (1 - k);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 9 + k * 10, (9 + k * 10) * 0.42, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * Support units show what they do: every few seconds a pair of chevrons rises
+ * from them in the Empower colour (the same colour as the EMP side tier).
+ */
+function supportCue(ctx, u, t, x, y) {
+  if (!u.def.buffs?.length || u.ally) return;
+  const k = ((t + u.uid * 0.37) % 3.4) / 0.9;
+  if (k > 1) return;
+  ctx.strokeStyle = `rgba(109,154,216,${0.85 * (1 - k)})`;
+  ctx.lineWidth = 1.4;
+  ctx.lineJoin = 'round';
+  const yy = y - 4 - k * 8;
+  ctx.beginPath();
+  ctx.moveTo(x - 3.5, yy + 2);
+  ctx.lineTo(x, yy - 1);
+  ctx.lineTo(x + 3.5, yy + 2);
+  ctx.moveTo(x - 3.5, yy + 5.5);
+  ctx.lineTo(x, yy + 2.5);
+  ctx.lineTo(x + 3.5, yy + 5.5);
+  ctx.stroke();
+}
+
+/** Draws a deployed unit (or a summoned ally) on its base. Feet sit slightly below the tile centre. */
 export function drawUnit(ctx, u, t) {
   if (u.def.art === 'tank') return drawTank(ctx, u, t);
   if (u.def.art === 'fortress') return drawFortress(ctx, u, t);
@@ -1147,11 +1204,26 @@ export function drawUnit(ctx, u, t) {
   let facing = u.facing >= 0 ? 1 : -1;
   if (anim.flip) facing = -facing;
   const s = unitSprite(u.def.art, anim.frame, facing, u.level);
-  ctx.drawImage(s.img, u.x + s.ox + (anim.dx ?? 0) * facing, u.y + 9 + s.oy + (anim.dy ?? 0), s.w, s.h);
+  const feetY = u.y + 9;
+  const b = baseSprite(u.def, !!u.ally);
+  ctx.drawImage(b.img, u.x + b.ox, feetY + b.oy, b.w, b.h);
+  abilityCue(ctx, u, t, u.x, feetY);
+  const S = unitScale(u.def);
+  const p = pose(u, t, facing);
+  ctx.save();
+  ctx.translate(u.x + (anim.dx ?? 0) * facing, feetY + (anim.dy ?? 0) + p.hop);
+  if (p.lean) ctx.rotate(p.lean);
+  ctx.scale(S * p.sx, S * p.sy);
+  ctx.drawImage(s.img, s.ox, s.oy, s.w, s.h);
+  ctx.restore();
+  supportCue(ctx, u, t, u.x, feetY - 30 * S);
 }
 
 /** Fortress: static emplacement, slow-tracking siege turret that charges before firing, hangar opens for drones. */
 function drawFortress(ctx, u, t) {
+  const plate = baseSprite(u.def, !!u.ally);
+  ctx.drawImage(plate.img, u.x + plate.ox, u.y + 6 + plate.oy, plate.w, plate.h);
+  abilityCue(ctx, u, t, u.x, u.y + 6);
   const base = partSprite('fortress-base', fortressBase, 26);
   const turret = partSprite('fortress-turret', fortressTurret, 32);
   const x = u.x;
@@ -1185,6 +1257,9 @@ function drawFortress(ctx, u, t) {
 
 /** Tank: hull, then a turret that tracks its target, with barrel recoil and engine idle. */
 function drawTank(ctx, u, t) {
+  const plate = baseSprite(u.def, !!u.ally);
+  ctx.drawImage(plate.img, u.x + plate.ox, u.y + 5 + plate.oy, plate.w, plate.h);
+  supportCue(ctx, u, t, u.x, u.y - 16);
   const hull = partSprite('tank-hull', tankHull, 20);
   const turret = partSprite('tank-turret', tankTurret, 22);
   const idle = Math.sin(t * 38 + u.uid) * 0.3; // engine shimmy
@@ -1207,11 +1282,16 @@ function drawTank(ctx, u, t) {
 }
 
 /** Portrait for UI cards: returns a data URL of the unit art at the given size. */
-export function unitPortrait(artKey, size = 96, level = 0) {
+export function unitPortrait(artKey, size = 96, level = 0, def = null) {
   const c = makeCanvas(size, size);
   const ctx = c.getContext('2d');
   const k = size / 40;
   ctx.setTransform(k, 0, 0, k, size / 2, size * 0.8);
+  // the same miniature base as on the battlefield (tier metal, faction edge)
+  if (def) {
+    const b = baseSprite(def);
+    ctx.drawImage(b.img, b.ox, b.oy, b.w, b.h);
+  }
   (PAINTERS[artKey] ?? fallback)(ctx, { frame: 0, facing: 1, level });
   return c.toDataURL();
 }

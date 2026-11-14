@@ -1,3 +1,4 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
 import { TILE } from '../../config.js';
 import { TileType } from '../mapGenerator.js';
 import { scatterWeighted, softBlob, dropShadow } from '../paint.js';
@@ -32,6 +33,7 @@ export default {
   name: 'Enchanted Forest',
   tagline: 'Ancient boughs hum with forgotten magic',
   palette,
+  swayKinds: ['ancientTree', 'elderTree'],
   lighting: { strength: 0.16, vignette: 0.42, grade: '#eef3e2' },
   atmosphere: { cloudShadows: 4 },
   enemyPalette: { body: '#7448a6', dark: '#2a1446', eye: '#f2d65c', glow: '#c39ae8' },
@@ -44,6 +46,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 3 }, featureDensity: 0.07, rivers: [0, 1] },
   decor: [
+    ...VIGNETTE_DECOR.forest,
     { kind: 'elderTree', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 2.7 },
     { kind: 'ancientTree', count: [6, 9], fp: 2, minPathDist: 2, size: 2.0, clump: 0.6 },
     { kind: 'ancientTree', count: [4, 7], fp: 1, minPathDist: 2, size: 1.2, clump: 0.6 },

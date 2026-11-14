@@ -201,6 +201,7 @@ game.on('waveClear', (d) => {
 });
 game.on('bossArrived', (e) => hud.onBossArrived(e, game));
 game.on('sell', ({ refund }) => hud.toast(`Sold for ${refund} coins`, '#8d939e'));
+game.on('upgrade', () => { const el = document.getElementById('unit-panel'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); });
 game.on('gameOver', (d) => {
   ui.placingDef = null;
   profile.recordBattle(d.wave);

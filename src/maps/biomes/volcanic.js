@@ -1,6 +1,7 @@
+import { VIGNETTE_DECOR } from '../vignettes.js';
 import { TILE, WORLD_W, WORLD_H } from '../../config.js';
 import { TileType } from '../mapGenerator.js';
-import { scatter, scatterWeighted, softBlob, dropShadow, isInterior, blobPoints } from '../paint.js';
+import { scatter, scatterWeighted, softBlob, dropShadow, paintFeatureLayers } from '../paint.js';
 import { rgba } from '../../core/color.js';
 import { circle, drawGlow } from '../../render/canvas.js';
 import { TAU } from '../../core/math.js';
@@ -53,6 +54,7 @@ export default {
   ],
   layout: { styles: { meander: 3, serpentine: 2, converge: 2 }, featureDensity: 0.055, rivers: [1, 2], noiseScale: 0.2 },
   decor: [
+    ...VIGNETTE_DECOR.volcanic,
     { kind: 'volcano', landmark: true, count: [1, 1], fp: 3, fallbackFp: 2, minPathDist: 2, size: 2.4 },
     { kind: 'rockSpire', count: [7, 11], fp: 1, minPathDist: 1, size: 0.62, clump: 0.6 },
     { kind: 'rockSpire', count: [3, 5], fp: 2, minPathDist: 2, size: 1.05 },
@@ -70,25 +72,16 @@ export default {
 
   paintFeatures(ctx, map, pal) {
     const tiles = map.featureTiles;
-    const blobs = blobPoints(map);
-    const pass = (r, color, filter) => {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      for (const t of blobs) {
-        if (filter && !filter(t)) continue;
-        const x = t.x * TILE + TILE / 2;
-        const y = t.y * TILE + TILE / 2;
-        ctx.moveTo(x + r, y);
-        ctx.arc(x, y, r, 0, TAU);
-      }
-      ctx.fill();
-    };
     // heat halo on surrounding rock
     for (const t of tiles) softBlob(ctx, t.x * TILE + TILE / 2, t.y * TILE + TILE / 2, TILE * 1.2, '#c4401a', 0.07);
-    pass(TILE * 0.86, '#140604');
-    pass(TILE * 0.74, '#7a1e08');
-    pass(TILE * 0.64, pal.feature);
-    pass(TILE * 0.6, pal.featureDeep, (t) => isInterior(map, t));
+    // basalt lip, cooling crust, molten surface, white-hot core
+    paintFeatureLayers(ctx, map, [
+      { level: 0.32, color: '#140604' },
+      { level: 0.42, color: '#7a1e08' },
+      { level: 0.54, color: pal.feature },
+      { level: 0.84, color: pal.featureDeep },
+      { level: 0.54, stroke: 'rgba(255,190,90,0.55)', width: 1.2 },
+    ]);
     // cooled crust floating on the surface
     for (const t of tiles) {
       const n = (t.x * 928371 + t.y * 12345) % 7;

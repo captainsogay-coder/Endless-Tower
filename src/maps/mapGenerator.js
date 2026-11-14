@@ -323,7 +323,7 @@ function placeDecor(map, biome, rng, pathDist) {
             } else if (spec.on === 'cliff') {
               // Ground tile directly above a feature (void) tile.
               if (grid[i] !== TileType.GROUND || ty + 1 >= ROWS || grid[i + COLS] !== TileType.FEATURE) ok = false;
-            } else if (grid[i] !== TileType.GROUND || pathDist[i] < minPD) {
+            } else if (grid[i] !== TileType.GROUND || pathDist[i] < minPD || (spec.maxPathDist && pathDist[i] > spec.maxPathDist)) {
               ok = false;
             }
             if (ok && cheb(tx, ty, goal.x, goal.y) < 3) ok = false;

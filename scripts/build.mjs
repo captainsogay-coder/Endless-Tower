@@ -14,6 +14,18 @@ import { join, basename } from 'node:path';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'dist');
 
+// never ship side tiers that no longer describe the units (re-measure with `npm run ratings`)
+{
+  const { registerRoster, ROSTER } = await import('../src/units/roster.js');
+  const { isStale } = await import('../src/meta/sideTiers.js');
+  registerRoster();
+  const stale = ROSTER.filter((d) => isStale(d)).map((d) => d.id);
+  if (stale.length) {
+    console.error(`side tiers are out of date for: ${stale.join(', ')} – run: npm run ratings`);
+    process.exit(1);
+  }
+}
+
 await rm(OUT, { recursive: true, force: true });
 await mkdir(join(OUT, 'assets'), { recursive: true });
 

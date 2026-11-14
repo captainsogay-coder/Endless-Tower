@@ -541,7 +541,7 @@ export class Game {
       this.damageEnemy(e, damage * (e === focus ? focusMult : 1), source);
       if (onHit && e.alive) this.applyOnHit(e, onHit);
     });
-    this.emit('blast', { x, y, radius, kind, focus: focus ? { x: focus.x, y: focus.y } : null });
+    this.emit('blast', { x, y, radius, kind, damage, focus: focus ? { x: focus.x, y: focus.y } : null });
   }
 
   applyStatusTo(e, id, opts) {
@@ -611,6 +611,7 @@ export class Game {
     p.onHit = spec ? spec.onHit : (u.def.onHit ?? null);
     p.crit = !!spec?.crit;
     p.stumble = !!spec?.stumble;
+    p.summoned = !!spec?.summoned;
     p.color = proj.color ?? '#ffffff';
     p.tier = u.tier;
     p.source = u;
@@ -666,7 +667,11 @@ export class Game {
     const falloff = BALANCE.splashFalloff;
     const hit = (e) => {
       if (!e.alive || e.invulnerable) return;
-      this.damageEnemy(e, primary && e !== primary ? p.damage * falloff : p.damage, p.source);
+      const dealt = this.damageEnemy(e, primary && e !== primary ? p.damage * falloff : p.damage, p.source);
+      if (p.summoned && p.source) {
+        p.source.summonDamage = (p.source.summonDamage ?? 0) + dealt;
+        p.source.droneDamage = (p.source.droneDamage ?? 0) + dealt;
+      }
       if (onHit && e.alive) this.applyOnHit(e, onHit);
     };
     if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
@@ -725,7 +730,15 @@ export class Game {
     e.flash = 0.1;
     e.lastHit = this.time;
     this.stats.damage += dealt;
-    if (source) source.damageDealt += dealt;
+    if (source) {
+      source.damageDealt += dealt;
+      // summoned allies credit the unit that created them (for stats and side-tier measurement)
+      if (source.ally) {
+        let root = source.owner;
+        while (root?.ally) root = root.owner;
+        if (root) root.summonDamage = (root.summonDamage ?? 0) + dealt;
+      }
+    }
     if (e.hp <= 0) this.killEnemy(e, source);
     return dealt;
   }

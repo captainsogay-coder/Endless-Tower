@@ -2,6 +2,10 @@
 // Storage is injectable so this module stays testable outside the browser.
 
 import { createPlan, MAX_PLAN_TYPES } from './battlePlan.js';
+import { CATEGORY_IDS } from './sideTiers.js';
+
+const SORTS = ['tier', 'acquired', ...CATEGORY_IDS];
+const side = (v) => (CATEGORY_IDS.includes(v) ? v : null);
 
 export const PROFILE_KEY = 'endless-tower/profile/v1';
 
@@ -47,7 +51,9 @@ export class Profile {
       weatherEnabled: true,
       muted: false,
       favorites: [], // pinned unit TYPES (never copies, never plan slots)
-      rosterSort: 'tier', // Battle Plans roster order within pinned/unpinned: 'tier' | 'acquired'
+      rosterSort: 'tier', // Battle Plans roster order within pinned/unpinned: 'tier' | 'acquired' | a side tier
+      rosterFilter: { ownership: 'all', circle: 'all', side: null }, // collection filters
+      autoPick: { primary: null, secondary: null }, // Auto Pick priorities (null = balanced Auto Build)
       planBackup: null, // the plan replaced by the last Auto Build, for Undo
     };
   }
@@ -77,7 +83,13 @@ export class Profile {
       weatherEnabled: d.weatherEnabled !== false,
       muted: d.muted === true,
       favorites: Array.isArray(d.favorites) ? [...new Set(d.favorites.filter((x) => typeof x === 'string'))] : [],
-      rosterSort: d.rosterSort === 'acquired' ? 'acquired' : 'tier',
+      rosterSort: SORTS.includes(d.rosterSort) ? d.rosterSort : 'tier',
+      rosterFilter: {
+        ownership: ['all', 'owned', 'locked'].includes(d.rosterFilter?.ownership) ? d.rosterFilter.ownership : 'all',
+        circle: typeof d.rosterFilter?.circle === 'string' ? d.rosterFilter.circle : 'all',
+        side: side(d.rosterFilter?.side),
+      },
+      autoPick: { primary: side(d.autoPick?.primary), secondary: side(d.autoPick?.secondary) },
       planBackup: d.planBackup && Array.isArray(d.planBackup.units) ? createPlan(String(d.planBackup.name ?? 'Battle Plan').slice(0, 32), d.planBackup.units.filter((x) => typeof x === 'string')) : null,
     };
   }
