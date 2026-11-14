@@ -239,34 +239,56 @@ Every pool is checked at start-up to total exactly 100%.
 
 ## Balance and progression
 
-Every knob is in `src/balance.js`; measurements and the reasoning behind each individual adjustment are in **[docs/BALANCE.md](docs/BALANCE.md)** (`node scripts/balance.mjs tokens|units|bot [--before]` reproduces them).
+Every knob is in `src/balance.js`. The measurements and the reasoning are in **[docs/BALANCE.md](docs/BALANCE.md)**.
 
-- **Global layer (every unit, including future ones):** +20% damage, +10% range, −10% attack cooldown, +15% coins from abilities and economy bonuses.
-- **Upgrades:** each level adds +8% damage, +2% range and +2% attack speed on top of the unit's own table, so every upgrade is at least +20% DPS.
-- **Wave scaling:** Tier I–III units gain +2% of their base damage per completed wave and Tier IV–VI +1%. Tier VII and up get none. It is linear, the same for every copy, shown in the unit panel, and never written into base stats.
-- **Stacking:** wave scaling, count passives (Dude Power, Squad Tactics, The Gang) and capped self bonuses are **added** together. Buffs (once per id) and weather (one at a time) **multiply**. Nothing compounds per wave.
-- **Splash falloff:** the enemy a shot was aimed at takes full damage; others in the blast take 60%.
+**Tier means power.** Getting a higher-tier unit should be immediately noticeable. Three rules make it so.
 
-### Tiers
+1. **A steep, real power curve.** Each tier is a 20–60% step:
 
-No unit has hand-picked stats. `tierUnit(tier, profile)` in `src/units/levels.js` builds every level table from the tier's **combat-power budget** (`TIERS` in `src/balance.js`).
+   | Tier | I | II | III | IV | V | VI | VII | VIII | IX | X | XI | XII | XIII | XIV | XV | XVII | XIX |
+   | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+   | Power (× T1) | 1 | 1.6 | 2.4 | 3.4 | 4.7 | 6.3 | 8.3 | 10.8 | 13.8 | 17.5 | 22 | 27.5 | 34 | 42 | 51 | 73 | 106 |
 
-| Tier | I | II | III | IV | V | VI | VII | VIII | IX | X | XI | XII | XIII | XIV | XV | XVII | XIX |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Budget (× T1) | 1.0 | 1.5 | 2.1 | 2.8 | 3.6 | 4.5 | 5.5 | 6.6 | 7.8 | 9.1 | 10.5 | 12 | 13.7 | 15.5 | 17.5 | 22.1 | 27.5 |
+   A Tier VII has ~2.4× the power of a Tier IV, and a Tier XII ~3.3× a Tier VII. Past XV, each tier is another ×1.2.
 
-Past XV, each step grows by 0.2 more than the last.
+2. **Own fighting power matches the tier.** A unit's file only says *how* it fights: attack speed, range, splash, hits per attack and role. `tierUnit()` spends the tier's budget on damage after charging for area, long range and role. Support, summoner and economy units keep 85%, 80% or 75% of the budget for their own attacks and spend the rest on utility.
+   - `node scripts/calibrate.mjs` measures every unit in a real headless battle: single-target and 10-enemy swarm damage, damage abilities included, reach credited. It sets each unit's `power` trim so that **own value = tier power × role share** (±5%).
+   - Utility (buffs, summons, income) comes on top and never by gutting a unit's own stats. Before this rework, trims as low as 0.2 had left high-tier ability units weaker in direct combat than units several tiers below them.
 
-A unit's file only describes **how** it fights: attack speed, range, splash, hits per attack and role (gunner / summoner / support / economy). The generator then spends the budget:
+3. **Price follows power.** Price is `20 × power^1.05` (it was `power^1.3`). Saving for a high tier buys nearly the same power per coin, concentrated in one tile with better upgrade growth. Tier I–V prices are unchanged or slightly lower, so the early game stays cheap.
 
-- **Damage:** `12 DPS × budget × role share × splash cost × range cost`, split across attacks and hits. Area damage, long range and team-wide buffs are paid for out of the same budget, so an area unit hits many enemies for less each (and is weaker against bosses) and a support unit trades its own damage for its buffs.
-- **Price:** `20 × budget^1.3`. Higher tiers cost more but stay worth it. The Colonel is deliberately cheap.
-- **Upgrades:** costs scale with the price, and higher tiers grow faster per level, so the order holds at every level.
-- **Per-unit trims:** an optional `power` factor (0.22–1.35) corrects measured outliers, mostly abilities worth a lot on their own, like summoned gangs and global barrages. It's written next to each unit's profile.
+**What the tests guarantee** (in real simulations, `tests/tiers.test.js` and `tests/progression.test.js`):
+- Every unit two or more tiers higher out-fights every lower one.
+- The Tier VII average is over 2× Tier IV, and Tier XII over 3× Tier VII.
+- Baseline stats alone, without abilities, beat every unit three tiers below.
+- The order holds at equal upgrade level (all at max).
+- Every Tier VII+ single-target dealer out-hits every Tier III one on a boss.
+- Swarm damage climbs with tier among area units.
 
-`node scripts/balance.mjs tiers [level]` measures every unit in the real simulation: its single-target DPS, and its *battlefield contribution* (a six-Cadet squad's crowd damage with the unit minus without it, so buffs and summons count). It reports the geometric mean of the two against the tier target. `tests/tiers.test.js` runs that measurement and fails if a tier's average drifts more than 15% from its budget, any unit more than 25%, or any Tier III unit falls below a Tier I.
+**Full campaigns** (`node scripts/balance.mjs bot 400 --all`, 34 loadouts): the correlation between tier and waves survived went from 0.73 to 0.94. A Tier III army no longer outlasts Tier VII and X armies.
 
-The tables show level-0 stats as players see them (with the global layer). DPS counts every hit of an attack.
+**Power-creep caps** (`BALANCE.caps`):
+- **Wave scaling** is capped: Tier I–III +1.5%/wave up to +45%; IV–VI +1% up to +30%; VII–IX +0.5% up to +15%; X+ none. Before, +2%/wave forever let a Tier I match a Tier VII by wave 150.
+- **Buffs:** each distinct buff applies once, and all buffs together are capped on one unit at ×1.8 damage, ×1.6 attack speed and ×1.35 range.
+- **Additive bonuses** (wave scaling, count passives, House Edge) are capped at +150% in total.
+- **Coin multipliers:** unit economy auras are capped at +50% together; weather stays a separate, temporary layer.
+- **Repeat earners:** each extra copy of the same income unit pays 1/√k (the 2nd copy earns 71%, the 4th 50%), so stacking one earner can't run away.
+- **Weather and ability effects** are temporary and never written into base stats.
+
+Other layers (unchanged): a global +20% damage, +10% range, −10% cooldown and +15% ability coins. Upgrades add +8% damage, +2% range and +2% attack speed per level, and higher tiers grow faster per upgrade. Splash falloff: secondary targets in a blast take 60%.
+
+**Numerical changes beyond the curve** (themes and abilities kept):
+- ICBM aftershock: 40% → 20% of the impact.
+- B-2 focus on the strongest enemy: 3× → 2×.
+- Outlaw Leader's summoned Outlaws last 8 s, down from 12 s (they were effectively permanent).
+- Colonel price: 0.3 → 0.5 of its tier price (it was cheaper than a Tier III).
+- The Master Engineer counts as a gunner (its mini-ballistas are a small extra).
+
+In every case, power moved from the ability into the unit's baseline, so its total stays on budget while its stats now reflect its tier.
+
+**Comparing units:** a unit's details panel has a **combat sheet**: deployment cost, damage per hit, attacks per second, measured single-target and swarm DPS, range, the share of damage from abilities, summons, buffs to allies, income per minute and an overall combat rating. A *Compare with* picker puts it side by side with any other unit and shows the multiple you gain. By default it picks your best owned unit from a lower tier, so the sheet shows what an investment buys.
+
+The tables below show level-0 stats as players see them (global layer included). DPS counts every hit of an attack. `node scripts/sync-readme-stats.mjs` regenerates the numbers from the definitions.
 
 ## Units
 
@@ -274,17 +296,17 @@ Every unit has a base level plus 5 upgrades, bought per copy in battle. Stats co
 
 | Unit | Tier | Price | Damage | Range (tiles) | Attacks/s | DPS | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Dude | I | 15 | 8.6 | 2.2 | 1.39 | 12 | Starter. **Dude Power:** `Damage × [1 + 0.10 × (deployed Dudes − 1)]` |
+| Dude | I | 15 | 8.64 | 2.2 | 1.39 | 12 | Starter. **Dude Power:** `Damage × [1 + 0.10 × (deployed Dudes − 1)]` |
 | Cadet | I | 30 | 9.6 | 2.75 | 1.67 | 16 | Better DPS and range than Dude |
-| Gunnerman | II | 35 | 4.9 | 3.85 | 4.44 | 21.9 | Sustained machine-gun DPS |
-| Grenade Launcher | III | 50 | 18 | 4.4 | 0.61 | 11 | Small blast (1.1 tiles). **Wounded:** 20% per enemy hit, −5% speed for 4 s, refreshes, never stacks |
-| Tank | V | 105 | 28.2 | 5.5 | 0.44 | 12.5 | Blast 1.5 tiles. Leaves **flames** for 3 s (8% of shell damage per second). **Command Presence:** allies within 2.5 tiles attack 10% faster; overlapping Tanks don't stack |
-| Special Forces | III | 50 | 10.3 | 3.85 | 3.33 | 34.4 | **Squad Tactics:** +15% damage per other Special Forces deployed, up to +300% (`SQUAD_TACTICS_PER_UNIT`, `SQUAD_TACTICS_CAP`) |
-| Drone | V | 105 | 25.2 | 6.88 | 0.74 | 18.7 | Launches a drone every 1.5 s (1.35 s with the global cooldown cut) that hunts a target and detonates (1-tile blast). 10% are **Explosive Drones**: 5× damage, 2× blast radius |
-| Commander | V | 105 | 15.6 | 11 | 2.67 | 41.6 | Extreme range, targets the strongest enemy. **Field Command:** allies within 5.5 tiles get +8% range and 8% cooldown reduction |
-| Colonel | VI | 40 | 36.6 | 4.4 | 1.33 | 48.8 | Cheap. **Orders:** every unit on the map gets +15% damage, 10% cooldown reduction and +5% range. **Requisitions:** +15% coins |
-| General | VII | 185 | 33.6 | 7.15 | 0.56 | 18.7 | Artillery (1.75-tile blast). **High Command:** allies within 6.5 tiles get +25% damage, 15% cooldown reduction and +10% range. Launches a regular drone every 4 s |
-| Fortress | X | 350 | 48.6 | 9.35 | 0.33 | 16.2 | Siege guns with an enormous 3.75-tile blast. Launches an Explosive Drone every 5 s that inflicts **Crippled** (+20% damage taken, −10% speed for 5 s). **Logistics:** +25% coins |
+| Gunnerman | II | 35 | 5.16 | 3.85 | 4.44 | 22.93 | Sustained machine-gun DPS |
+| Grenade Launcher | III | 50 | 28.8 | 4.4 | 0.61 | 17.6 | Small blast (1.1 tiles). **Wounded:** 20% per enemy hit, −5% speed for 4 s, refreshes, never stacks |
+| Tank | V | 100 | 44.4 | 5.5 | 0.44 | 19.73 | Blast 1.5 tiles. Leaves **flames** for 3 s (8% of shell damage per second). **Command Presence:** allies within 2.5 tiles attack 10% faster; overlapping Tanks don't stack |
+| Special Forces | III | 50 | 10.92 | 3.85 | 3.33 | 36.4 | **Squad Tactics:** +15% damage per other Special Forces deployed, up to +300% (`SQUAD_TACTICS_PER_UNIT`, `SQUAD_TACTICS_CAP`) |
+| Drone | V | 100 | 34.2 | 6.88 | 0.74 | 25.35 | Launches a drone every 1.5 s (1.35 s with the global cooldown cut) that hunts a target and detonates (1-tile blast). 10% are **Explosive Drones**: 5× damage, 2× blast radius |
+| Commander | V | 100 | 15.6 | 11 | 2.67 | 41.6 | Extreme range, targets the strongest enemy. **Field Command:** allies within 5.5 tiles get +8% range and 8% cooldown reduction |
+| Colonel | VI | 70 | 48 | 4.4 | 1.33 | 64 | Cheap. **Orders:** every unit on the map gets +15% damage, 10% cooldown reduction and +5% range. **Requisitions:** +15% coins |
+| General | VII | 185 | 64.8 | 7.15 | 0.56 | 36 | Artillery (1.75-tile blast). **High Command:** allies within 6.5 tiles get +25% damage, 15% cooldown reduction and +10% range. Launches a regular drone every 4 s |
+| Fortress | X | 400 | 144 | 9.35 | 0.33 | 48 | Siege guns with an enormous 3.75-tile blast. Launches an Explosive Drone every 5 s that inflicts **Crippled** (+20% damage taken, −10% speed for 5 s). **Logistics:** +25% coins |
 
 ### Circle units
 
@@ -292,50 +314,50 @@ Range is in tiles; ability numbers live in each unit's `ability` block (`src/uni
 
 | Unit | Tier | Price | Damage | Range | Atk/s | DPS | Ability |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Farmer | I | 15 | 11 | 1.51 | 1.44 | 15.9 | Pitchfork; cheap |
-| Spearman | I | 20 | 12.6 | 2.06 | 1.22 | 15.4 | Spear thrust |
-| Slingman | II | 35 | 10.1 | 3.58 | 2.22 | 22.4 | Fast stones |
-| Militia Archer | II | 35 | 21.6 | 5.16 | 0.89 | 19.2 | Long-range arrows |
-| Village Captain | III | 50 | 24 | 1.93 | 1.33 | 32 | **Rally:** Village Militia within 4 tiles +10% damage |
-| The Village Hero | IV | 75 | 23.4 | 2.75 | 1.44 | 33.8 | Every 10th attack strikes for 4×; +1% damage per other deployed Village Militia unit (max +30%) |
-| Guard Recruit | II | 35 | 16.8 | 1.65 | 1.44 | 24.3 | Sword and shield |
-| Crossbowman | III | 50 | 43.8 | 6.19 | 0.67 | 29.2 | Heavy bolts |
-| Guard Sergeant | III | 50 | 13.8 | 1.79 | 2.44 | 33.7 | Fast sword |
-| Halberdier | IV | 75 | 18 | 2.48 | 1 | 18 | Sweeping halberd (small area) |
-| Royal Patrol | V | 105 | 33.6 | 5.16 | 1.44 | 48.5 | Always targets the enemy closest to the exit |
-| Grand Captain | VI | 140 | 51.6 | 2.2 | 1.33 | 68.8 | Town Guard within 5 tiles +12% damage, +8% attack speed |
-| The King's Champion | VIII | 230 | 76.2 | 2.48 | 1 | 76.2 | Every 12 s a 5× strike at the strongest enemy in range |
-| Apprentice Engineer | III | 40 | 22.8 | 4.13 | 1.33 | 30.4 | Thrown wrenches |
-| Ballista | IV | 75 | 81.6 | 7.7 | 0.44 | 36.3 | Huge bolts at the strongest enemy |
-| Catapult | V | 105 | 40.2 | 5.78 | 0.39 | 15.6 | Boulders, 1.5-tile blast |
-| Bombardier | V | 105 | 21 | 4.4 | 1 | 21 | Lit bombs, small blast |
-| Siege Commander | VI | 140 | 60.6 | 4.4 | 1.11 | 67.3 | Siege Workshop units within 6 tiles +15% damage |
-| Trebuchet | VIII | 230 | 129.6 | 15.4 | 0.17 | 21.6 | Extreme range (15 tiles), enormous 3.75-tile blast, very slow |
-| The Master Engineer | X | 350 | 49.8 | 6.6 | 0.67 | 33.2 | Heavy 2-tile blasts; every 20 s builds a mini-ballista that fights for 10 s (max 2 at once) |
-| Gambler | III | 50 | 16.8 | 3.85 | 1.56 | 26.1 | 15% crits for 3×; every 10th attack is a guaranteed crit and pays 2 coins |
-| Bandit | III | 50 | 13.2 | 3.58 | 2.44 | 32.3 | +3% per consecutive hit on one enemy, up to +30%; resets on a new target |
-| Outlaw | V | 105 | 21.6 | 4.4 | 1.33 | 28.8 | Every 6th attack: dynamite (1.5×, 1.4-tile blast), enemies hit take +10% damage for 4 s |
-| Bounty Hunter | V | 105 | 51 | 6.05 | 0.89 | 45.3 | Every 8 s marks the highest-HP enemy in range; +20% damage to it; a marked kill pays 4× its coin reward |
-| Gunslinger | VII | 185 | 24 | 5.16 | 2.22 | 53.3 | Every 5th attack: 3-shot burst at 70%; 20% crit chance, crits 2.5× |
-| Sheriff | IX | 290 | 79.8 | 6.05 | 1.11 | 88.7 | Allies within 7 tiles: +12% damage, +10% range; every 15 s a 5× shot at the strongest enemy |
-| Outlaw Leader | IX | 290 | 14.4 | 5.5 | 1.22 | 17.6 | Calls 3 Outlaws for 12 s every 12 s; +5% damage per *deployed* Outlaw (max +50%); every 20 s 0.5 coins per enemy alive (max 150) |
-| Fastest Hand In The West | XII | 510 | 81 ×6 | 7.15 | 0.28 | 135 | Six-shot barrage per attack; +2% attack speed per consecutive kill (max +40%, resets after 8 s); every 25 s a 10× crit at the strongest enemy |
-| Drunkard | I | 25 | 7.2 | 2.48 | 1.33 | 9.6 | 70% or 160% damage; every 10th attack a stumble that slows 5% for 2 s |
-| Dealer | VI | 140 | 31.8 | 5.5 | 1.78 | 56.5 | Card throws; allies in its range: 10% cooldown reduction; every 20 s 1 coin per enemy eliminated (max 200) |
-| Night Dancer | VI | 140 | 16.8 | 4.4 | 1.67 | 28 | Small blasts; every 5 attacks a pulse slowing enemies in range 15% for 3 s |
-| Desperate Gambler | VII | 185 | 36.6 | 4.95 | 1.56 | 56.9 | 50%: 2.5× or 40%; every 15 s an all-in shot of 0.5×–5× |
-| Pit Boss | IX | 290 | 91.8 | 5.5 | 1.11 | 102 | Allies within 7.5 tiles: +15% damage, 10% cooldown reduction; every 15 s 1.5 coins per enemy defeated (max 300) |
-| High Roller | X | 350 | 64.2 | 6.05 | 1.33 | 85.6 | Every 8 s an 8× shot; every 10th attack a Jackpot: 30 coins and +1% battle damage (max +25%) |
-| THE HOUSE | XV | 830 | 49.2 | 8.25 | 1.11 | 54.7 | All allies +10% damage, 10% cooldown reduction; every 20 s Jackpot (+500 coins), Bankruptcy (5× in a 4-tile area) or Double Down (2× damage for 10 s); every 50 kills all allies +1% damage for the battle (max +20%) |
-| Missile Launcher | IV | 75 | 13.8 | 6.05 | 0.78 | 10.7 | Area rockets; every 8th attack a bonus 2× missile |
-| Special Force Battalion | V | 105 | 15.6 | 4.68 | 2.22 | 34.7 | Keeps up to 3 mini soldiers (20 s each, one more every 3 s); +5% damage per surviving soldier |
-| Intercontinental Ballistic Missile | VII | 185 | 59.4 | 16.5 | 0.22 | 13.2 | 3-tile blast plus a 40% aftershock |
-| Bomber | VII | 185 | 26.4 ×4 | 7.7 | 0.25 | 26 | Flyover dropping 4 bombs along the road, leading the column; every 3rd run an extra 2× explosion |
-| B-2 | IX | 290 | 90.6 ×2 | 8.8 | 1 per 10.8 s | 16.7 | Bombing run; the strongest enemy in the main blast takes 3× |
-| Marshal | XII | 510 | 39 | 6.88 | 1.33 | 52 | All allies +15% damage, +10% range; every 20 s 120 coins; every 30 s a 6× barrage |
-| Glorious Leader | XV | 830 | 163.2 | 7.15 | 1.33 | 217.6 | All allies +20% damage; every 25 s 400 coins; every 20 s every enemy takes +15% damage for 5 s |
-| Nuclear Warhead | XVII | 1,120 | 170.4 | 11 | 0.22 | 37.9 | 5-tile blast, a 6 s energy zone, enemies hit take +20% damage for 5 s |
-| Antimatter Warhead | XIX | 1,490 | 318 | 12.1 | 0.2 | 63.6 | 6-tile energy blast, +30% damage taken for 8 s; every 40 s a gravity field holds and gathers enemies for 3 s, then detonates (bosses resist the pull) |
+| Farmer | I | 15 | 12.6 | 1.51 | 1.44 | 18.2 | Pitchfork; cheap |
+| Spearman | I | 20 | 13.8 | 2.06 | 1.22 | 16.87 | Spear thrust |
+| Slingman | II | 35 | 10.44 | 3.58 | 2.22 | 23.2 | Fast stones |
+| Militia Archer | II | 35 | 22.2 | 5.16 | 0.89 | 19.73 | Long-range arrows |
+| Village Captain | III | 50 | 26.4 | 1.93 | 1.33 | 35.2 | **Rally:** Village Militia within 4 tiles +10% damage |
+| The Village Hero | IV | 70 | 28.8 | 2.75 | 1.44 | 41.6 | Every 10th attack strikes for 4×; +1% damage per other deployed Village Militia unit (max +30%) |
+| Guard Recruit | II | 35 | 19.8 | 1.65 | 1.44 | 28.6 | Sword and shield |
+| Crossbowman | III | 50 | 42 | 6.19 | 0.67 | 28 | Heavy bolts |
+| Guard Sergeant | III | 50 | 18 | 1.79 | 2.44 | 44 | Fast sword |
+| Halberdier | IV | 70 | 32.4 | 2.48 | 1 | 32.4 | Sweeping halberd (small area) |
+| Royal Patrol | V | 100 | 41.4 | 5.16 | 1.44 | 59.8 | Always targets the enemy closest to the exit |
+| Grand Captain | VI | 140 | 66.6 | 2.2 | 1.33 | 88.8 | Town Guard within 5 tiles +12% damage, +8% attack speed |
+| The King's Champion | VIII | 240 | 124.8 | 2.48 | 1 | 124.8 | Every 12 s a 5× strike at the strongest enemy in range |
+| Apprentice Engineer | III | 40 | 24.6 | 4.13 | 1.33 | 32.8 | Thrown wrenches |
+| Ballista | IV | 70 | 84.6 | 7.7 | 0.44 | 37.6 | Huge bolts at the strongest enemy |
+| Catapult | V | 100 | 71.4 | 5.78 | 0.39 | 27.77 | Boulders, 1.5-tile blast |
+| Bombardier | V | 100 | 37.8 | 4.4 | 1 | 37.8 | Lit bombs, small blast |
+| Siege Commander | VI | 140 | 65.4 | 4.4 | 1.11 | 72.67 | Siege Workshop units within 6 tiles +15% damage |
+| Trebuchet | VIII | 240 | 220.8 | 15.4 | 0.17 | 36.8 | Extreme range (15 tiles), enormous 3.75-tile blast, very slow |
+| The Master Engineer | X | 400 | 133.2 | 6.6 | 0.67 | 88.8 | Heavy 2-tile blasts; every 20 s builds a mini-ballista that fights for 10 s (max 2 at once) |
+| Gambler | III | 50 | 15 | 3.85 | 1.56 | 23.33 | 15% crits for 3×; every 10th attack is a guaranteed crit and pays 2 coins |
+| Bandit | III | 50 | 11.4 | 3.58 | 2.44 | 27.87 | +3% per consecutive hit on one enemy, up to +30%; resets on a new target |
+| Outlaw | V | 100 | 32.4 | 4.4 | 1.33 | 43.2 | Every 6th attack: dynamite (1.5×, 1.4-tile blast), enemies hit take +10% damage for 4 s |
+| Bounty Hunter | V | 100 | 54 | 6.05 | 0.89 | 48 | Every 8 s marks the highest-HP enemy in range; +20% damage to it; a marked kill pays 4× its coin reward |
+| Gunslinger | VII | 185 | 30.6 | 5.16 | 2.22 | 68 | Every 5th attack: 3-shot burst at 70%; 20% crit chance, crits 2.5× |
+| Sheriff | IX | 310 | 105.6 | 6.05 | 1.11 | 117.3 | Allies within 7 tiles: +12% damage, +10% range; every 15 s a 5× shot at the strongest enemy |
+| Outlaw Leader | IX | 310 | 110.4 | 5.5 | 1.22 | 134.9 | Calls 3 Outlaws for 8 s every 12 s; +5% damage per *deployed* Outlaw (max +50%); every 20 s 0.5 coins per enemy alive (max 150) |
+| Fastest Hand In The West | XII | 650 | 165.6 ×6 | 7.15 | 0.28 | 276 | Six-shot barrage per attack; +2% attack speed per consecutive kill (max +40%, resets after 8 s); every 25 s a 10× crit at the strongest enemy |
+| Drunkard | I | 25 | 9.36 | 2.48 | 1.33 | 12.48 | 70% or 160% damage; every 10th attack a stumble that slows 5% for 2 s |
+| Dealer | VI | 140 | 37.2 | 5.5 | 1.78 | 66.13 | Card throws; allies in its range: 10% cooldown reduction; every 20 s 1 coin per enemy eliminated (max 200) |
+| Night Dancer | VI | 140 | 31.2 | 4.4 | 1.67 | 52 | Small blasts; every 5 attacks a pulse slowing enemies in range 15% for 3 s |
+| Desperate Gambler | VII | 185 | 49.8 | 4.95 | 1.56 | 77.47 | 50%: 2.5× or 40%; every 15 s an all-in shot of 0.5×–5× |
+| Pit Boss | IX | 310 | 134.4 | 5.5 | 1.11 | 149.3 | Allies within 7.5 tiles: +15% damage, 10% cooldown reduction; every 15 s 1.5 coins per enemy defeated (max 300) |
+| High Roller | X | 400 | 97.2 | 6.05 | 1.33 | 129.6 | Every 8 s an 8× shot; every 10th attack a Jackpot: 30 coins and +1% battle damage (max +25%) |
+| THE HOUSE | XV | 1,240 | 157.2 | 8.25 | 1.11 | 174.7 | All allies +10% damage, 10% cooldown reduction; every 20 s Jackpot (+500 coins), Bankruptcy (5× in a 4-tile area) or Double Down (2× damage for 10 s); every 50 kills all allies +1% damage for the battle (max +20%) |
+| Missile Launcher | IV | 70 | 21.6 | 6.05 | 0.78 | 16.8 | Area rockets; every 8th attack a bonus 2× missile |
+| Special Force Battalion | V | 100 | 20.4 | 4.68 | 2.22 | 45.33 | Keeps up to 3 mini soldiers (20 s each, one more every 3 s); +5% damage per surviving soldier |
+| Intercontinental Ballistic Missile | VII | 185 | 102.6 | 16.5 | 0.22 | 22.8 | 3-tile blast plus a 20% aftershock |
+| Bomber | VII | 185 | 46.2 ×4 | 7.7 | 0.25 | 45.58 | Flyover dropping 4 bombs along the road, leading the column; every 3rd run an extra 2× explosion |
+| B-2 | IX | 310 | 236.4 ×2 | 8.8 | 1 per 10.84 s | 43.6 | Bombing run; the strongest enemy in the main blast takes 2× |
+| Marshal | XII | 650 | 133.2 | 6.88 | 1.33 | 177.6 | All allies +15% damage, +10% range; every 20 s 120 coins; every 30 s a 6× barrage |
+| Glorious Leader | XV | 1,240 | 373.2 | 7.15 | 1.33 | 497.6 | All allies +20% damage; every 25 s 400 coins; every 20 s every enemy takes +15% damage for 5 s |
+| Nuclear Warhead | XVII | 1,820 | 762 | 11 | 0.22 | 169.3 | 5-tile blast, a 6 s energy zone, enemies hit take +20% damage for 5 s |
+| Antimatter Warhead | XIX | 2,670 | 1606.8 | 12.1 | 0.2 | 321.4 | 6-tile energy blast, +30% damage taken for 8 s; every 40 s a gravity field holds and gathers enemies for 3 s, then detonates (bosses resist the pull) |
 
 Selling refunds 70% of everything spent on that copy.
 

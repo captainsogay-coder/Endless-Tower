@@ -43,7 +43,7 @@ test('ratings are independent of each other and of the overall tier', () => {
   const r = (id) => sideTiers(id);
   assert.ok(r('colonel').economy > r('colonel').dps && r('colonel').empower > r('colonel').dps, 'Colonel: support and economy over damage');
   assert.ok(r('bomber').aoe > r('bomber').dps, 'Bomber: area over single target');
-  assert.ok(r('outlaw-leader').summon > r('outlaw-leader').dps, 'Outlaw Leader: summons over own damage');
+  assert.ok(r('outlaw-leader').summon >= 4 && r('outlaw-leader').dps >= 6, 'Outlaw Leader: real summons on top of a real baseline');
   assert.ok(r('fastest-hand').dps > r('the-house').dps, 'a Tier XII duelist out-damages the Tier XV House on one target');
   assert.equal(r('fastest-hand').aoe, null);
   assert.ok(r('the-house').aoe > 10);
@@ -52,8 +52,9 @@ test('ratings are independent of each other and of the overall tier', () => {
   assert.ok(r('glorious-leader').economy > r('colonel').economy, 'more income rates higher');
   // faction-only buffs count less than the same strength map-wide
   assert.ok(r('siege-commander').empower < r('colonel').empower);
-  // overall tier alone does not decide anything: some Tier I–III units beat a Tier X unit in DPS
-  assert.ok(r('bandit').dps > r('master-engineer').dps);
+  // tier sets baseline combat, not every category: a Tier VI earner out-earns a Tier XII duelist
+  assert.ok(r('colonel').economy > 5 && r('fastest-hand').economy === null);
+  assert.ok(r('master-engineer').dps > r('bandit').dps, 'a Tier X baseline beats a Tier III baseline');
 });
 
 test('Economy is net of the unit price and ranks real income, not damage', () => {
@@ -104,5 +105,5 @@ test('presentation helpers: whole numbers, N/A, tooltips from measured numbers, 
   assert.match(ratingDetail(getUnit('bounty-hunter'), 'economy'), /coins\/min/);
   assert.match(ratingDetail(getUnit('cadet'), 'summon'), /N\/A/);
   assert.equal(bestSide(getUnit('glorious-leader')).id, 'economy');
-  assert.equal(bestSide(getUnit('outlaw-leader')).id, 'summon');
+  assert.equal(bestSide(getUnit('general')).id, 'empower');
 });

@@ -79,7 +79,7 @@ test('buffs: each id applies once (no infinite stacking), different buffs combin
   assert.ok(Math.abs(dude.stats.rate - base.rate / (0.9 * 0.92)) < 1e-9, 'cooldown reductions combine');
 });
 
-test('Colonel and Fortress raise coin gain once each, battle-wide', () => {
+test('Colonel and Fortress raise coin gain once each, battle-wide, capped at +50% together', () => {
   const g = game(5);
   const t = freeTiles(g);
   assert.equal(g.coinMult, 1);
@@ -89,7 +89,8 @@ test('Colonel and Fortress raise coin gain once each, battle-wide', () => {
   const fort = 1 + 0.25 * 1.15;
   assert.ok(Math.abs(g.coinMult - col) < 1e-9);
   const f = g.deploy('fortress', ...t[6]);
-  assert.ok(Math.abs(g.coinMult - col * fort) < 1e-9);
+  // two economy auras multiply, but unit coin bonuses are capped at +50% together
+  assert.ok(Math.abs(g.coinMult - Math.min(1.5, col * fort)) < 1e-9 && col * fort > 1.5);
   g.sell(f);
   assert.ok(Math.abs(g.coinMult - col) < 1e-9, 'removed with the unit');
 });

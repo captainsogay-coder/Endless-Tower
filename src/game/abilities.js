@@ -56,7 +56,7 @@ const gambler = {
     const guaranteed = n % a.guaranteedEvery === 0;
     const crit = guaranteed || game.combatRng.next() < a.critChance;
     shoot(game, u, target, crit ? a.critMult : 1, { crit });
-    if (guaranteed) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24);
+    if (guaranteed) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24, null, u);
   },
   describe(u) {
     const a = u.def.ability;
@@ -170,7 +170,7 @@ const outlawLeader = {
     if (every(u, 'tribute', a.coinEvery, dt)) {
       const alive = game.enemies.length;
       const coins = Math.round(Math.min(a.coinCap, alive * a.coinsPerEnemy) * abilityPower(u));
-      if (coins > 0) game.grantCoins(coins, u.x, u.y - 24);
+      if (coins > 0) game.grantCoins(coins, u.x, u.y - 24, null, u);
     }
   },
   describe(u) {
@@ -251,7 +251,7 @@ function killPayout(u, game, a) {
   const kills = game.stats.kills - (u.killMark ?? game.stats.kills);
   u.killMark = game.stats.kills;
   const coins = Math.round(Math.min(a.coinCap, kills * a.coinsPerKill) * abilityPower(u));
-  if (coins > 0) game.grantCoins(coins, u.x, u.y - 24);
+  if (coins > 0) game.grantCoins(coins, u.x, u.y - 24, null, u);
 }
 
 const dealer = {
@@ -331,7 +331,7 @@ const highRoller = {
     const a = u.def.ability;
     shoot(game, u, target, 1, { kind: 'chip' });
     if (count(u) % a.jackpotEvery === 0) {
-      game.grantCoins(Math.round(a.jackpotCoins * abilityPower(u)), u.x, u.y - 24, 'Jackpot');
+      game.grantCoins(Math.round(a.jackpotCoins * abilityPower(u)), u.x, u.y - 24, 'Jackpot', u);
       setBonus(u, game, 'damage', Math.min(a.jackpotCap, (u.bonus?.damage ?? 0) + a.jackpotDamage));
     }
   },
@@ -352,7 +352,7 @@ const theHouse = {
     u.lastSpecial = game.time;
     u.lastWheel = pick;
     if (pick === 'jackpot') {
-      game.grantCoins(Math.round(a.jackpotCoins * abilityPower(u)), u.x, u.y - 30, 'Jackpot');
+      game.grantCoins(Math.round(a.jackpotCoins * abilityPower(u)), u.x, u.y - 30, 'Jackpot', u);
     } else if (pick === 'bankruptcy') {
       const e = game.findTarget(u, u.stats.range) ?? game.enemies.find((o) => o.alive && o.intro >= 1);
       if (e) game.explode(e.x, e.y, a.bankruptcyRadius, u.stats.damage * a.bankruptcyMult, u, { kind: 'bankruptcy' });
@@ -462,7 +462,7 @@ const b2 = {
 const marshal = {
   update(u, dt, game) {
     const a = u.def.ability;
-    if (every(u, 'pay', a.coinEvery, dt)) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24);
+    if (every(u, 'pay', a.coinEvery, dt)) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24, null, u);
     if (every(u, 'barrage', a.aoeEvery, dt)) {
       const e = game.findTarget(u, u.stats.range);
       if (!e) {
@@ -482,7 +482,7 @@ const marshal = {
 const gloriousLeader = {
   update(u, dt, game) {
     const a = u.def.ability;
-    if (every(u, 'tribute', a.coinEvery, dt)) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24);
+    if (every(u, 'tribute', a.coinEvery, dt)) game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24, null, u);
     if (every(u, 'decree', a.weakenEvery, dt)) {
       u.lastSpecial = game.time;
       for (const e of game.enemies) if (e.alive) game.applyStatusTo(e, 'exposed', { amount: a.weaken, duration: a.weakenDuration });

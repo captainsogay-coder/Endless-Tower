@@ -32,7 +32,7 @@ import { Game } from '../game/Game.js';
 import { sampleRoute } from '../maps/mapGenerator.js';
 import { getUnit, listUnits } from '../units/unitRegistry.js';
 import { waveScaling } from '../waves/scaling.js';
-import { TIERS, tierPower } from '../balance.js';
+import { TIERS, tierPower, waveDamageBonus } from '../balance.js';
 import { statusSpeedMultiplier } from '../game/effects.js';
 import { levelStats } from '../units/unitStats.js';
 
@@ -138,6 +138,14 @@ function run(g, T, each = null) {
 
 const own = (u) => u.damageDealt - (u.droneDamage ?? 0);
 
+/** Upgrades a freshly deployed unit to BENCH.level (0 by default; tests compare at max level too). */
+function upgraded(g, u) {
+  while (u.level < (BENCH.level ?? 0) && g.upgrade(u)) {
+    /* keep upgrading */
+  }
+  return u;
+}
+
 /** Where the unit stands: next to the road, 40% along the first route. */
 function anchor(g, route) {
   const p = roadPoint(route, route.length * 0.4);
@@ -149,7 +157,7 @@ function anchor(g, route) {
 function single(def) {
   const { g, route } = arena([def.id]);
   const a = anchor(g, route);
-  const u = g.deploy(def.id, a.c, a.r);
+  const u = upgraded(g, g.deploy(def.id, a.c, a.r));
   dummy(g, waveCtx(), nearestRoadD(route, u.x, u.y));
   run(g, BENCH.singleTime);
   return { own: own(u) / BENCH.singleTime, range: u.stats.range };
@@ -158,7 +166,7 @@ function single(def) {
 function pack(def) {
   const { g, route } = arena([def.id]);
   const a = anchor(g, route);
-  const u = g.deploy(def.id, a.c, a.r);
+  const u = upgraded(g, g.deploy(def.id, a.c, a.r));
   const d0 = nearestRoadD(route, u.x, u.y);
   const wv = waveCtx();
   const foes = [];
@@ -296,6 +304,9 @@ export function measureUnit(def, ctx) {
   const grossPerMin = Math.max(0, (ec.coins - be.coins - (ec.killedReward - be.killedReward)) / minutes);
   const net = grossPerMin * BENCH.econPeriodMin - def.price;
 
+  // auto-attack only: damage per hit × hits × attacks per second, nothing from abilities
+  const st = levelStats(def, 0);
+  const baseDps = st.damage * (1 + waveDamageBonus(def.tier, BENCH.wave - 1)) * st.rate * (def.profile?.hits ?? 1);
   const dr = (v, na) => (v >= na * refDps ? round1(Math.max(1, tierForPower(v / refDps))) : null);
   const econ =
     grossPerMin >= BENCH.naEconPerMin
@@ -310,6 +321,16 @@ export function measureUnit(def, ctx) {
       economy: econ,
     },
     raw: {
+      // comparison sheet: what one copy actually does (wave 10, level 0)
+      hit: round1(st.damage * (1 + waveDamageBonus(def.tier, BENCH.wave - 1))),
+      hits: def.profile?.hits ?? 1,
+      rate: Math.round(st.rate * 100) / 100,
+      range: Math.round(st.range),
+      baseDps: round1(baseDps),
+      singleDps: round1(s.own),
+      packDps: round1(p.own),
+      abilityShare: baseDps > 0 ? Math.round((s.own / baseDps - 1) * 100) / 100 : 0,
+      combat: round1(Math.max(1, tierForPower((Math.sqrt(dpsV * (dpsV + aoeV)) + summonV) / refDps))),
       dps: round1(dpsV),
       aoe: round1(aoeV),
       summon: round1(summonV),
@@ -323,3 +344,19 @@ export function measureUnit(def, ctx) {
 }
 
 export const benchStats = (def) => levelStats(def, 0);
+
+/**
+ * A unit's OWN fighting value relative to the Cadet (plain Tier I rifleman):
+ * √(single-target × swarm), with reach credited exactly as the tier system
+ * charges for it. Abilities that deal damage count; buffs, summons and income
+ * do not (those are utility, paid for by the role share). Measured at the
+ * bench's current wave, level 0.
+ */
+export function ownCombat(def, ref = null) {
+  const s = single(def);
+  const p = pack(def);
+  const sv = s.own * rangeFactor(s.range);
+  const pv = p.own * rangeFactor(s.range);
+  if (!ref) return { single: sv, pack: pv };
+  return { single: sv, pack: pv, value: Math.sqrt(Math.max(0, sv / ref.single) * Math.max(0, pv / ref.pack)) };
+}

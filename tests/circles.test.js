@@ -432,7 +432,7 @@ test('Battalion: up to 3 soldiers, +5% damage per surviving soldier; soldiers ar
   assert.equal(g.allies.length, 0, 'soldiers leave with their leader');
 });
 
-test('ICBM: extreme range, large blast and a 40% aftershock', () => {
+test('ICBM: extreme range, large blast and a 20% aftershock', () => {
   const g = arena(21);
   const e = foe(g);
   const u = place(g, 'icbm', e);
@@ -446,7 +446,7 @@ test('ICBM: extreme range, large blast and a 40% aftershock', () => {
   const first = hp0 - e.hp;
   for (let i = 0; i < 40; i++) g.update(1 / 60);
   const second = hp0 - e.hp - first;
-  assert.ok(close(second / first, 0.4, 1e-6), `${second}/${first}`);
+  assert.ok(close(second / first, 0.2, 1e-6), `${second}/${first}`);
 });
 
 test('Bomber: each attack is a flyover of 4 bombs; every third run adds an extra 2× explosion', () => {

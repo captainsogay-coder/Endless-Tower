@@ -7,16 +7,25 @@ import { levelStats, maxLevel } from '../src/units/unitStats.js';
 import { TIERS, tierPower, tierPrice, tierDamageGrowth, profileDps, BALANCE } from '../src/balance.js';
 
 registerRoster();
-const TARGET = { 1: 1, 2: 1.5, 3: 2.1, 4: 2.8, 5: 3.6, 6: 4.5, 7: 5.5, 8: 6.6, 9: 7.8, 10: 9.1, 11: 10.5, 12: 12, 13: 13.7, 14: 15.5, 15: 17.5 };
+const TARGET = { 1: 1, 2: 1.6, 3: 2.4, 4: 3.4, 5: 4.7, 6: 6.3, 7: 8.3, 8: 10.8, 9: 13.8, 10: 17.5, 11: 22, 12: 27.5, 13: 34, 14: 42, 15: 51 };
 
-test('tier power budget follows the table and keeps growing (controlled) past T15', () => {
+test('tier power curve: every tier is a real step (+20–60%), T7 ≈ 2.4× T4, T12 ≈ 3.3× T7, ×1.2 per tier past T15', () => {
   for (const [t, v] of Object.entries(TARGET)) assert.equal(tierPower(Number(t)), v);
-  let prevStep = tierPower(15) - tierPower(14);
-  for (let t = 16; t <= 30; t++) {
-    const step = tierPower(t) - tierPower(t - 1);
-    assert.ok(step > prevStep && step < prevStep + 0.5, `T${t} step ${step}`);
-    prevStep = step;
+  for (let t = 2; t <= 30; t++) {
+    const step = tierPower(t) / tierPower(t - 1);
+    assert.ok(step >= 1.18 && step <= 1.65, `T${t} step ×${step.toFixed(2)}`);
   }
+  assert.ok(tierPower(7) / tierPower(4) > 2.3 && tierPower(12) / tierPower(7) > 3.2);
+  assert.ok(Math.abs(tierPower(17) / tierPower(16) - 1.2) < 1e-9);
+});
+
+test('price follows power (≈ power^1.05): a Tier XIX costs ~130× a Tier I for ~105× the power – nearly the same value per coin', () => {
+  const eff = (t) => tierPower(t) / tierPrice(t);
+  for (let t = 2; t <= 20; t++) assert.ok(tierPrice(t) > tierPrice(t - 1));
+  // power per coin drifts down only slightly with tier (one tile, better upgrades, and the same efficiency)
+  assert.ok(eff(19) / eff(1) > 0.75, `T19 efficiency ${(eff(19) / eff(1)).toFixed(2)} of T1`);
+  // early game stays cheap
+  assert.ok(tierPrice(1) === 20 && tierPrice(3) < 55 && tierPrice(5) < 110);
 });
 
 test('every unit is generated from its tier profile (no hand-picked stat tables)', () => {
@@ -68,20 +77,40 @@ test('prices rise with tier (Colonel is deliberately cheap); upgrades cost more 
   void TIERS;
 });
 
-test('measured battlefield value (real simulation, abilities included): tiers climb and match the budget', () => {
-  const script = fileURLToPath(new URL('../scripts/balance.mjs', import.meta.url));
-  const out = execFileSync(process.execPath, [script, 'tiers', '0', '--json'], { encoding: 'utf8' }).trim().split('\n').pop();
-  const res = JSON.parse(out);
-  const tiers = [...new Set(res.map((r) => r.tier))].sort((a, b) => a - b);
-  const avg = (t) => res.filter((r) => r.tier === t).reduce((a, r) => a + r.value, 0) / res.filter((r) => r.tier === t).length;
-  for (let i = 1; i < tiers.length; i++) assert.ok(avg(tiers[i]) > avg(tiers[i - 1]), `T${tiers[i]} (${avg(tiers[i]).toFixed(2)}) > T${tiers[i - 1]} (${avg(tiers[i - 1]).toFixed(2)})`);
-  for (const t of tiers) {
-    const target = tierPower(t);
-    assert.ok(Math.abs(avg(t) / target - 1) < 0.15, `T${t} average ${avg(t).toFixed(2)} vs target ${target}`);
+import { BENCH, ownCombat } from '../src/meta/sideTierBench.js';
+import { getUnit } from '../src/units/unitRegistry.js';
+
+/** Own fighting value of every unit in a real headless battle (wave 1, level 0), relative to the Cadet. */
+function measureOwn() {
+  const saved = { wave: BENCH.wave, s: BENCH.singleTime, p: BENCH.packTime };
+  Object.assign(BENCH, { wave: 1, singleTime: 40, packTime: 40 });
+  try {
+    const ref = ownCombat(getUnit('cadet'));
+    return ROSTER.map((d) => {
+      const def = getUnit(d.id);
+      const role = def.profile?.role ?? 'gunner';
+      return { id: def.id, tier: def.tier, role, value: ownCombat(def, ref).value, target: tierPower(def.tier) * (TIERS.roles[role] ?? 1) };
+    });
+  } finally {
+    Object.assign(BENCH, { wave: saved.wave, singleTime: saved.s, packTime: saved.p });
   }
-  // unit by unit: within ±25% of the tier target (Dude is weak alone by design: Dude Power)
-  for (const r of res) if (r.id !== 'dude') assert.ok(Math.abs(r.value / tierPower(r.tier) - 1) < 0.25, `${r.id}: ${r.value.toFixed(2)} vs ${tierPower(r.tier)}`);
-  // every T3 beats every T1 in measured value
-  const best1 = Math.max(...res.filter((r) => r.tier === 1).map((r) => r.value));
-  for (const r of res.filter((x) => x.tier === 3)) assert.ok(r.value > best1, r.id);
+}
+
+test('measured own combat value (real simulation, damage abilities included) matches each tier budget × role share', () => {
+  const res = measureOwn().filter((r) => r.id !== 'dude'); // Dude is weak alone by design (Dude Power scales with copies)
+  for (const r of res) assert.ok(Math.abs(r.value / r.target - 1) < 0.1, `${r.id}: ${r.value.toFixed(2)} vs ${r.target.toFixed(2)}`);
+  const tiers = [...new Set(res.map((r) => r.tier))].sort((a, b) => a - b);
+  // tier averages compare role-normalised power (a support unit's own share is smaller by design)
+  const share = (r) => TIERS.roles[r.role] ?? 1;
+  const avg = (t) => res.filter((r) => r.tier === t).reduce((a, r) => a + r.value / share(r), 0) / res.filter((r) => r.tier === t).length;
+  for (let i = 1; i < tiers.length; i++) assert.ok(avg(tiers[i]) > avg(tiers[i - 1]) * 1.15, `T${tiers[i]} clearly above T${tiers[i - 1]}`);
+  assert.ok(avg(7) > 2 * avg(4), `T7 ${avg(7).toFixed(1)} vs T4 ${avg(4).toFixed(1)}`);
+  assert.ok(avg(12) > 3 * avg(7), `T12 ${avg(12).toFixed(1)} vs T7 ${avg(7).toFixed(1)}`);
+  // direct combat: any unit two or more tiers higher out-fights any lower unit, whatever the roles
+  for (const hi of res) for (const lo of res) if (hi.tier - lo.tier >= 2) assert.ok(hi.value > lo.value, `${hi.id} (T${hi.tier}) vs ${lo.id} (T${lo.tier})`);
+});
+
+test('baseline stats alone (no abilities) rise with tier: every unit beats every unit 3+ tiers below it', () => {
+  const raw = ROSTER.map((d) => ({ id: d.id, tier: d.tier, v: rawValue(d) }));
+  for (const hi of raw) for (const lo of raw) if (hi.tier - lo.tier >= 3) assert.ok(hi.v > lo.v, `${hi.id} T${hi.tier} ${hi.v.toFixed(1)} vs ${lo.id} T${lo.tier} ${lo.v.toFixed(1)}`);
 });

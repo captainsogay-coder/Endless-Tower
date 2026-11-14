@@ -14,7 +14,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'siege', speed: 480 },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(10, { rate: 0.3, range: 272, splash: 120, role: 'summoner', power: 0.53 }),
+  ...tierUnit(10, { rate: 0.3, range: 272, splash: 120, role: 'summoner', power: 0.81 }),
   summon: {
     every: FORTRESS_DRONE_INTERVAL,
     kind: 'drone',

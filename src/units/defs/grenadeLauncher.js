@@ -12,7 +12,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'grenade', speed: 260 },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(3, { rate: 0.55, range: 128, splash: 36, power: 0.62 }),
+  ...tierUnit(3, { rate: 0.55, range: 128, splash: 36, power: 0.86 }),
   onHit: [{ status: 'wounded', chance: WOUND_CHANCE }],
   passive: {
     id: 'wounded',

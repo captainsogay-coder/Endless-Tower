@@ -13,7 +13,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'bullet', speed: 1000, color: '#f0d890' },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(6, { rate: 1.2, range: 128, role: 'economy', price: 0.3 }),
+  ...tierUnit(6, { rate: 1.2, range: 128, role: 'economy', price: 0.5, power: 0.93 }),
   buffs: [COLONEL_ORDERS],
   economy: COLONEL_ECONOMY,
   passive: {

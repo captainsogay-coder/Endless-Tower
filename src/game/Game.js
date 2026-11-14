@@ -552,8 +552,14 @@ export class Game {
     for (const h of onHit) if (h.chance >= 1 || this.combatRng.next() < h.chance) applyStatus(e, h.status, this.time, h);
   }
 
-  /** Bonus coins from abilities (shown as a pop-up). Goes through the coin multiplier. */
-  grantCoins(amount, x, y, label = null) {
+  /**
+   * Bonus coins from abilities (shown as a pop-up). Goes through the coin multiplier.
+   * With a `source`, repeat copies of the same income unit pay less: the k-th
+   * copy (by deployment order) earns 1/k^exponent, so stacking one earner can't
+   * run away – the second copy still pays 71%, the fourth 50%.
+   */
+  grantCoins(amount, x, y, label = null, source = null) {
+    if (source && !source.ally) amount *= this.copyIncomeFactor(source);
     const gained = this.gainCoins(amount * BALANCE.global.abilityCoinMult);
     this.stats.bonusCoins += gained;
     this.emit('bonusCoins', { amount: gained, x, y, label });
@@ -753,6 +759,13 @@ export class Game {
     return gained;
   }
 
+  /** Income share of one copy: 1 for the first copy of a unit type, 1/√k for the k-th. */
+  copyIncomeFactor(u) {
+    let rank = 1;
+    for (const o of this.units) if (o !== u && o.def.id === u.def.id && (o.placedAt < u.placedAt || (o.placedAt === u.placedAt && o.uid < u.uid))) rank++;
+    return 1 / Math.pow(rank, BALANCE.caps.copyIncomeExponent);
+  }
+
   killEnemy(e, source) {
     this.removeEnemy(e);
     this.gainCoins(e.reward);
@@ -867,9 +880,10 @@ export class Game {
     const ids = new Map();
     // economy bonuses are unit abilities too: their extra share gets the ability coin boost
     for (const u of this.units) if (u.def.economy) ids.set(u.def.economy.id, 1 + (u.def.economy.coinMult - 1) * BALANCE.global.abilityCoinMult);
-    let m = this.weather?.current?.coinMult ?? 1;
-    for (const v of ids.values()) m *= v;
-    this.coinMult = m;
+    let units = 1;
+    for (const v of ids.values()) units *= v;
+    // unit economy bonuses are capped together; weather is a separate, temporary layer
+    this.coinMult = Math.min(BALANCE.caps.unitCoinMult, units) * (this.weather?.current?.coinMult ?? 1);
     this.house = this.units.find((u) => u.def.ability?.id === 'the-house') ?? null;
     this.economyIds = [...ids.keys()];
   }
@@ -983,9 +997,21 @@ export class Game {
     // and join the ADDITIVE bucket, so they add to wave scaling instead of multiplying it.
     const s = p?.bonus ? levelStats(u.def, level) : applyPassive(u.def, levelStats(u.def, level), ctx);
     const defs = this.buffDefs();
-    for (const id of u.auras ?? []) applyModifiers(s, scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0));
+    // every distinct buff id once, then the combined effect is capped (power creep)
+    const agg = { damageMult: 1, cooldownMult: 1, rangeMult: 1 };
+    for (const id of u.auras ?? []) {
+      const b = scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0);
+      if (b?.damageMult) agg.damageMult *= b.damageMult;
+      if (b?.cooldownMult) agg.cooldownMult *= b.cooldownMult;
+      if (b?.rangeMult) agg.rangeMult *= b.rangeMult;
+    }
+    const C = BALANCE.caps;
+    agg.damageMult = Math.min(C.buffDamage, agg.damageMult);
+    agg.cooldownMult = Math.max(1 / C.buffRate, agg.cooldownMult);
+    agg.rangeMult = Math.min(C.buffRange, agg.rangeMult);
+    applyModifiers(s, agg);
     // ADDITIVE bucket: wave scaling + capped self bonuses (jackpots, soldiers) + battle-long bonuses
-    const dmg = this.waveBonus(u.def) + (p?.bonus ? p.bonus(ctx) : 0) + (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0);
+    const dmg = Math.min(C.additiveDamage, this.waveBonus(u.def) + (p?.bonus ? p.bonus(ctx) : 0) + (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0));
     if (dmg) s.damage *= 1 + dmg;
     if (u.bonus?.rate) s.rate *= 1 + u.bonus.rate;
     applyModifiers(s, this.weather?.current);

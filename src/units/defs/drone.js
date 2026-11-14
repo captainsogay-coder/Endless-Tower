@@ -14,7 +14,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'drone', speed: 230, explosive: EXPLOSIVE_DRONE },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(5, { rate: 1 / 1.5, range: 200, splash: 30, power: 0.68 }),
+  ...tierUnit(5, { rate: 1 / 1.5, range: 200, splash: 30, power: 0.71 }),
   passive: {
     id: 'explosive-drones',
     name: 'Explosive Drones',

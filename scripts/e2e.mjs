@@ -112,8 +112,10 @@ await ev(() => {
   const { profile } = window.endlessTower;
   profile.data.wallet.tokens = 150 * 25 * 6;
   profile.save();
+  window.endlessTower.summoning.render();
 });
 for (let i = 0; i < 6 && (await ev(() => window.endlessTower.profile.data.unlocked.length)) < 5; i++) {
+  await page.waitForSelector('[data-count="25"]:not([disabled])', { timeout: 5000 });
   await page.click('[data-count="25"]');
   await page.click('#btn-confirm-ok');
   await page.click('#btn-reveal-skip');
@@ -238,6 +240,7 @@ const rareRow = await page.$$eval('.pool-item.rare', (els) => els.length);
 check('only the 0.5% Fortress is flagged rare', rareRow === 1);
 await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 250 * 25; p.save(); window.endlessTower.summoning.render(); });
 const b0 = await wallet();
+await page.waitForSelector('[data-count="25"]:not([disabled])', { timeout: 5000 });
 await page.click('[data-count="25"]');
 await page.click('#btn-confirm-ok');
 await page.click('#btn-reveal-skip');
@@ -433,6 +436,15 @@ await page.click('#roster-reset');
 await page.waitForTimeout(100);
 const reset = await ev(() => ({ f: window.endlessTower.profile.data.rosterFilter, n: document.querySelectorAll('.roster-grid .unit-card').length, sort: window.endlessTower.profile.data.rosterSort }));
 check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 55 && reset.sort === 'tier', JSON.stringify(reset));
+// combat sheet + comparison in the unit details panel
+await ev(() => { window.endlessTower.plans.focusId = 'glorious-leader'; window.endlessTower.plans.compare = null; window.endlessTower.plans.render(); });
+const sheet = await ev(() => ({ rows: [...document.querySelectorAll('#dossier .cmp-sheet tbody th')].map((e) => e.textContent.trim()), against: document.getElementById('compare-with').value, verdict: document.querySelector('#dossier .cmp-verdict')?.textContent ?? '' }));
+const need = ['Deployment cost', 'Damage per hit', 'Attacks per second', 'Single-target DPS', 'Swarm DPS', 'Range', 'From abilities', 'Summons', 'Buffs to allies', 'Income', 'Combat rating'];
+check('unit details show a combat sheet (cost, hit, speed, single-target and swarm DPS, range, abilities, summons, buffs, income, combat rating)', need.every((n) => sheet.rows.includes(n)), sheet.rows.join(', '));
+check('by default it compares with your best owned lower-tier unit and says what the investment buys', sheet.against && sheet.against !== 'glorious-leader' && /deals [\d.]+× the single-target damage of .+, for [\d.]+× the cost\./.test(sheet.verdict), sheet.verdict);
+await page.selectOption('#compare-with', 'cadet');
+const vsCadet = await ev(() => ({ v: document.querySelector('#dossier .cmp-verdict').textContent, ups: [...document.querySelectorAll('#dossier .cmp-d.up')].length }));
+check('Compare with any unit: Glorious Leader vs Cadet shows the multiples gained', /Cadet/.test(vsCadet.v) && vsCadet.ups >= 4, vsCadet.v);
 const before14 = await ev(() => [...window.endlessTower.profile.plan.units]);
 await page.click('#btn-autobuild');
 await page.click('#ab-primary [data-prio="economy"]');

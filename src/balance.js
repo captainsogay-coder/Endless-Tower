@@ -34,18 +34,37 @@ export const BALANCE = {
    */
   upgrades: { damagePerLevel: 0.08, rangePerLevel: 0.02, ratePerLevel: 0.02 },
 
-  /**
-   * Wave scaling: + `perWave` × waves completed this battle, as an additive
-   * share of the unit's base damage (linear – it never compounds). The first
-   * matching tier band applies.
-   */
   /** Area damage: enemies other than the one a shot was aimed at take this share. */
   splashFalloff: 0.6,
 
+  /**
+   * Wave scaling: + `perWave` × waves completed this battle, as an additive
+   * share of the unit's base damage, up to `cap`. It keeps cheap units useful
+   * through the early waves but levels off, so low tiers can never grow into
+   * high tiers over a long run (before: +2%/wave forever let a Tier I match a
+   * Tier VII by wave 150). The first matching band applies.
+   */
   waveScaling: [
-    { maxTier: 3, perWave: 0.02 },
-    { maxTier: 6, perWave: 0.01 },
+    { maxTier: 3, perWave: 0.015, cap: 0.45 },
+    { maxTier: 6, perWave: 0.01, cap: 0.3 },
+    { maxTier: 9, perWave: 0.005, cap: 0.15 },
   ],
+
+  /**
+   * Stacking caps (power creep). Every distinct buff id still applies once,
+   * but their combined effect on one unit is limited, the additive bucket
+   * (wave scaling + passives + House Edge) is limited, and battle-wide coin
+   * multipliers from units are limited. Weather stays a separate, temporary layer.
+   */
+  caps: {
+    buffDamage: 1.8, // all aura damage buffs together: at most ×1.8
+    buffRate: 1.6, // all cooldown reductions together: at most ×1.6 attack speed
+    buffRange: 1.35, // all range buffs together: at most ×1.35
+    additiveDamage: 1.5, // wave scaling + passives + battle bonuses: at most +150%
+    unitCoinMult: 1.5, // economy auras together: at most +50% coins (weather on top)
+    /** periodic income from abilities: the k-th copy of the same unit earns 1/√k of the base payout */
+    copyIncomeExponent: 0.5,
+  },
 };
 
 /**
@@ -67,8 +86,10 @@ export const BALANCE = {
  * - Higher tiers also grow faster per upgrade, so the order holds at every level.
  */
 export const TIERS = {
-  power: [1.0, 1.5, 2.1, 2.8, 3.6, 4.5, 5.5, 6.6, 7.8, 9.1, 10.5, 12, 13.7, 15.5, 17.5],
-  stepGrowth: 0.2,
+  // T1…T15. Steep enough that tier is real power: T4 = 3.4×, T7 = 8.3×, T12 = 27.5× a T1;
+  // past T15 every tier is another ×growthPastTable.
+  power: [1.0, 1.6, 2.4, 3.4, 4.7, 6.3, 8.3, 10.8, 13.8, 17.5, 22, 27.5, 34, 42, 51],
+  growthPastTable: 1.2,
   baseDps: 12, // T1 single-target DPS at level 0, before the global layer
   /** share of the budget a role spends on its own damage (the rest is its utility) */
   roles: { gunner: 1, summoner: 0.8, support: 0.85, economy: 0.75 },
@@ -79,7 +100,9 @@ export const TIERS = {
   refRangePerTier: 0.04,
   rangeCost: 0.3,
   basePrice: 20, // T1 deploy price
-  priceExponent: 1.3, // price = basePrice × power^1.3: higher tiers cost more per point of power, but stay worth it
+  // price = basePrice × power^1.05: cost rises almost in step with power, so saving for a
+  // high tier never buys less power per coin (it buys it in one tile, with better upgrades)
+  priceExponent: 1.05,
   upgradeCosts: [0.8, 1.3, 2, 3, 4.5], // × deploy price
   damageGrowth: { base: 1.2, perTier: 0.006, max: 1.32 }, // × per upgrade level
   rangeGrowth: 1.03,
@@ -90,13 +113,7 @@ export const TIERS = {
 export function tierPower(tier) {
   const p = TIERS.power;
   if (tier <= p.length) return p[Math.max(1, tier) - 1];
-  let value = p[p.length - 1];
-  let step = p[p.length - 1] - p[p.length - 2];
-  for (let t = p.length + 1; t <= tier; t++) {
-    step += TIERS.stepGrowth;
-    value += step;
-  }
-  return value;
+  return p[p.length - 1] * Math.pow(TIERS.growthPastTable, tier - p.length);
 }
 
 export const tierPrice = (tier) => TIERS.basePrice * Math.pow(tierPower(tier), TIERS.priceExponent);
@@ -119,15 +136,22 @@ export function tokensForWave(wave, cfg = BALANCE.tokens) {
   return Math.round(cfg.base * (1 + cfg.milestoneBonus * milestones));
 }
 
-/** Damage bonus per completed wave for a tier (0 for T7+). */
+const waveBand = (tier) => BALANCE.waveScaling.find((b) => tier <= b.maxTier) ?? null;
+
+/** Damage bonus per completed wave for a tier (0 for T10+). */
 export function waveBonusPerWave(tier) {
-  for (const band of BALANCE.waveScaling) if (tier <= band.maxTier) return band.perWave;
-  return 0;
+  return waveBand(tier)?.perWave ?? 0;
 }
 
-/** Additive damage bonus from wave scaling after `wavesCleared` completed waves. */
+/** The most wave scaling a tier can reach. */
+export function waveBonusCap(tier) {
+  return waveBand(tier)?.cap ?? 0;
+}
+
+/** Additive damage bonus from wave scaling after `wavesCleared` completed waves (capped). */
 export function waveDamageBonus(tier, wavesCleared) {
-  return waveBonusPerWave(tier) * Math.max(0, wavesCleared);
+  const b = waveBand(tier);
+  return b ? Math.min(b.cap ?? Infinity, b.perWave * Math.max(0, wavesCleared)) : 0;
 }
 
 /** The global and per-upgrade layer applied on top of a level table entry. */

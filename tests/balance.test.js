@@ -4,7 +4,7 @@ import { Game } from '../src/game/Game.js';
 import { registerRoster, ROSTER } from '../src/units/roster.js';
 import { getUnit } from '../src/units/unitRegistry.js';
 import { levelStats, tableStats, maxLevel } from '../src/units/unitStats.js';
-import { BALANCE, tokensForWave, waveBonusPerWave, waveDamageBonus } from '../src/balance.js';
+import { BALANCE, tokensForWave, waveBonusPerWave, waveDamageBonus, tierPower } from '../src/balance.js';
 import { dudePowerMultiplier } from '../src/units/defs/dude.js';
 
 registerRoster();
@@ -72,9 +72,11 @@ test('upgrades: every level of every unit is a meaningful step (≥ +20% DPS)', 
   }
 });
 
-test('wave scaling: T1–T3 +2%, T4–T6 +1%, T7+ none; linear from base damage, same for every copy, never compounding', () => {
-  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 12, 19].map(waveBonusPerWave), [0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0, 0, 0]);
-  assert.ok(close(waveDamageBonus(3, 100), 2) && close(waveDamageBonus(5, 100), 1) && waveDamageBonus(7, 100) === 0);
+test('wave scaling: T1–3 +1.5% (max +45%), T4–6 +1% (max +30%), T7–9 +0.5% (max +15%), T10+ none; capped, never compounding', () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 19].map(waveBonusPerWave), [0.015, 0.015, 0.015, 0.01, 0.01, 0.01, 0.005, 0.005, 0, 0, 0]);
+  assert.ok(close(waveDamageBonus(3, 10), 0.15) && close(waveDamageBonus(3, 100), 0.45) && close(waveDamageBonus(5, 100), 0.3) && close(waveDamageBonus(8, 1000), 0.15) && waveDamageBonus(10, 1000) === 0);
+  // a long run can no longer lift a low tier into a high tier: a capped T1 stays far below an uncapped T7
+  assert.ok(1 * (1 + waveDamageBonus(1, 1e6)) < tierPower(4) && (1 + waveDamageBonus(4, 1e6)) * tierPower(4) < tierPower(7));
   const g = arena(4);
   const t = tiles(g);
   const ids = ['cadet', 'gunnerman', 'tank', 'colonel', 'general', 'fortress'];
@@ -85,7 +87,7 @@ test('wave scaling: T1–T3 +2%, T4–T6 +1%, T7+ none; linear from base damage,
   for (const w of waves) {
     while (g.stats.wavesCleared < w) g.completeWave({ plan: { wave: g.stats.wavesCleared + 1, reward: 0, isBoss: false } });
     units.forEach((u, i) => {
-      const expect = base[i] * (1 + waveBonusPerWave(u.def.tier) * w);
+      const expect = base[i] * (1 + waveDamageBonus(u.def.tier, w));
       assert.ok(close(u.stats.damage, expect, 1e-6), `${u.def.id} at wave ${w}`);
     });
     assert.equal(twin.stats.damage, units[0].stats.damage, 'every copy identical');
@@ -102,15 +104,16 @@ test('additive bucket: wave scaling and Dude Power add (not multiply); buffs and
   g.stats.wavesCleared = 50;
   g.refreshAll();
   const power = dudePowerMultiplier(5) - 1; // +40%
-  assert.ok(close(dudes[0].stats.damage, base * (1 + 1.0 + power)), 'base × (1 + 100% wave + 40% Dude Power)');
+  const wave = waveDamageBonus(1, 50); // +45% (capped)
+  assert.ok(close(dudes[0].stats.damage, base * (1 + wave + power)), 'base × (1 + 45% wave + 40% Dude Power)');
   g.deploy('colonel', ...t[t.length - 1]);
   g.weather.start('nova');
   const colonel = 1.15;
-  assert.ok(close(dudes[0].stats.damage, base * (1 + 1.0 + power) * colonel * 1.3), '× Colonel × Nova, once each');
+  assert.ok(close(dudes[0].stats.damage, base * (1 + wave + power) * colonel * 1.3), '× Colonel × Nova, once each');
   for (let i = 0; i < 5; i++) g.weather.start('nova');
-  assert.ok(close(dudes[0].stats.damage, base * (1 + 1.0 + power) * colonel * 1.3), 'repeated weather never stacks');
+  assert.ok(close(dudes[0].stats.damage, base * (1 + wave + power) * colonel * 1.3), 'repeated weather never stacks');
   g.weather.stop();
-  assert.ok(close(dudes[0].stats.damage, base * (1 + 1.0 + power) * colonel));
+  assert.ok(close(dudes[0].stats.damage, base * (1 + wave + power) * colonel));
 });
 
 test('summoned allies inherit their summoner\'s wave scaling but no buffs', () => {
@@ -120,7 +123,7 @@ test('summoned allies inherit their summoner\'s wave scaling but no buffs', () =
   g.stats.wavesCleared = 40;
   g.refreshAll();
   const a = g.spawnAlly(b, 'battalion-soldier', { life: 10 });
-  assert.ok(close(a.stats.damage, levelStats(a.def, 0).damage * (1 + 0.01 * 40)));
+  assert.ok(close(a.stats.damage, levelStats(a.def, 0).damage * (1 + waveDamageBonus(b.def.tier, 40))));
 });
 
 test('ability coins get +15%; economy bonuses get +15% of their bonus', () => {

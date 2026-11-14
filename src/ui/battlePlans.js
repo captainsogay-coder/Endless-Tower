@@ -9,6 +9,8 @@ import { sortRoster, filterRoster, autoBuildPlan, planDiff, isSideMode } from '.
 import { listCirclesByPrice } from '../units/summoning.js';
 import { CATEGORIES, categoryOf, sideTiers, ratingKey } from '../meta/sideTiers.js';
 import { sideTierStrip, sideTierTable } from './sideTierView.js';
+import { combatSheet } from './compareView.js';
+import { sideTierRaw } from '../meta/sideTiers.js';
 import { unitPortrait } from '../render/unitArt.js';
 import { esc, tiles, upgradeRange, passiveScale } from './format.js';
 
@@ -177,6 +179,11 @@ export class BattlePlansView {
         this.focusId = slot.dataset.id;
         this.render();
       }
+    });
+    el.dossier.addEventListener('change', (ev) => {
+      if (ev.target.id !== 'compare-with') return;
+      this.compare = { for: this.focusId, id: ev.target.value || null };
+      this.renderDossier();
     });
     el.dossier.addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-toggle]');
@@ -428,6 +435,28 @@ export class BattlePlansView {
     this.el.roster.innerHTML = cards.join('');
   }
 
+  /**
+   * Who the details panel compares against: the player's pick for this unit,
+   * otherwise their strongest owned unit from a lower tier (so the sheet shows
+   * what the investment gains), otherwise nothing.
+   */
+  compareTarget(def) {
+    if (this.compare?.for === def.id) return this.compare.id ? getUnit(this.compare.id) : null;
+    const lower = listUnits()
+      .filter((u) => u.id !== def.id && u.tier < def.tier && this.profile.isUnlocked(u.id))
+      .sort((a, b) => b.tier - a.tier || (sideTierRaw(b)?.combat ?? 0) - (sideTierRaw(a)?.combat ?? 0));
+    return lower[0] ?? null;
+  }
+
+  compareOptions(def) {
+    const cur = this.compareTarget(def)?.id ?? '';
+    const opts = listUnits()
+      .filter((u) => u.id !== def.id)
+      .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name))
+      .map((u) => `<option value="${esc(u.id)}" ${u.id === cur ? 'selected' : ''}>${esc(getTier(u.tier).label)}: ${esc(u.name)}${this.profile.isUnlocked(u.id) ? '' : ' (not owned)'}</option>`);
+    return [`<option value="" ${cur ? '' : 'selected'}>Nothing (this unit only)</option>`, ...opts].join('');
+  }
+
   /** "#2 of 14 owned" – where a unit stands among the player's units in one side tier. */
   rankAmongOwned(def, cat) {
     const owned = listUnits().filter((u) => this.profile.isUnlocked(u.id) && sideTiers(u)[cat] != null);
@@ -465,6 +494,11 @@ export class BattlePlansView {
         <div><h2>${esc(def.name)}</h2><div class="ds-sub">${esc(tier.label)}, ${esc(def.role ?? '')}</div></div>
       </div>
       <p class="ds-desc">${esc(def.description ?? '')}</p>
+      <div class="ds-section ds-compare">
+        <h3>Combat sheet</h3>
+        <label class="cmp-pick"><span>Compare with</span><select id="compare-with">${this.compareOptions(def)}</select></label>
+        ${combatSheet(def, this.compareTarget(def))}
+      </div>
       <div class="ds-section">
         <h3>Side tiers <span class="muted small">vs overall ${esc(tier.label)}</span></h3>
         ${sideTierTable(def, { rank: (c) => this.rankAmongOwned(def, c) })}

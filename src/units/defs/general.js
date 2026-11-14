@@ -14,7 +14,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'artillery', speed: 420 },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(7, { rate: 0.5, range: 208, splash: 56, role: 'support', power: 0.63 }),
+  ...tierUnit(7, { rate: 0.5, range: 208, splash: 56, role: 'support', power: 0.81 }),
   buffs: [GENERAL_COMMAND],
   summon: { every: GENERAL_DRONE_INTERVAL, kind: 'drone', speed: 230, damageFactor: 0.4, splash: 30, explosive: null },
   passive: {

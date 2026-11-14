@@ -82,7 +82,7 @@ function stable(value) {
 }
 
 /** Everything about the global balance that changes how any unit performs. */
-export const balanceSignature = () => fnv1a(stable({ global: BALANCE.global, upgrades: BALANCE.upgrades, splash: BALANCE.splashFalloff, waves: BALANCE.waveScaling, tiers: TIERS }));
+export const balanceSignature = () => fnv1a(stable({ global: BALANCE.global, caps: BALANCE.caps, upgrades: BALANCE.upgrades, splash: BALANCE.splashFalloff, waves: BALANCE.waveScaling, tiers: TIERS }));
 
 /** Hash of everything about a unit that affects its performance. */
 export function unitSignature(defOrId) {

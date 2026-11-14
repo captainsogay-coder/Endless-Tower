@@ -20,7 +20,7 @@ export const farmer = {
   role: 'Melee · cheap',
   description: 'Brought the pitchfork from the barn. Reliable up close.',
   projectile: melee(),
-  ...tierUnit(1, { rate: 1.3, range: 44, price: 0.8 }),
+  ...tierUnit(1, { rate: 1.3, range: 44, price: 0.8, power: 1.15 }),
   passive: { id: 'farmer', name: 'Pitchfork', summary: 'Cheap, short-range melee attacker with reliable basic damage.' },
   art: 'farmer',
 };
@@ -33,7 +33,7 @@ export const spearman = {
   role: 'Melee · long reach',
   description: 'A longer stick with a sharper end.',
   projectile: { kind: 'thrust', speed: 1400 },
-  ...tierUnit(1, { rate: 1.1, range: 60, power: 0.98 }),
+  ...tierUnit(1, { rate: 1.1, range: 60, power: 1.07 }),
   passive: { id: 'spearman', name: 'Reach', summary: 'Longer melee reach and slightly stronger attacks than the Farmer.' },
   art: 'spearman',
 };
@@ -46,7 +46,7 @@ export const slingman = {
   role: 'Ranged · fast',
   description: 'Spins, lets go, reaches for the next stone.',
   projectile: { kind: 'stone', speed: 520 },
-  ...tierUnit(2, { rate: 2, range: 104 }),
+  ...tierUnit(2, { rate: 2, range: 104, power: 0.97 }),
   passive: { id: 'slingman', name: 'Quick Sling', summary: 'Ranged attacker with moderate damage and fast attacks.' },
   art: 'slingman',
 };
@@ -59,7 +59,7 @@ export const militiaArcher = {
   role: 'Ranged · long range',
   description: 'Hunts deer on weekdays.',
   projectile: { kind: 'arrow', speed: 640 },
-  ...tierUnit(2, { rate: 0.8, range: 150 }),
+  ...tierUnit(2, { rate: 0.8, range: 150, power: 0.95 }),
   passive: { id: 'militia-archer', name: 'Longbow', summary: 'Longer range and slower attacks with stronger individual shots.' },
   art: 'militiaArcher',
 };
@@ -74,7 +74,7 @@ export const villageCaptain = {
   role: 'Frontline · militia buff',
   description: 'Was elected for being the loudest. Turned out to be good at it.',
   projectile: melee(),
-  ...tierUnit(3, { rate: 1.2, range: 56, role: 'support', power: 1.12 }),
+  ...tierUnit(3, { rate: 1.2, range: 56, role: 'support', power: 1.07 }),
   buffs: [VILLAGE_RALLY],
   passive: { id: 'village-captain', name: 'Rally', summary: 'Strong frontline attacker. Village Militia units within 4 tiles gain +10% damage (more per upgrade; Captains do not stack).' },
   art: 'villageCaptain',
@@ -117,7 +117,7 @@ export const guardRecruit = {
   role: 'Melee · dependable',
   description: 'Fresh tabard, fresh sword, fresh enthusiasm.',
   projectile: melee(),
-  ...tierUnit(2, { rate: 1.3, range: 48 }),
+  ...tierUnit(2, { rate: 1.3, range: 48, power: 1.13 }),
   passive: { id: 'guard-recruit', name: 'On Duty', summary: 'Affordable, dependable melee damage.' },
   art: 'guardRecruit',
 };
@@ -130,7 +130,7 @@ export const crossbowman = {
   role: 'Ranged · heavy bolts',
   description: 'Slow to reload. Worth the wait.',
   projectile: { kind: 'xbolt', speed: 760 },
-  ...tierUnit(3, { rate: 0.6, range: 180, power: 1.15 }),
+  ...tierUnit(3, { rate: 0.6, range: 180, power: 0.97 }),
   passive: { id: 'crossbowman', name: 'Heavy Bolts', summary: 'Long range, slow firing speed, strong damage per shot.' },
   art: 'crossbowman',
 };
@@ -143,7 +143,7 @@ export const guardSergeant = {
   role: 'Melee · fast',
   description: 'Two swords, no patience.',
   projectile: melee(),
-  ...tierUnit(3, { rate: 2.2, range: 52 }),
+  ...tierUnit(3, { rate: 2.2, range: 52, power: 1.15 }),
   passive: { id: 'guard-sergeant', name: 'Flurry', summary: 'Fast melee attacker with more damage per second than the Guard Recruit.' },
   art: 'guardSergeant',
 };
@@ -156,7 +156,7 @@ export const halberdier = {
   role: 'Reach · small area',
   description: 'Axe, spear and hook in one long pole.',
   projectile: { kind: 'thrust', speed: 1400 },
-  ...tierUnit(4, { rate: 0.9, range: 72, splash: 24, power: 0.59 }),
+  ...tierUnit(4, { rate: 0.9, range: 72, splash: 24, power: 0.89 }),
   passive: { id: 'halberdier', name: 'Sweep', summary: 'Medium-range attacks with a small area of effect, good against groups.' },
   art: 'halberdier',
 };
@@ -170,7 +170,7 @@ export const royalPatrol = {
   description: 'Watches the road out. Nothing gets past.',
   targeting: 'first', // the enemy with the least road left to the exit (Tower)
   projectile: { kind: 'arrow', speed: 700 },
-  ...tierUnit(5, { rate: 1.3, range: 150 }),
+  ...tierUnit(5, { rate: 1.3, range: 150, power: 0.94 }),
   passive: { id: 'royal-patrol', name: 'Last Line', summary: 'Ranged attacker that always targets the enemy closest to the exit.' },
   art: 'royalPatrol',
 };
@@ -185,7 +185,7 @@ export const grandCaptain = {
   role: 'Commander · guard buff',
   description: 'Gold trim, steel nerves.',
   projectile: melee(),
-  ...tierUnit(6, { rate: 1.2, range: 64, role: 'support', power: 1.13 }),
+  ...tierUnit(6, { rate: 1.2, range: 64, role: 'support', power: 1.04 }),
   buffs: [GRAND_CAPTAIN_ORDERS],
   passive: { id: 'grand-captain', name: 'Orders', summary: 'Town Guard units within 5 tiles gain +12% damage and +8% attack speed (more per upgrade; Grand Captains do not stack).' },
   art: 'grandCaptain',
@@ -216,7 +216,7 @@ export const apprenticeEngineer = {
   role: 'Ranged · balanced',
   description: 'Built the crossbow himself. Mostly.',
   projectile: { kind: 'xbolt', speed: 680 },
-  ...tierUnit(3, { rate: 1.2, range: 120, price: 0.8 }),
+  ...tierUnit(3, { rate: 1.2, range: 120, price: 0.8, power: 0.96 }),
   passive: { id: 'apprentice-engineer', name: 'Handmade', summary: 'Basic ranged attacker with balanced stats and a cheap price.' },
   art: 'apprenticeEngineer',
 };
@@ -230,7 +230,7 @@ export const ballista = {
   description: 'A crossbow the size of a cart.',
   targeting: 'strongest',
   projectile: { kind: 'ballista', speed: 900 },
-  ...tierUnit(4, { rate: 0.4, range: 224, power: 1.17 }),
+  ...tierUnit(4, { rate: 0.4, range: 224, power: 1 }),
   passive: { id: 'ballista', name: 'Skewer', summary: 'Long range, high single-target damage, slow attack speed.' },
   art: 'ballista',
 };
@@ -243,7 +243,7 @@ export const catapult = {
   role: 'Area · boulders',
   description: 'Throws rocks. Big ones.',
   projectile: { kind: 'boulder', speed: 300 },
-  ...tierUnit(5, { rate: 0.35, range: 168, splash: 48, power: 0.61 }),
+  ...tierUnit(5, { rate: 0.35, range: 168, splash: 48, power: 0.83 }),
   passive: { id: 'catapult', name: 'Boulder', summary: 'Medium-range area attacks, effective against groups.' },
   art: 'catapult',
 };
@@ -256,7 +256,7 @@ export const bombardier = {
   role: 'Area · quick bombs',
   description: 'Lights fuses faster than anyone thinks is wise.',
   projectile: { kind: 'bombball', speed: 380 },
-  ...tierUnit(5, { rate: 0.9, range: 128, splash: 28, power: 0.62 }),
+  ...tierUnit(5, { rate: 0.9, range: 128, splash: 28, power: 0.87 }),
   passive: { id: 'bombardier', name: 'Short Fuse', summary: 'Faster explosive attacks with a smaller blast and less damage per hit than the Catapult.' },
   art: 'bombardier',
 };
@@ -271,7 +271,7 @@ export const siegeCommander = {
   role: 'Commander · siege buff',
   description: 'Knows exactly where every stone will land.',
   projectile: { kind: 'xbolt', speed: 700 },
-  ...tierUnit(6, { rate: 1, range: 128, role: 'support', power: 1.21 }),
+  ...tierUnit(6, { rate: 1, range: 128, role: 'support', power: 0.93 }),
   buffs: [SIEGE_COMMAND],
   passive: { id: 'siege-commander', name: 'Siege Command', summary: 'Siege Workshop units within 6 tiles gain +15% damage (more per upgrade; Siege Commanders do not stack).' },
   art: 'siegeCommander',
@@ -285,7 +285,7 @@ export const trebuchet = {
   role: 'Extreme range · enormous area',
   description: 'Counterweight, sling, and a very long wait.',
   projectile: { kind: 'trebuchet', speed: 260 },
-  ...tierUnit(8, { rate: 0.15, range: 448, splash: 120, power: 0.86 }),
+  ...tierUnit(8, { rate: 0.15, range: 448, splash: 120, power: 0.89 }),
   passive: { id: 'trebuchet', name: 'Counterweight', summary: 'Extremely long-range attacks with an enormous blast and a slow cooldown.' },
   art: 'trebuchet',
 };
@@ -312,7 +312,7 @@ export const masterEngineer = {
   role: 'Chase · builder',
   description: 'Draws a ballista on a napkin. It works.',
   projectile: { kind: 'bombball', speed: 360 },
-  ...tierUnit(10, { rate: 0.6, range: 192, splash: 64, role: 'summoner', power: 0.7 }),
+  ...tierUnit(10, { rate: 0.6, range: 192, splash: 64, power: 0.78 }),
   ability: { id: 'master-engineer', buildEvery: 20, buildLife: 10, maxActive: 2, allyUnit: 'mini-ballista' },
   passive: { id: 'master-engineer', name: 'Automaton', summary: 'Heavy area attacks. Every 20 s builds an automated mini-ballista that fights on its own for 10 s (at most two at once).' },
   art: 'masterEngineer',

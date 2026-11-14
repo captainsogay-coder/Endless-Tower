@@ -1352,3 +1352,20 @@ body * { letter-spacing: 0 !important; }
 .pool-item .pi-sub span[style], .unit-card .uc-role span[style], .bp-dossier .ds-sub span[style], #unit-panel .up-tier, .rs-item .rs-tier { filter: brightness(0.55) saturate(1.4); font-weight: 700; }
 .st-cell .st-num { font-size: 15px; }
 .pool-item .pi-chance span, .pull-btn .pb-need { font-weight: 500; }
+
+/* combat sheet + comparison (datasheet) */
+.cmp-pick { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.cmp-pick select { flex: 1; min-width: 0; min-height: 34px; padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line-2); background: #f6f4ee; color: var(--ink); font-family: var(--body); font-size: 14px; }
+.cmp-sheet { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.cmp-sheet th, .cmp-sheet td { padding: 5px 4px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: baseline; }
+.cmp-sheet tbody th { text-align: left; font-weight: 500; color: var(--text-2); }
+.cmp-sheet tbody th[title] { text-decoration: underline dotted var(--line-2); text-underline-offset: 3px; cursor: help; }
+.cmp-sheet td { font-family: var(--display); font-stretch: 80%; font-weight: 700; font-size: 15px; color: var(--ink); }
+.cmp-sheet thead th { font-family: var(--display); font-stretch: 72%; font-weight: 850; font-size: 15px; line-height: 1.05; color: var(--ink); border-bottom: 2px solid var(--ink); }
+.cmp-sheet thead th small { display: block; font-family: var(--body); font-stretch: 100%; font-weight: 600; font-size: 11px; color: var(--c); filter: brightness(0.55) saturate(1.4); }
+.cmp-sheet tr.strong td, .cmp-sheet tr.strong th { border-top: 2px solid var(--ink); font-weight: 800; color: var(--ink); }
+.cmp-sheet tr.strong td { font-size: 18px; }
+.cmp-d { font-family: var(--body); font-stretch: 100%; font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.cmp-d.up { color: #3d6b1d; }
+.cmp-d.down { color: #a23a2a; }
+.cmp-verdict { margin: 10px 0 0; font-size: 14px; line-height: 1.45; color: var(--text-2); }

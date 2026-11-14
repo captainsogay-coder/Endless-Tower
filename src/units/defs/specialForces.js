@@ -14,7 +14,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'bullet', speed: 1100, color: '#e8e2c8' },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(3, { rate: 3, range: 112, power: 1.12 }),
+  ...tierUnit(3, { rate: 3, range: 112, power: 1.03 }),
   passive: {
     id: 'squad-tactics',
     name: 'Squad Tactics',

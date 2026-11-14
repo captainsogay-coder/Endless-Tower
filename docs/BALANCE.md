@@ -1,5 +1,128 @@
 # Endless Tower: Progression Balance
 
+## Tier rework: make tiers matter (current)
+
+The problem, measured:
+- The old curve was shallow (Tier VII = 5.5× Tier I) and priced at `power^1.3`, so every tier step bought less power per coin.
+- Uncapped wave scaling (+2%/wave forever for Tier I–III) let low tiers catch high tiers in long runs.
+- Units whose abilities did a lot had their *own* stats trimmed to as little as 20% of their tier budget.
+
+The result was that a Tier III Special Forces army outlasted Tier VII and X armies, and the Tier XVII Nuclear Warhead survived fewer waves than it.
+
+The fix (details in the README's *Balance and progression*):
+1. **Curve:** power 1 / 1.6 / 2.4 / 3.4 / 4.7 / 6.3 / 8.3 / 10.8 / 13.8 / 17.5 / 22 / 27.5 / 34 / 42 / 51, then ×1.2 per tier.
+2. **Price:** `20 × power^1.05`.
+3. **Calibration** on each unit's own fighting power (`scripts/calibrate.mjs`).
+4. **Caps:** on wave scaling, stacked buffs, additive bonuses, coin multipliers and repeat earners.
+5. **Ability tweaks:** five numerical changes that move power from abilities into baselines.
+
+### Calibration (wave 1, level 0): own value vs tier power × role share
+
+Own value is √(single-target × swarm) relative to the Cadet. Abilities that deal damage count; utility doesn't (it's paid for by the role share). Dude is weak alone by design: Dude Power scales with copies.
+
+```
+T 1 cadet                    gunner    value   1.00 target   1.00 ×1.00  trim 1.00 → 1.00
+T 1 drunkard                 gunner    value   1.00 target   1.00 ×1.00  trim 0.78 → 0.78
+T 1 dude                     gunner    value   0.73 target   1.00 ×0.73  trim 0.75 → 1.02 (skipped)
+T 1 farmer                   gunner    value   0.99 target   1.00 ×0.99  trim 1.15 → 1.16
+T 1 spearman                 gunner    value   1.00 target   1.00 ×1.00  trim 1.07 → 1.07
+T 2 guard-recruit            gunner    value   1.60 target   1.60 ×1.00  trim 1.13 → 1.13
+T 2 gunnerman                gunner    value   1.61 target   1.60 ×1.01  trim 0.98 → 0.97
+T 2 militia-archer           gunner    value   1.60 target   1.60 ×1.00  trim 0.95 → 0.95
+T 2 slingman                 gunner    value   1.61 target   1.60 ×1.00  trim 0.97 → 0.97
+T 3 apprentice-engineer      gunner    value   2.39 target   2.40 ×1.00  trim 0.96 → 0.96
+T 3 bandit                   gunner    value   2.41 target   2.40 ×1.00  trim 0.77 → 0.77
+T 3 crossbowman              gunner    value   2.39 target   2.40 ×1.00  trim 0.97 → 0.97
+T 3 gambler                  gunner    value   2.36 target   2.40 ×0.98  trim 0.67 → 0.68
+T 3 grenade-launcher         gunner    value   2.43 target   2.40 ×1.01  trim 0.86 → 0.85
+T 3 guard-sergeant           gunner    value   2.41 target   2.40 ×1.00  trim 1.15 → 1.15
+T 3 special-forces           gunner    value   2.40 target   2.40 ×1.00  trim 1.03 → 1.03
+T 3 village-captain          support   value   2.04 target   2.04 ×1.00  trim 1.07 → 1.07
+T 4 ballista                 gunner    value   3.43 target   3.40 ×1.01  trim 1.00 → 0.99
+T 4 halberdier               gunner    value   3.39 target   3.40 ×1.00  trim 0.89 → 0.89
+T 4 missile-launcher         gunner    value   3.35 target   3.40 ×0.98  trim 0.69 → 0.70
+T 4 village-hero             gunner    value   3.43 target   3.40 ×1.01  trim 0.76 → 0.75
+T 5 bombardier               gunner    value   4.70 target   4.70 ×1.00  trim 0.87 → 0.87
+T 5 bounty-hunter            gunner    value   4.73 target   4.70 ×1.01  trim 0.81 → 0.81
+T 5 catapult                 gunner    value   4.72 target   4.70 ×1.00  trim 0.83 → 0.83
+T 5 commander                support   value   3.91 target   4.00 ×0.98  trim 1.05 → 1.07
+T 5 drone                    gunner    value   4.72 target   4.70 ×1.00  trim 0.71 → 0.71
+T 5 outlaw                   gunner    value   4.68 target   4.70 ×0.99  trim 0.64 → 0.64
+T 5 royal-patrol             gunner    value   4.71 target   4.70 ×1.00  trim 0.94 → 0.94
+T 5 special-force-battalion  summoner  value   3.80 target   3.76 ×1.01  trim 0.85 → 0.84
+T 5 tank                     support   value   4.00 target   4.00 ×1.00  trim 0.68 → 0.68
+T 6 colonel                  economy   value   4.75 target   4.72 ×1.01  trim 0.93 → 0.92
+T 6 dealer                   support   value   5.38 target   5.35 ×1.00  trim 0.92 → 0.92
+T 6 grand-captain            support   value   5.36 target   5.35 ×1.00  trim 1.04 → 1.04
+T 6 night-dancer             gunner    value   6.26 target   6.30 ×0.99  trim 0.88 → 0.89
+T 6 siege-commander          support   value   5.35 target   5.35 ×1.00  trim 0.93 → 0.93
+T 7 bomber                   gunner    value   8.35 target   8.30 ×1.01  trim 0.81 → 0.80
+T 7 desperate-gambler        gunner    value   8.31 target   8.30 ×1.00  trim 0.66 → 0.66
+T 7 general                  support   value   7.04 target   7.06 ×1.00  trim 0.81 → 0.81
+T 7 gunslinger               gunner    value   8.26 target   8.30 ×0.99  trim 0.59 → 0.59
+T 7 icbm                     gunner    value   8.30 target   8.30 ×1.00  trim 0.65 → 0.65
+T 8 kings-champion           gunner    value  10.80 target  10.80 ×1.00  trim 0.72 → 0.72
+T 8 trebuchet                gunner    value  10.84 target  10.80 ×1.00  trim 0.89 → 0.89
+T 9 b2                       gunner    value  13.80 target  13.80 ×1.00  trim 0.62 → 0.62
+T 9 outlaw-leader            summoner  value  11.01 target  11.04 ×1.00  trim 0.88 → 0.88
+T 9 pit-boss                 support   value  11.76 target  11.73 ×1.00  trim 0.92 → 0.92
+T 9 sheriff                  support   value  11.72 target  11.73 ×1.00  trim 0.75 → 0.75
+T10 fortress                 summoner  value  14.06 target  14.00 ×1.00  trim 0.81 → 0.81
+T10 high-roller              gunner    value  17.49 target  17.50 ×1.00  trim 0.55 → 0.55
+T10 master-engineer          gunner    value  17.63 target  17.50 ×1.01  trim 0.78 → 0.77
+T12 fastest-hand             gunner    value  27.72 target  27.50 ×1.01  trim 0.78 → 0.77
+T12 marshal                  support   value  23.37 target  23.38 ×1.00  trim 0.58 → 0.58
+T15 glorious-leader          support   value  43.60 target  43.35 ×1.01  trim 0.86 → 0.86
+T15 the-house                support   value  43.39 target  43.35 ×1.00  trim 0.55 → 0.55
+T17 nuclear-warhead          gunner    value  73.77 target  73.44 ×1.00  trim 0.62 → 0.62
+T19 antimatter-warhead       gunner    value 105.88 target 105.75 ×1.00  trim 0.92 → 0.92
+```
+
+### Full campaigns: waves survived (bot, ≤40 units, waves one at a time)
+
+Correlation between tier and waves survived: **0.73 before, 0.94 after**. Low tiers lose their late-game runaway but still clear the early and mid game; high tiers carry difficult waves.
+
+| Tier | Loadout | Before | After |
+| --- | --- | --- | --- |
+| I | dude | 88 | 63 |
+| I | cadet | 69 | 63 |
+| I | drunkard | 61 | 57 |
+| II | gunnerman | 88 | 69 |
+| III | bandit | 103 | 80 |
+| III | special-forces | 131 | 97 |
+| III | gambler | 112 | 88 |
+| III | dude+grenade-launcher | 71 | 71 |
+| IV | dude+missile-launcher | 80 | 88 |
+| V | dude+tank | 88 | 88 |
+| V | dude+drone | 106 | 97 |
+| V | dude+commander | 99 | 90 |
+| V | dude+outlaw | 97 | 97 |
+| V | dude+bounty-hunter | 99 | 99 |
+| V | dude+special-force-battalion | 112 | 103 |
+| VI | dude+night-dancer | 97 | 113 |
+| VI | dude+dealer | 103 | 99 |
+| VII | dude+general | 97 | 126 |
+| VII | dude+gunslinger | 103 | 106 |
+| VII | dude+desperate-gambler | 103 | 112 |
+| VII | dude+icbm | 88 | 116 |
+| VII | dude+bomber | 96 | 113 |
+| IX | dude+sheriff | 103 | 112 |
+| IX | dude+outlaw-leader | 122 | 151 |
+| IX | dude+pit-boss | 112 | 129 |
+| IX | dude+b2 | 80 | 127 |
+| X | dude+fortress | 113 | 151 |
+| X | dude+high-roller | 112 | 129 |
+| XII | dude+fastest-hand | 129 | 131 |
+| XII | dude+marshal | 126 | 198 |
+| XV | dude+the-house | 144 | 232 |
+| XV | dude+glorious-leader | 131 | 179 |
+| XVII | dude+nuclear-warhead | 106 | 240 |
+| XIX | dude+antimatter-warhead | 182 | 317 |
+
+Reproduce with `node scripts/balance.mjs bot 400 --all`. The "Before" column was measured on the previous release (commit aa394b3).
+
+---
+
 All knobs live in `src/balance.js` (`BALANCE`); per-unit values live in the unit files. Every number below was measured with
 `node scripts/balance.mjs` against the real simulation. The `--before` flag reproduces the previous balance for comparison.
 

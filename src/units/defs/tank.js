@@ -13,7 +13,7 @@ export default {
   targeting: 'first',
   projectile: { kind: 'shell', speed: 560 },
   // Base stats come from the tier budget (src/balance.js TIERS); this line is the unit's identity.
-  ...tierUnit(5, { rate: 0.4, range: 160, splash: 48, role: 'support', power: 0.56 }),
+  ...tierUnit(5, { rate: 0.4, range: 160, splash: 48, role: 'support', power: 0.68 }),
   // Flames: 3 s of burning ground, low damage per second (8% of shell damage).
   impactHazard: { kind: 'fire', radius: 28, duration: 3, dpsFactor: 0.08 },
   buffs: [TANK_AURA],
