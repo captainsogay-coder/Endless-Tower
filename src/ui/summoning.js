@@ -130,7 +130,7 @@ export class SummoningView {
       })
       .join('');
     const rarest = Math.min(...banner.pool.map((p) => p.chance));
-    $('pool-summary').textContent = `${banner.pool.length} units · rarest ${pct(rarest)}`;
+    $('pool-summary').textContent = `${banner.pool.length} units, rarest ${pct(rarest)}`;
     el.pool.innerHTML = banner.pool
       .map((p) => {
         const def = getUnit(p.unit);
@@ -138,7 +138,7 @@ export class SummoningView {
         const owned = profile.ownedCount(p.unit);
         return `<li class="pool-item ${isRare(p.chance) ? 'rare' : ''}" style="--c:${tier.color}">
           <img alt="" src="${portrait(def, 104)}" />
-          <div class="pi-main"><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span> · ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div>${sideTierStrip(def, { label: false })}</div>
+          <div class="pi-main"><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span>, ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div>${sideTierStrip(def, { label: false })}</div>
           <div class="pi-chance">${pct(p.chance)}<span>Chance</span></div>
         </li>`;
       })
@@ -229,8 +229,8 @@ export class SummoningView {
     el.card.innerHTML = `
       <span class="rc-tier" style="--c:${tier.color}">${esc(tier.label)}</span>
       <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
-      ${r.rare ? `<div class="rc-rare">Rare asset · ${pct(r.chance)}</div>` : ''}
-      <div class="rc-meta">${esc(def.role ?? '')} · ${pct(r.chance)} chance${r.isNew ? ' · Unlocked in Battle Plans' : ` · Owned ×${this.profile.ownedCount(r.unit)} · duplicate refunded`}</div>
+      ${r.rare ? `<div class="rc-rare">Rare asset, ${pct(r.chance)}</div>` : ''}
+      <div class="rc-meta">${esc(def.role ?? '')}, ${pct(r.chance)} chance${r.isNew ? ', Unlocked in Battle Plans' : `, Owned ×${this.profile.ownedCount(r.unit)}, duplicate refunded`}</div>
       ${sideTierStrip(def)}`;
     if (this.results.length === 1) {
       el.skip.hidden = true;

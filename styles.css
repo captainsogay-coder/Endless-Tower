@@ -1110,3 +1110,245 @@ html:not(.phone) .circle-card .cc-name { font-size: 15px; white-space: nowrap; o
 html:not(.phone) .circle-card .cc-units img { width: 26px; height: 26px; }
 .ab-unit .ab-name { padding-right: 30px; }
 .ab-section h3 { flex-wrap: wrap; row-gap: 2px; }
+
+/* ================================================================
+   WORKBENCH — the menus are a hobbyist's cutting mat; every unit is a
+   printed datasheet card lying on it. One family (Archivo) carries the
+   personality through its width axis: extra-condensed heavy for names,
+   normal width for reading. Sentence case everywhere, no tracked caps,
+   no mono. Ochre (ruler paint) marks the one primary action per screen.
+   Datasheets re-scope the colour tokens, so every component inside them
+   flips to ink on card stock without separate rules.
+   ================================================================ */
+:root {
+  --mat: #1f4a43;
+  --mat-grid: #2a5c53;
+  --mat-deep: #17362f;
+  --stock: #e9e7df;
+  --stock-2: #dddad0;
+  --ink: #1d2321;
+  --ochre: #e2ae3c;
+  --bg: var(--mat);
+  --surface: var(--mat-deep);
+  --surface-2: #1c4139;
+  --surface-3: #285148;
+  --line: #2f5c53;
+  --line-2: #3f6e64;
+  --text: #ebf0ea;
+  --text-2: #c6d3cb;
+  --muted: #93aaa1;
+  --accent: var(--ochre);
+  --accent-2: #edc061;
+  --accent-ink: #231a06;
+  --paper: #e9e7df;
+  --felt: #24544b;
+  --felt-2: #1d463e;
+  --display: 'Archivo', 'Arial Narrow', sans-serif;
+  --body: 'Archivo', system-ui, sans-serif;
+  --mono: 'Archivo', system-ui, sans-serif;
+  --r: 4px;
+}
+body * { text-transform: none !important; }
+body { font-family: var(--body); font-stretch: 100%; letter-spacing: 0; font-size: 15px; }
+h1, h2, h3, h4, .label, .tab, .btn-primary, .btn-secondary, .btn-battle, .state-tag, .uc-tier, .uc-pick, .st-code, .st-name, .rt-focus button, .rt-own button, .seg button,
+.section-head h2, .wordmark, .ds-section h3, .ab-section h3, .up-upgrade h4, .arch-tag, .trait, .cc-price, .pb-cost, .dc-key, .dc-count, .rc-tier, .rc-new, .rc-dupe, .rc-rare, .ab-mark, .ab-side,
+.uc-stats dt, .stats-grid dt, table.levels th, .kv dd, .uc-line .k, .pd-title, .b-kicker, .np-arch, .boss-title, .pull-btn .pb-n, .wallet .label, .realm-name, .auto { letter-spacing: 0 !important; }
+
+/* the mat: fine grid every 16 px, a stronger line every 80 px, as on a real cutting mat */
+#menu {
+  background-color: var(--mat);
+  background-image:
+    linear-gradient(var(--mat-grid) 1px, transparent 1px), linear-gradient(90deg, var(--mat-grid) 1px, transparent 1px),
+    linear-gradient(rgba(42,92,83,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(42,92,83,0.45) 1px, transparent 1px);
+  background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+}
+#screen-plans, #screen-summon { background: transparent; }
+.bp-header, .bp-footer, .sm-footer, .menu-bar, #hud-top, #dock { background: var(--mat-deep); }
+.bp-header, .bp-footer, .menu-bar { border-color: #12302a; }
+.bp-roster { background: transparent; }
+
+/* type: condensed heavy names, readable body, tabular figures */
+h1, h2, h3 { font-family: var(--display); font-stretch: 68%; font-weight: 850; line-height: 0.95; }
+.bp-title h1, .sm-banner h1 { font-size: 52px; font-stretch: 62%; font-weight: 900; }
+.wordmark { font-stretch: 62%; font-weight: 900; font-size: 22px; color: var(--stock); }
+.wordmark::before { display: none; }
+.tab { font-stretch: 75%; font-weight: 800; font-size: 19px; }
+.label { font-family: var(--body); font-size: 12px; font-weight: 500; color: var(--muted); }
+.section-head h2 { border-left: 0; padding-left: 0; font-size: 22px; font-stretch: 68%; font-weight: 850; }
+.num, .kv dd, .uc-stats dd, table.levels td, .cmp td, #coins, #plan-count, .st-num, .pi-chance { font-variant-numeric: tabular-nums; font-stretch: 75%; }
+.btn-primary, .btn-secondary, .btn-battle, .pull-btn, .rt-focus button, .rt-own button, .seg button { font-family: var(--display); font-stretch: 80%; font-weight: 750; border-radius: var(--r); }
+.btn-primary, .btn-battle, .pull-btn.primary { background: var(--ochre); border-color: #b9862a; color: var(--accent-ink); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.18); }
+.btn-battle { font-stretch: 62%; font-weight: 900; font-size: 38px; }
+.btn-secondary { border-color: #4f8075; color: var(--text); }
+.state-tag { font-family: var(--body); font-size: 13px; font-weight: 600; border-radius: 99px; padding: 4px 12px; }
+.state-tag.ready { border-color: var(--ok); color: #bfe08f; }
+.wallet { border-radius: 99px; padding: 4px 14px; }
+.wallet .label { display: none; }
+
+/* ---------------------------------------------------------------- datasheets */
+.unit-card, .bp-dossier, .pool-item, .ab-unit, .modal, #unit-panel, .circle-card, .reveal-summary .rs-item, .weather-card {
+  --text: var(--ink);
+  --text-2: #3a4542;
+  --muted: #6b726d;
+  --surface: var(--stock);
+  --surface-2: var(--stock-2);
+  --surface-3: #cfccc0;
+  --line: #cbc8bc;
+  --line-2: #b4b1a4;
+  --felt: #2a5c53;
+  --felt-2: #1f4a43;
+  color: var(--ink);
+}
+.unit-card { background: var(--stock); border: 0; border-radius: 6px; box-shadow: 0 1px 0 rgba(0,0,0,0.25), 0 6px 14px rgba(8,24,20,0.35); }
+.unit-card:hover { transform: translateY(-2px); }
+.unit-card.focused { box-shadow: 0 0 0 2px var(--stock), 0 0 0 4px var(--ochre), 0 6px 14px rgba(8,24,20,0.35); }
+.unit-card.selected { box-shadow: 0 0 0 3px var(--ink), 0 6px 14px rgba(8,24,20,0.35); animation: none; }
+.unit-card.locked { background: #c9cbc3; border: 0; opacity: 0.92; }
+/* the art window shows the miniature standing on the mat; its top edge is the tier colour */
+.uc-art { margin: 8px 8px 0; border-radius: 4px; border: 0; border-top: 4px solid var(--tc); background: var(--mat); background-image: linear-gradient(var(--mat-grid) 1px, transparent 1px), linear-gradient(90deg, var(--mat-grid) 1px, transparent 1px); background-size: 16px 16px; }
+.uc-art::before { display: none; }
+.uc-tier { font-family: var(--body); font-weight: 700; font-size: 11px; color: var(--ink); background: var(--tc); border: 0; border-radius: 3px; }
+.uc-pick { font-family: var(--body); font-weight: 600; font-size: 11px; color: var(--stock); background: rgba(23,54,47,0.85); border-radius: 3px; }
+.unit-card.selected .uc-pick { background: var(--ink); color: var(--ochre); }
+.uc-head h3 { font-size: 26px; color: var(--ink); }
+.uc-price { color: #7a5a14; font-stretch: 75%; }
+.uc-role { color: var(--muted); }
+.uc-stats { background: transparent; border: 0; gap: 4px; margin: 10px 12px 0; }
+.uc-stats div { background: var(--stock-2); border-radius: 3px; }
+.uc-stats dt, .uc-line .k { font-family: var(--body); font-weight: 600; font-size: 11px; color: var(--muted); }
+.uc-stats dd { color: var(--ink); }
+.uc-fav { border-radius: 50%; background: rgba(23,54,47,0.85); border: 0; color: var(--stock); }
+.uc-fav.on { background: var(--ochre); color: var(--ink); }
+.unit-card.pinned::after { border-color: transparent var(--ochre) transparent transparent; border-width: 0 22px 22px 0; border-top-right-radius: 6px; }
+.roster-divider { background: rgba(233,231,223,0.25); }
+
+/* side tiers on stock: paint swatches */
+.st-cell { background: var(--stock-2); border: 0; border-radius: 3px; cursor: help; }
+.st-cell .st-code { font-family: var(--body); font-weight: 700; font-size: 10px; color: var(--muted); }
+.st-cell .st-num { color: var(--ink); font-weight: 850; }
+.st-cell.na { background: transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+.st-cell.na .st-num { color: var(--line-2); }
+.st-cell.hl { box-shadow: inset 0 0 0 2px var(--c); background: var(--stock); }
+.st-row .st-name { font-family: var(--display); font-stretch: 75%; font-weight: 800; font-size: 17px; }
+.st-row .st-bar, .st-cell .st-bar { background: var(--surface-3); border-radius: 2px; }
+.st-row .st-why em { font-family: var(--body); font-style: italic; }
+.st-row.na .st-num { font-family: var(--body); }
+
+/* the details panel is one big datasheet pinned to the side of the mat */
+.bp-dossier { background: var(--stock); border-left: 0; margin: 16px 16px 16px 0; border-radius: 6px; box-shadow: 0 6px 18px rgba(8,24,20,0.4); }
+.ds-top { border-color: var(--line); }
+.ds-top .ds-art, .up-head img, .pool-item img, .ab-unit img { background: var(--mat); border: 0; border-radius: 4px; }
+.ds-top h2 { font-size: 40px; color: var(--ink); }
+.ds-sub { font-family: var(--body); font-weight: 500; font-size: 13px; color: var(--muted); }
+.ds-section { border-color: var(--line); }
+.ds-section h3, .ab-section h3, .up-upgrade h4 { font-family: var(--body); font-weight: 700; font-size: 13px; color: var(--ink); }
+.passive-name { color: #8a5f0d; font-stretch: 75%; }
+.passive-formula { background: var(--stock-2); border-color: var(--line); color: var(--text-2); }
+table.levels tr.current td { color: #8a5f0d; }
+
+/* the selected army stands on round miniature bases */
+.army-slots { gap: 10px; }
+.slot { aspect-ratio: 1 / 1; border-radius: 50%; border: 2px dashed #3f6e64; background: rgba(23,54,47,0.5); }
+.slot.filled { border: 3px solid #0f2622; background: radial-gradient(circle at 40% 35%, #33433e, #1e2826 70%); box-shadow: 0 3px 0 #0b1c19; }
+.slot.filled img { width: 82%; margin-top: -10%; }
+.slot .slot-name { bottom: -18px; font-family: var(--body); font-weight: 600; font-size: 11px; color: var(--text-2); }
+.slot .slot-n { top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: var(--display); font-stretch: 75%; font-size: 18px; color: #3f6e64; }
+.slot.filled .slot-n { display: none; }
+.slot .slot-x { border-radius: 50%; background: var(--stock); color: var(--ink); border: 0; top: -4px; right: -4px; }
+.bp-footer { padding-bottom: 28px; }
+
+/* collection tools sit on the mat as chips */
+.rt-focus button, .rt-own button { border-color: #3f6e64; color: var(--text-2); font-size: 15px; }
+.rt-focus button[aria-pressed="true"], .rt-own button[aria-pressed="true"] { background: var(--stock); border-color: var(--stock); color: var(--ink); }
+.rt-focus button[aria-pressed="true"] .st-ico { color: var(--ink); }
+.rt-own button { border-radius: 0; }
+.rt-own button:first-child { border-radius: var(--r) 0 0 var(--r); }
+.rt-own button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.rt-field select { background: var(--mat-deep); border-color: #3f6e64; border-radius: var(--r); font-family: var(--body); font-stretch: 100%; font-weight: 600; font-size: 14px; }
+.rt-reset { color: var(--ochre); font-family: var(--body); }
+.roster-hint .st-ico { fill: var(--ochre); }
+.roster-empty { border-color: #3f6e64; color: var(--text-2); border-radius: 6px; }
+
+/* summoning: circles as cards on the mat, drop rates as a datasheet list */
+.circle-card { background: var(--stock); border: 0; border-radius: 6px; box-shadow: 0 4px 10px rgba(8,24,20,0.35); }
+.circle-card.active { box-shadow: 0 0 0 3px var(--ochre), 0 4px 10px rgba(8,24,20,0.35); }
+.circle-card .cc-name { color: var(--ink); font-stretch: 68%; font-weight: 850; font-size: 19px; }
+.circle-card .cc-price { font-family: var(--body); font-weight: 700; font-size: 13px; color: #7a5a14; }
+.circle-card .cc-price .ico { fill: #b9862a; }
+.circle-card .cc-units img { background: var(--mat); border-radius: 3px; }
+.circle-card .cc-units span { color: var(--muted); }
+.sm-side { background: var(--stock); --text: var(--ink); --text-2: #3a4542; --muted: #6b726d; color: var(--ink); }
+.pool-details .pd-title { font-stretch: 68%; font-weight: 850; font-size: 22px; }
+.pool-item { background: #f2f0ea; border: 0; border-left: 4px solid var(--c); border-radius: 4px; box-shadow: 0 1px 0 var(--line); }
+.pool-item .pi-name { font-stretch: 68%; font-size: 21px; color: var(--ink); }
+.pool-item .pi-chance { color: var(--ink); font-size: 26px; }
+.pool-item .pi-chance span { font-family: var(--body); font-weight: 500; font-size: 11px; }
+.pool-item.rare .pi-chance { color: #9a6a10; }
+.pool-item.rare .pi-name::after { content: 'rare'; background: var(--ochre); color: var(--ink); border-radius: 3px; letter-spacing: 0; }
+.pull-btn { background: var(--mat-deep); border-color: #3f6e64; }
+.pull-btn .pb-n { font-stretch: 68%; font-weight: 900; }
+.pull-btn .pb-cost { font-family: var(--body); font-weight: 700; }
+.sm-stage { background: #10241f; }
+
+/* dialogs and the battle unit panel are datasheets too */
+.modal { background: var(--stock); border: 0; border-top: 0; border-radius: 8px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.modal h2 { color: var(--ink); font-size: 44px; }
+.ab-prio { background: var(--stock-2); border: 0; border-radius: 6px; }
+.seg button { border-color: var(--line-2); color: var(--text-2); }
+.seg button[aria-checked="true"]:not([style]) { background: var(--ink); border-color: var(--ink); color: var(--stock); }
+.ab-unit { background: #f2f0ea; border: 0; border-left: 4px solid var(--c); border-radius: 4px; }
+.ab-unit.added { background: #e3eed6; }
+.ab-unit.removed { background: #f0dcd6; }
+.ab-unit.added .ab-mark { color: #3d6b1d; }
+.ab-unit.removed .ab-mark { color: #a23a2a; }
+.ab-mark, .ab-side { font-family: var(--body); font-weight: 700; }
+.overlay { background: rgba(10,26,22,0.72); }
+#unit-panel { background: var(--stock); border: 0; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.45); }
+.up-head h3 { color: var(--ink); font-size: 26px; }
+.up-close { border-color: var(--line-2); color: var(--ink); border-radius: 50%; }
+.up-passive { background: var(--stock-2); border: 0; border-radius: 4px; }
+.up-passive b { color: #8a5f0d; font-stretch: 75%; }
+.cmp td.up { color: #3d6b1d; }
+.up-wave b { color: #3d6b1d; }
+.up-btn.maxed { background: var(--stock-2); color: #3d6b1d; }
+.up-pips i { background: var(--surface-3); border-radius: 2px; }
+.weather-card { background: var(--stock); border: 0; border-left: 4px solid var(--c); border-radius: 6px; color: var(--ink); }
+.weather-card .wc-name { color: var(--ink); font-stretch: 75%; }
+.weather-card ul { color: #3a4542; }
+
+/* battle chrome on the deep mat */
+.deploy-card { background: var(--stock); border: 0; border-radius: 6px; --text: var(--ink); color: var(--ink); }
+.deploy-card .dc-art { background: var(--mat); }
+.deploy-card .dc-name { font-stretch: 68%; font-weight: 850; font-size: 17px; color: var(--ink); }
+.deploy-card .dc-price { color: #7a5a14; }
+.deploy-card.active { box-shadow: 0 0 0 3px var(--ochre); }
+.dc-key, .dc-count { font-family: var(--body); background: rgba(23,54,47,0.85); color: var(--stock); }
+.next-preview { background: #1c4139; }
+.realm-name { font-stretch: 68%; font-weight: 850; font-size: 22px; }
+#wave-num { font-stretch: 68%; font-weight: 900; }
+.arch-tag { border-radius: 99px; font-family: var(--body); }
+.banner-card { background: rgba(23,54,47,0.94); border-radius: 0 6px 6px 0; }
+.banner-card .b-title { font-stretch: 62%; font-weight: 900; }
+.banner-card .b-kicker { font-family: var(--body); font-weight: 600; font-size: 13px; }
+.speed button.active, .icon-btn.active { background: var(--stock); color: var(--ink); border-color: var(--stock); }
+.icon-btn, .speed button { background: #1c4139; border-color: #3f6e64; border-radius: var(--r); }
+#game { box-shadow: 0 0 0 1px #0f2622, 0 8px 24px rgba(0,0,0,0.35); border-radius: 4px; }
+#app { background: var(--mat); }
+
+/* reveal + results */
+.reveal-card .rc-name { font-stretch: 62%; font-weight: 900; }
+.rs-item { --c: var(--line-2); background: var(--stock); border: 0; border-top: 4px solid var(--c); border-radius: 6px; }
+.rs-item .rs-name { font-stretch: 68%; font-weight: 850; color: var(--ink); }
+.rc-new { border-radius: 99px; }
+
+html.phone .bp-dossier { margin: 0 12px 12px; }
+html.phone .bp-title h1, html.phone .sm-banner h1 { font-size: 38px; }
+html.phone .uc-head h3 { font-size: 19px; }
+html.phone .slot .slot-name { display: none; }
+html.phone .bp-footer { padding-bottom: calc(8px + var(--safe-b)); }
+@media (prefers-reduced-motion: reduce) { .unit-card:hover { transform: none; } }
+body * { letter-spacing: 0 !important; }
+/* tier colours are made for dark grounds; on card stock they are darkened for contrast */
+.pool-item .pi-sub span[style], .unit-card .uc-role span[style], .bp-dossier .ds-sub span[style], #unit-panel .up-tier, .rs-item .rs-tier { filter: brightness(0.55) saturate(1.4); font-weight: 700; }
+.st-cell .st-num { font-size: 15px; }
+.pool-item .pi-chance span, .pull-btn .pb-need { font-weight: 500; }

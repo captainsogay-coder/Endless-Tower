@@ -254,7 +254,7 @@ await page.waitForTimeout(200);
 const circles = [];
 for (const id of ['wild-west-circle', 'gambino-circle', 'nuclear-war-circle']) {
   await page.click(`[data-banner="${id}"]`);
-  const rows = await page.$$eval('.pool-item', (els) => els.map((e) => ({ name: e.querySelector('.pi-name').textContent, tier: e.querySelector('.pi-sub').textContent.split('·')[0].trim(), chance: parseFloat(e.querySelector('.pi-chance').firstChild.textContent) })));
+  const rows = await page.$$eval('.pool-item', (els) => els.map((e) => ({ name: e.querySelector('.pi-name').textContent, tier: e.querySelector('.pi-sub').textContent.split(',')[0].trim(), chance: parseFloat(e.querySelector('.pi-chance').firstChild.textContent) })));
   circles.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, price: await page.textContent('#banner-price'), card: await page.textContent(`[data-banner="${id}"] .cc-price`) });
 }
 check('Wild West, Gambino and Nuclear War pools list tier + drop rate and total exactly 100%', circles.every((c) => c.sum === 100 && c.rows.every((r) => /^Tier [IVXL]+$/.test(r.tier))) && circles.map((c) => c.rows.length).join() === '8,7,9', circles.map((c) => `${c.id}:${c.rows.length}/${c.sum}%`).join(' '));

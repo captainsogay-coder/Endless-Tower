@@ -140,7 +140,7 @@ export class Hud {
 
   onRunStart(game) {
     this.el.realmName.textContent = game.biome.name;
-    this.el.realmLayout.textContent = `${game.map.variantName ? `${game.map.variantName} · ` : ''}${game.map.layoutLabel} · ${game.map.routes.length} ${game.map.routes.length > 1 ? 'entrances' : 'entrance'}`;
+    this.el.realmLayout.textContent = `${game.map.variantName ? `${game.map.variantName}, ` : ''}${game.map.layoutLabel}, ${game.map.routes.length} ${game.map.routes.length > 1 ? 'entrances' : 'entrance'}`;
     this.deployKey = '';
     this.panelUnit = null;
     this.el.unitPanel.hidden = true;
@@ -160,25 +160,25 @@ export class Hud {
   }
 
   onWaveStart(plan, game) {
-    const traits = plan.traits.map((id) => getTrait(id).label).join(' · ');
+    const traits = plan.traits.map((id) => getTrait(id).label).join(', ');
     if (plan.isBoss) {
       this.banner(
-        `<div class="b-kicker">Wave ${plan.wave} · Boss · +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title">${esc(game.biome.bossTitle ?? 'Guardian')}</div>` +
-          `<div class="b-sub">${esc(plan.tagline)}${traits ? ` · ${esc(traits)}` : ''}</div>`,
+        `<div class="b-kicker">Wave ${plan.wave}, Boss, +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title">${esc(game.biome.bossTitle ?? 'Guardian')}</div>` +
+          `<div class="b-sub">${esc(plan.tagline)}${traits ? `, ${esc(traits)}` : ''}</div>`,
         plan.color,
         'boss',
       );
     } else {
       this.banner(
-        `<div class="b-kicker">Wave ${plan.wave} · +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title"><em>${esc(plan.label)}</em></div>` +
-          `<div class="b-sub">${formatNumber(plan.total)} enemies · ${esc(plan.patternLabel)}${traits ? ` · ${esc(traits)}` : ''}</div>`,
+        `<div class="b-kicker">Wave ${plan.wave}, +${formatNumber(plan.tokens)} Tokens on clear</div><div class="b-title"><em>${esc(plan.label)}</em></div>` +
+          `<div class="b-sub">${formatNumber(plan.total)} enemies, ${esc(plan.patternLabel)}${traits ? `, ${esc(traits)}` : ''}</div>`,
         plan.color,
       );
     }
   }
 
   onWaveClear({ wave, reward, tokens }, game) {
-    this.banner(`<div class="b-kicker">Wave ${wave} held · +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens</div>`, '#e3a33b', 'small');
+    this.banner(`<div class="b-kicker">Wave ${wave} held, +${formatNumber(reward)} coins</div><div class="b-title">+${formatNumber(tokens)} Tokens</div>`, '#e3a33b', 'small');
     this.el.tokens.textContent = `+${formatNumber(game.tokensEarned)}`;
     this.el.tokens.parentElement.classList.remove('bump');
     void this.el.tokens.offsetWidth;
@@ -241,7 +241,7 @@ export class Hud {
       el.waveArch.style.setProperty('--c', plan.color);
       const remaining = game.waveRemaining;
       const list = active.length > 1 ? `Active ${waveRange(active)}` : plan.patternLabel;
-      el.waveRemaining.textContent = `${formatNumber(remaining)} remaining · ${list}${queued.length ? ` · ${formatNumber(queued.length)} queued` : ''}`;
+      el.waveRemaining.textContent = `${formatNumber(remaining)} remaining, ${list}${queued.length ? `, ${formatNumber(queued.length)} queued` : ''}`;
       el.waveProgress.style.width = `${(1 - remaining / Math.max(1, game.waveTotal)) * 100}%`;
       const traitsHtml = plan.traits.map((id) => {
         const t = getTrait(id);
@@ -265,8 +265,8 @@ export class Hud {
     if (this.npKey !== `${np.wave}` || force) {
       this.npKey = `${np.wave}`;
       el.nextPreview.style.setProperty('--c', np.color);
-      const traits = np.traits.map((id) => getTrait(id).label).join(' · ');
-      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave} · <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? ` · ${esc(traits)}` : ''}</div><div class="np-reward"><svg class="ico token"><use href="#i-token" /></svg>+${formatNumber(np.tokens)} Tokens on clear</div>`;
+      const traits = np.traits.map((id) => getTrait(id).label).join(', ');
+      el.nextPreview.innerHTML = `<div class="np-arch">Wave ${np.wave}, <em>${esc(np.label)}</em></div><div class="np-sub">${formatNumber(np.total)} enemies${traits ? `, ${esc(traits)}` : ''}</div><div class="np-reward"><svg class="ico token"><use href="#i-token" /></svg>+${formatNumber(np.tokens)} Tokens on clear</div>`;
     }
   }
 
@@ -391,7 +391,7 @@ export class Hud {
       this.panelBody = '';
       const tier = getTier(def.tier);
       panel.innerHTML = `
-        <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span> · <span class="up-lv"></span></div><div class="up-quick"></div></div>
+        <div class="up-head"><img alt="" src="${portrait(def, 96)}" /><div><h3>${esc(def.name)}</h3><div class="ds-sub"><span class="up-tier" style="--c:${tier.color}">${esc(tier.label)}</span>, <span class="up-lv"></span></div><div class="up-quick"></div></div>
           <button class="up-close" data-act="close" aria-label="Close" type="button">×</button></div>
         ${sideTierStrip(def, { label: false })}
         <div class="up-body"></div>
@@ -415,7 +415,7 @@ export class Hud {
     E.lv.textContent = `Level ${u.level} / ${max}`;
     // always-visible stat line for phones (the full comparison table scrolls below)
     const c = info.current;
-    const quick = `${formatNumber(Math.round(c.damage * 10) / 10)} dmg · ${tiles(c.range)} range · ${c.rate.toFixed(2)}/s`;
+    const quick = `${formatNumber(Math.round(c.damage * 10) / 10)} dmg, ${tiles(c.range)} range, ${c.rate.toFixed(2)}/s`;
     if (E.quick.textContent !== quick) E.quick.textContent = quick;
     // upgrade button: label, cost and affordability
     const upKey = info.maxed ? 'max' : `${info.cost}:${info.affordable}`;
@@ -454,21 +454,21 @@ export class Hud {
     const lines = u.ability?.describe?.(u, game) ?? [];
     const passive = def.passive
       ? `<div class="up-passive"><div class="row"><b>${esc(def.passive.name)}</b>${bonusFn ? `<span class="pct">+${Math.round(bonusFn(game.passiveContext(def)) * 100)}%</span>` : ''}</div>
-         <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed · ` : ''}${esc(def.passive.summary)}</div>
+         <div class="muted">${bonusFn ? `${n} ${esc(def.name)}${n === 1 ? '' : 's'} deployed, ` : ''}${esc(def.passive.summary)}</div>
          ${lines.length ? `<div class="up-now">At this level</div><ul class="up-lines">${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : ''}</div>`
       : '';
     const per = waveBonusPerWave(def.tier);
     const waveLine = per
-      ? `<div class="up-wave"><b>Wave scaling +${Math.round(game.waveBonus(def) * 100)}%</b> damage · +${Math.round(per * 100)}% of base damage per wave cleared (${game.stats.wavesCleared} so far)</div>`
+      ? `<div class="up-wave"><b>Wave scaling +${Math.round(game.waveBonus(def) * 100)}%</b> damage, +${Math.round(per * 100)}% of base damage per wave cleared (${game.stats.wavesCleared} so far)</div>`
       : `<div class="up-wave muted">No wave scaling at ${esc(getTier(def.tier).label)} (Tier I–VI only)</div>`;
     const buffNames = (u.auras ?? []).map((id) => game.buffDefs().get(id)?.label ?? id);
     if (game.battleBonus?.damage) buffNames.push(`House Edge +${Math.round(game.battleBonus.damage * 100)}%`);
     if (game.weather.current) buffNames.push(`${game.weather.current.label} weather`);
-    const buffs = buffNames.length ? `<div class="up-buffs muted small">Active buffs: ${buffNames.map(esc).join(' · ')}</div>` : '';
+    const buffs = buffNames.length ? `<div class="up-buffs muted small">Active buffs: ${buffNames.map(esc).join(', ')}</div>` : '';
     return `
       <div class="up-pips" title="Upgrade level">${pips}</div>
       <div class="up-upgrade">
-        <h4><span>${info.maxed ? `Level ${u.level} · maximum` : `Level ${info.level} → ${info.nextLevel}`}</span><span>${formatNumber(u.kills)} kills</span></h4>
+        <h4><span>${info.maxed ? `Level ${u.level} (maximum)` : `Level ${info.level} → ${info.nextLevel}`}</span><span>${formatNumber(u.kills)} kills</span></h4>
         <table class="cmp">
           ${row('Damage', cur.damage, nx?.damage, f1)}
           ${row('Range', cur.range, nx?.range, tiles)}
@@ -476,7 +476,7 @@ export class Hud {
           ${cur.splash ? row('Blast radius', cur.splash, nx?.splash, tiles) : ''}
           ${row('DPS', cur.damage * cur.rate, nx ? nx.damage * nx.rate : undefined, f1)}
         </table>
-        ${info.maxed ? '<div class="up-max">Fully upgraded</div>' : `<div class="up-costline">Upgrade cost <b><span class="coin sm"></span>${formatNumber(info.cost)}</b>${need ? ` · <span class="up-need">${need}</span>` : ''}</div>`}
+        ${info.maxed ? '<div class="up-max">Fully upgraded</div>' : `<div class="up-costline">Upgrade cost <b><span class="coin sm"></span>${formatNumber(info.cost)}</b>${need ? `, <span class="up-need">${need}</span>` : ''}</div>`}
       </div>
       ${waveLine}
       ${passive}

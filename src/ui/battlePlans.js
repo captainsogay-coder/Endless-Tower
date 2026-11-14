@@ -251,7 +251,7 @@ export class BattlePlansView {
     };
     const same = diff.added.length === 0 && diff.removed.length === 0 && next.every((id, i) => this.plan.units[i] === id);
     this.el.abBody.innerHTML = `
-      <div class="ab-section"><h3>New plan · ${next.length} / ${MAX_PLAN_TYPES}<span class="ab-sum">${diff.added.length} new · ${diff.kept.length} kept · ${diff.removed.length} replaced</span></h3><ol class="ab-list">${next.map((id) => chip(id, diff.added.includes(id) ? 'added' : 'kept')).join('')}</ol></div>
+      <div class="ab-section"><h3>New plan: ${next.length} of ${MAX_PLAN_TYPES}<span class="ab-sum">${diff.added.length} new, ${diff.kept.length} kept, ${diff.removed.length} replaced</span></h3><ol class="ab-list">${next.map((id) => chip(id, diff.added.includes(id) ? 'added' : 'kept')).join('')}</ol></div>
       ${diff.removed.length ? `<div class="ab-section"><h3>Will be replaced (${diff.removed.length})</h3><ul class="ab-list">${diff.removed.map((id) => chip(id, 'removed')).join('')}</ul></div>` : ''}
       ${same ? '<p class="muted">Your plan already matches this selection.</p>' : ''}
       ${next.length < MAX_PLAN_TYPES ? `<p class="muted small">You own ${next.length} unit type${next.length === 1 ? '' : 's'}; all of them are included.</p>` : ''}
@@ -343,7 +343,7 @@ export class BattlePlansView {
     for (const b of el.own.querySelectorAll('[data-own]')) b.setAttribute('aria-pressed', String(b.dataset.own === f.ownership));
     const circles = listCirclesByPrice();
     if (f.circle !== 'all' && f.circle !== 'starter' && !circles.some((c) => c.id === f.circle)) f.circle = 'all';
-    el.circle.innerHTML = [`<option value="all">All circles</option>`, `<option value="starter">Starter units</option>`, ...circles.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} · ${c.price} Tokens</option>`)].join('');
+    el.circle.innerHTML = [`<option value="all">All circles</option>`, `<option value="starter">Starter units</option>`, ...circles.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}, ${c.price} Tokens</option>`)].join('');
     el.circle.value = f.circle;
     el.reset.hidden = f.ownership === 'all' && f.circle === 'all' && !f.side;
     const n = this.plan.units.length;
@@ -383,7 +383,7 @@ export class BattlePlansView {
     const locked = sortRoster(this.filtered(lockedAll), { acquiredIndex: () => 0, mode: mode === 'acquired' ? 'tier' : mode });
     const total = allOwned.length + lockedAll.length;
     const shown = units.length + locked.length;
-    this.el.rosterCount.textContent = `${allOwned.length} of ${total} owned${shown < total ? ` · ${shown} shown` : ''}`;
+    this.el.rosterCount.textContent = `${allOwned.length} of ${total} owned${shown < total ? `, ${shown} shown` : ''}`;
     const cards = units.map((def) => {
       const tier = getTier(def.tier);
       const s = levelStats(def, 0);
@@ -401,7 +401,7 @@ export class BattlePlansView {
           <div><dt>Speed</dt><dd>${s.rate.toFixed(2)}/s</dd></div>
         </dl>
         <div class="uc-foot">
-          <div class="uc-line"><span class="k">Upgrades</span><span class="v">${maxLevel(def)} levels · ${upgradeRange(def)}</span></div>
+          <div class="uc-line"><span class="k">Upgrades</span><span class="v">${maxLevel(def)} levels, ${upgradeRange(def)}</span></div>
           ${def.passive ? `<div class="uc-line"><span class="k">${esc(def.passive.name)}</span><span class="v">${esc(def.passive.summary)}</span></div>` : ''}
         </div>
       </div>`;
@@ -421,7 +421,7 @@ export class BattlePlansView {
           <div class="uc-head"><h3>${esc(def.name)}</h3><span class="uc-price"><span class="coin sm"></span>${def.price}</span></div>
           <div class="uc-role">${esc(def.role ?? '')}</div>
           ${sideTierStrip(def, { highlight: hl, label: false })}
-          <div class="uc-foot"><div class="uc-line"><span class="k">Obtain</span><span class="v">${src ? `${esc(src.banner.name)} · ${pctText(src.chance)} per summon` : 'Not available yet'}</span></div></div>
+          <div class="uc-foot"><div class="uc-line"><span class="k">Obtain</span><span class="v">${src ? `${esc(src.banner.name)}, ${pctText(src.chance)} per summon` : 'Not available yet'}</span></div></div>
         </button>`);
       }
     }
@@ -462,7 +462,7 @@ export class BattlePlansView {
     this.el.dossier.innerHTML = `
       <div class="ds-top">
         <div class="ds-art"><img alt="" src="${portrait(def)}" /></div>
-        <div><h2>${esc(def.name)}</h2><div class="ds-sub">${esc(tier.label)} · ${esc(def.role ?? '')}</div></div>
+        <div><h2>${esc(def.name)}</h2><div class="ds-sub">${esc(tier.label)}, ${esc(def.role ?? '')}</div></div>
       </div>
       <p class="ds-desc">${esc(def.description ?? '')}</p>
       <div class="ds-section">

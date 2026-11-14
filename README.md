@@ -363,12 +363,12 @@ Shared systems handle the rest: targeting, upgrades, passives, `onHit` statuses,
 
 The game is staged as a **campaign table**. Units are painted miniatures on a diorama battlefield, and the interface is the commander's field kit. One set of rules covers everything.
 
-- **Interface:**
-  - Warm war-table darks, bone-white type and one brass accent.
-  - Headings in a condensed industrial face (Big Shoulders Display), data and labels in a typewriter mono (IBM Plex Mono), reading text in IBM Plex Sans.
-  - Flat plates with hairline rules and no glow. Colour always means something: tier, faction, side tier or state.
-  - Feedback is brief: cards lift on hover, selections settle with a short brass frame, the unit panel flashes once on upgrade, wallet numbers tick.
-  - Reduced-motion settings turn all of it off.
+- **Interface (the workbench):**
+  - The menus are a hobbyist's green cutting mat (fine 16 px grid, stronger 80 px lines). Every unit is a printed datasheet card lying on it: card stock, ink text, and the miniature shown standing on the mat in an art window topped with its tier colour.
+  - The unit details panel, drop-rate list, dialogs and battle unit panel are datasheets too. They re-scope the colour tokens, so everything inside flips to ink-on-stock without separate rules. The selected army stands on round miniature bases.
+  - One typeface, Archivo, carries the personality through its width axis: extra-condensed heavy for names and titles, normal width for reading, tabular figures for stats. Sentence case throughout, with no tracked capitals and no monospace labels.
+  - Ochre (ruler paint) marks the single primary action on each screen (Battle, Summon ×1, Upgrade, Call wave).
+  - Feedback answers the player's actions (card lift, a frame on selection, the panel flash on upgrade). Reduced-motion settings turn it off.
 - **Units:**
   - Every unit stands on a miniature base. The base size and rim metal show the tier band (iron I–III, bronze IV–VI, silver VII–X, gold XI–XIV, platinum XV+). A painted front edge shows the summoning circle (faction colour). Figures grow gently with tier.
   - Summoned allies get a ghosted, dashed base, so they never read as deployed units.
