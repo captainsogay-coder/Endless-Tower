@@ -231,6 +231,28 @@ export function shot(kind, v = 1) {
       burst(0.4, 0.1 * v, 'lowpass', 1600, 400); // launch roar
       tone('sawtooth', 90, 60, 0.35, 0.04 * v);
       break;
+    case 'slash':
+    case 'thrust':
+    case 'smite':
+      burst(0.07, 0.07 * v, 'bandpass', 2600, 900, 2); // swish
+      if (kind === 'smite') tone('triangle', 900, 1200, 0.2, 0.05 * v);
+      break;
+    case 'stone':
+    case 'arrow':
+      burst(0.08, 0.05 * v, 'bandpass', 1800, 1200, 3);
+      break;
+    case 'xbolt':
+    case 'ballista':
+      tone('triangle', kind === 'ballista' ? 160 : 260, kind === 'ballista' ? 90 : 140, 0.12, 0.08 * v); // string twang
+      break;
+    case 'boulder':
+    case 'trebuchet':
+      tone('sine', 120, 60, 0.25, 0.08 * v); // creak and thump of the arm
+      burst(0.15, 0.05 * v, 'lowpass', 600, 200);
+      break;
+    case 'bombball':
+      tone('triangle', 500, 900, 0.12, 0.04 * v);
+      break;
     default:
       burst(0.05, 0.08 * v, 'highpass', 1500);
   }

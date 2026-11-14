@@ -527,7 +527,6 @@ table.levels tr.current td { color: var(--accent); }
   .wallets .wallet .label { display: none; }
 }
 
-}
 .up-now { margin-top: 6px; font-family: var(--display); font-weight: 600; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 .np-reward { margin-top: 3px; display: flex; align-items: center; gap: 5px; font-family: var(--display); font-weight: 700; font-size: 13px; color: var(--accent); }
 .up-wave { font-size: 12px; color: var(--text-2); }
@@ -578,13 +577,6 @@ html.phone .toast { font-size: 13px; padding: 4px 8px; }
 /* dock: weather strip → unit cards (or the unit sheet) → control bar */
 html.phone #dock { display: flex; flex-direction: column; gap: 8px; padding: 8px 8px calc(8px + var(--safe-b)); min-height: 0; overflow: hidden; }
 html.phone #dock .section-head { display: none; }
-html.phone .dock-weather:empty { display: none; }
-html.phone .weather-card { position: static; width: auto; padding: 6px 10px; display: grid; grid-template-columns: auto auto 1fr; align-items: center; column-gap: 10px; }
-html.phone .weather-card .wc-head { display: contents; }
-html.phone .weather-card .wc-name { font-size: 16px; }
-html.phone .weather-card .wc-time { font-size: 14px; }
-html.phone .weather-card .wc-bar { display: none; }
-html.phone .weather-card ul { grid-column: 3; display: flex; flex-wrap: wrap; gap: 0 10px; padding: 0; list-style: none; font-size: 12px; line-height: 1.3; }
 html.phone .deploy-panel { min-height: 0; }
 html.phone .deploy-bar { gap: 8px; padding-bottom: 2px; overscroll-behavior: contain; scroll-snap-type: x proximity; }
 html.phone .deploy-card { width: 92px; grid-template-rows: 52px auto; scroll-snap-align: start; }
@@ -648,8 +640,6 @@ html.phone-landscape #btn-next { grid-column: 1 / -1; min-height: var(--tap-sm);
 html.phone-landscape .call-many { grid-column: 1 / -1; grid-template-columns: 56px 1fr; }
 html.phone-landscape .call-many input, html.phone-landscape .call-many .btn-secondary, html.phone-landscape .next-actions .auto { height: var(--tap-sm); min-height: var(--tap-sm); }
 html.phone-landscape .next-actions .auto { grid-column: 1 / -1; }
-html.phone-landscape .weather-card { grid-template-columns: auto auto; }
-html.phone-landscape .weather-card ul { grid-column: 1 / -1; }
 html.phone-landscape #unit-panel .up-body { padding: 6px 8px; }
 
 /* ---------- menus (Battle Plans, Summoning) ---------- */
@@ -730,10 +720,6 @@ html.phone .rs-item img { width: 64px; height: 64px; }
 
 /* ---------- phone refinements: compact weather strip, guaranteed sheet actions, narrow phones ---------- */
 .dock-weather:empty { display: none; }
-.wc-short { display: none; }
-html.phone .weather-card { grid-template-columns: auto auto minmax(0, 1fr); }
-html.phone .weather-card ul { display: none; }
-html.phone .wc-short { display: block; grid-column: 3; min-width: 0; font-size: 12px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.phone #dock > * { min-width: 0; }
 html.phone #unit-panel { flex: 1 1 auto; min-height: 150px; }
 html.phone #unit-panel .up-actions { flex: none; }
@@ -808,3 +794,79 @@ html.phone .circle-card { min-width: 0; width: min(78vw, 260px); }
 html.phone .unit-card { min-width: 0; }
 html.phone .uc-head > * { min-width: 0; }
 html.phone .uc-price { flex: none; }
+
+/* ================================================================
+   BATTLE PLANS: favorites (pins), roster sorting, Auto Build
+   ================================================================ */
+.bp-header { grid-template-columns: auto 1fr auto auto; }
+.bp-tools { display: flex; gap: 8px; align-items: center; }
+.bp-tools button { min-height: 40px; padding: 0 14px; font-size: 15px; white-space: nowrap; }
+.roster-head { flex-wrap: wrap; }
+.roster-sort { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.roster-sort .label { margin-right: 4px; }
+.roster-sort button { min-height: 32px; padding: 0 10px; border-radius: var(--r); border: 1px solid var(--line-2); background: var(--surface-2); font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.roster-sort button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+.roster-hint { margin: -4px 0 10px; }
+div.unit-card { cursor: pointer; color: inherit; font: inherit; }
+div.unit-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.uc-fav { position: absolute; bottom: 6px; right: 6px; width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(15,17,21,0.75); color: var(--muted); font-size: 18px; line-height: 1; display: grid; place-items: center; z-index: 1; }
+.uc-fav:hover { color: #f2d38a; border-color: #f2d38a; }
+.uc-fav.on { color: #1c1406; background: #f2d38a; border-color: #f2d38a; }
+/* pinned ≠ in plan: pins get a gold top edge and a filled star; "In plan" keeps the accent border */
+.unit-card.pinned { box-shadow: inset 0 3px 0 #f2d38a; }
+.unit-card.pinned.selected { box-shadow: inset 0 3px 0 #f2d38a, inset 0 0 0 1px var(--accent); }
+.roster-divider { grid-column: 1 / -1; height: 1px; background: var(--line-2); margin: 2px 0; }
+.ds-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ds-fav[aria-pressed="true"] { color: #f2d38a; border-color: #f2d38a; }
+.autobuild-modal { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; }
+.autobuild-body { display: grid; gap: 12px; margin: 8px 0 16px; }
+.ab-section h3 { margin: 0 0 6px; font-family: var(--display); font-size: 14px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.ab-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.ab-unit { --c: var(--line-2); display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: center; padding: 4px 8px 4px 4px; border: 1px solid var(--line-2); border-left: 3px solid var(--c); border-radius: var(--r); background: var(--surface-2); }
+.ab-unit img { grid-row: 1 / 3; width: 32px; height: 32px; background: #283224; border-radius: 2px; }
+.ab-name { font-family: var(--display); font-weight: 700; font-size: 14px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ab-tier { font-size: 11px; color: var(--muted); }
+.ab-unit.added { background: rgba(110,190,120,0.12); }
+.ab-unit.removed { background: rgba(217,83,74,0.12); text-decoration: line-through; }
+html.phone .bp-tools { flex-wrap: wrap; }
+html.phone .bp-tools button { flex: 1; min-height: var(--tap); }
+html.phone .uc-fav { width: 40px; height: 40px; bottom: 4px; right: 4px; }
+html.phone .roster-sort button { min-height: 40px; }
+html.phone .roster-sort { margin-left: 0; width: 100%; }
+html.phone .ab-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ================================================================
+   WEATHER: compact card (desktop) · collapsible chip + panel (phones)
+   ================================================================ */
+.weather-card { width: 220px; padding: 6px 10px 7px; }
+.weather-card .wc-head { display: flex; align-items: center; gap: 6px; }
+.weather-card .wx-ico { width: 16px; height: 16px; fill: var(--c); color: var(--c); flex: none; }
+.weather-card .wc-name { font-size: 16px; flex: 1; }
+.weather-card .wc-time { font-size: 14px; }
+.weather-card .wc-bar { margin: 4px 0 5px; }
+.weather-card ul { font-size: 12px; line-height: 1.35; }
+.weather-card .wc-close { display: none; }
+.weather-chip { display: none; }
+/* phones: chip in the top bar; the card is a panel that only shows when expanded */
+html.phone .weather-chip { --c: var(--text-2); display: inline-flex; align-items: center; gap: 4px; height: var(--tap-sm); padding: 0 8px; border-radius: var(--r); border: 1px solid var(--line-2); border-left: 3px solid var(--c); background: var(--surface-2); color: var(--c); font-family: var(--display); font-weight: 700; font-size: 14px; flex: none; }
+html.phone .weather-chip[hidden] { display: none; }
+html.phone .weather-chip:disabled { opacity: 0.55; }
+html.phone .weather-chip[aria-expanded="true"] { background: var(--surface-3); }
+html.phone .weather-chip .wx-ico { width: 16px; height: 16px; fill: currentColor; }
+html.phone .weather-card { position: absolute; left: 6px; top: 6px; z-index: 6; width: min(280px, calc(100% - 12px)); display: block; pointer-events: auto; padding: 6px 8px 8px 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); animation: fade-in 0.15s ease; }
+html.phone .weather-card[hidden] { display: none; }
+html.phone .weather-card ul { display: block; padding-left: 16px; font-size: 13px; }
+html.phone .weather-card .wc-head { display: flex; }
+html.phone .weather-card .wc-bar { display: block; }
+html.phone .weather-card .wc-close { display: grid; place-items: center; width: var(--tap-sm); height: var(--tap-sm); margin: -4px -4px -4px 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 22px; }
+html.narrow .weather-chip { padding: 0 6px; font-size: 13px; }
+.wc-off { display: none; }
+html.phone .wc-off { display: block; width: 100%; margin-top: 6px; min-height: var(--tap-sm); font-size: 13px; }
+/* while weather is active on a phone the chip takes the on/off toggle's place in the top bar */
+html.phone #hud-top.has-weather #btn-weather { display: none; }
+html.phone #hud-top { min-width: 0; }
+html.phone .hud-right { min-width: 0; flex-shrink: 1; }
+html.phone .gold, html.phone .tokens-earned, html.phone .tower-hp { min-width: 0; flex-shrink: 1; overflow: hidden; }
+.roster-grid > .unit-card { min-width: 0; }
+.uc-head h3 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uc-price { flex: none; }

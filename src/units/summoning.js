@@ -140,6 +140,65 @@ registerBanner({
   ],
 });
 
+export const VILLAGE_MILITIA_CIRCLE = 'village-militia-circle';
+
+registerBanner({
+  id: VILLAGE_MILITIA_CIRCLE,
+  name: 'Village Militia',
+  tagline: 'Pitchforks up. The village defends itself.',
+  currency: 'tokens',
+  price: 100,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'farmer', chance: 0.35 },
+    { unit: 'spearman', chance: 0.25 },
+    { unit: 'slingman', chance: 0.2 },
+    { unit: 'militia-archer', chance: 0.12 },
+    { unit: 'village-captain', chance: 0.07 },
+    { unit: 'village-hero', chance: 0.01 },
+  ],
+});
+
+export const TOWN_GUARD_CIRCLE = 'town-guard-circle';
+
+registerBanner({
+  id: TOWN_GUARD_CIRCLE,
+  name: 'Town Guard',
+  tagline: 'Steel at the gate. Order on the walls.',
+  currency: 'tokens',
+  price: 250,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'guard-recruit', chance: 0.3 },
+    { unit: 'crossbowman', chance: 0.25 },
+    { unit: 'guard-sergeant', chance: 0.2 },
+    { unit: 'halberdier', chance: 0.14 },
+    { unit: 'royal-patrol', chance: 0.08 },
+    { unit: 'grand-captain', chance: 0.025 },
+    { unit: 'kings-champion', chance: 0.005 },
+  ],
+});
+
+export const SIEGE_WORKSHOP_CIRCLE = 'siege-workshop-circle';
+
+registerBanner({
+  id: SIEGE_WORKSHOP_CIRCLE,
+  name: 'Siege Workshop',
+  tagline: 'Timber, rope and very large rocks.',
+  currency: 'tokens',
+  price: 400,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'apprentice-engineer', chance: 0.3 },
+    { unit: 'ballista', chance: 0.25 },
+    { unit: 'catapult', chance: 0.2 },
+    { unit: 'bombardier', chance: 0.13 },
+    { unit: 'siege-commander', chance: 0.08 },
+    { unit: 'trebuchet', chance: 0.03 },
+    { unit: 'master-engineer', chance: 0.01 },
+  ],
+});
+
 export const summonCost = (banner, count) => banner.price * count;
 
 /** One independent pull: inverse-CDF over the pool using a single uniform draw. */

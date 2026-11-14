@@ -46,6 +46,9 @@ export class Profile {
       wavesCleared: 0,
       weatherEnabled: true,
       muted: false,
+      favorites: [], // pinned unit TYPES (never copies, never plan slots)
+      rosterSort: 'tier', // Battle Plans roster order within pinned/unpinned: 'tier' | 'acquired'
+      planBackup: null, // the plan replaced by the last Auto Build, for Undo
     };
   }
 
@@ -73,6 +76,9 @@ export class Profile {
       wavesCleared: Number(d.wavesCleared) || 0,
       weatherEnabled: d.weatherEnabled !== false,
       muted: d.muted === true,
+      favorites: Array.isArray(d.favorites) ? [...new Set(d.favorites.filter((x) => typeof x === 'string'))] : [],
+      rosterSort: d.rosterSort === 'acquired' ? 'acquired' : 'tier',
+      planBackup: d.planBackup && Array.isArray(d.planBackup.units) ? createPlan(String(d.planBackup.name ?? 'Battle Plan').slice(0, 32), d.planBackup.units.filter((x) => typeof x === 'string')) : null,
     };
   }
 
@@ -117,6 +123,28 @@ export class Profile {
   recordSummon(unitId) {
     this.data.owned[unitId] = (this.data.owned[unitId] ?? 0) + 1;
     if (!this.isUnlocked(unitId)) this.data.unlocked.push(unitId);
+  }
+
+  // ---------------------------------------------------------- favorites
+
+  isFavorite(id) {
+    return this.data.favorites.includes(id);
+  }
+
+  /** Pins/unpins an owned unit type. Returns the new state (or null if the unit isn't owned). */
+  toggleFavorite(id) {
+    if (!this.isUnlocked(id)) return null;
+    const i = this.data.favorites.indexOf(id);
+    if (i >= 0) this.data.favorites.splice(i, 1);
+    else this.data.favorites.push(id);
+    this.save();
+    return i < 0;
+  }
+
+  /** Acquisition order: position in the unlock history (starter units first). */
+  acquiredIndex(id) {
+    const i = this.data.unlocked.indexOf(id);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i; // finite, so sort comparators never see NaN
   }
 
   ownedCount(unitId) {

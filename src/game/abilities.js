@@ -520,7 +520,58 @@ const antimatter = {
   },
 };
 
+// ------------------------------------------------------------------ VILLAGE / TOWN GUARD / SIEGE WORKSHOP
+
+const villageHero = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const heavy = count(u) % a.heavyEvery === 0;
+    shoot(game, u, target, heavy ? a.heavyMult : 1, { crit: heavy });
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const others = game ? game.passiveContext(u.def).factionOthers : 0;
+    return [`Every ${a.heavyEvery}th attack: ${a.heavyMult}× damage`, `+1% damage per other Village Militia unit deployed (max +30%) · now +${Math.min(30, others)}%`];
+  },
+};
+
+const kingsChampion = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'strike', a.strikeEvery, dt)) return;
+    const e = game.hash.best(u.x, u.y, u.stats.range, (o) => o.hp + o.shield);
+    if (!e) {
+      u.timers.strike = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    shoot(game, u, e, a.strikeMult, { kind: 'smite', speed: 1600, crit: true });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.strikeEvery} s: a ${a.strikeMult}× strike at the strongest enemy in reach`];
+  },
+};
+
+const masterEngineer = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'build', a.buildEvery, dt)) return;
+    if (game.alliesOf(u).length >= a.maxActive) return; // at most two automatons at once
+    u.lastSpecial = game.time;
+    game.spawnAlly(u, a.allyUnit, { life: a.buildLife, slot: game.alliesOf(u).length, of: a.maxActive });
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const n = game ? game.alliesOf(u).length : 0;
+    return [`Every ${a.buildEvery} s builds a mini-ballista that fights for ${a.buildLife} s (max ${a.maxActive} at once) · active ${n}`];
+  },
+};
+
 export const ABILITIES = {
+  'village-hero': villageHero,
+  'kings-champion': kingsChampion,
+  'master-engineer': masterEngineer,
   gambler,
   bandit,
   outlaw,

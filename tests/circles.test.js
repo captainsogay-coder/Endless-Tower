@@ -562,7 +562,7 @@ test('long multi-wave battle with every new unit runs without errors and stays b
   for (let i = 0; i < 60 * 240; i++) g.update(1 / 60);
   assert.ok(g.stats.kills > 500, `${g.stats.kills} kills`);
   assert.ok(g.battleBonus.damage <= 0.2 + 1e-9);
-  assert.ok(g.allies.length <= 3 + 3, 'allies bounded');
+  assert.ok(g.allies.length <= 3 + 3 + 2, 'allies bounded (gang, soldiers, mini-ballistas)');
   for (const u of g.units) assert.ok(Number.isFinite(u.stats.damage) && u.stats.rate > 0);
   assert.ok(g.timers.length < 200 && g.fields.length <= 2);
 });

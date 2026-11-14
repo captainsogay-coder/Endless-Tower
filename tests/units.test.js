@@ -10,7 +10,7 @@ registerRoster();
 
 test("roster: Dude plus every circle's units, all valid", () => {
   assert.deepEqual(ROSTER.map((d) => d.id).slice(0, 11), ['dude', 'cadet', 'gunnerman', 'grenade-launcher', 'tank', 'special-forces', 'drone', 'commander', 'colonel', 'general', 'fortress']);
-  assert.equal(ROSTER.length, 11 + 8 + 7 + 9);
+  assert.equal(ROSTER.length, 11 + 8 + 7 + 9 + 6 + 7 + 7);
   assert.equal(new Set(ROSTER.map((d) => d.id)).size, ROSTER.length, 'unique ids');
   for (const d of ROSTER) assert.deepEqual(validateUnitDef(d), [], d.id);
   assert.deepEqual(validateUnitDef(dude), []);

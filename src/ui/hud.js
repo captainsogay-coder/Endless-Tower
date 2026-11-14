@@ -43,7 +43,7 @@ export class Hud {
       deployBar: $('deploy-bar'),
       nextPreview: $('next-preview'), next: $('btn-next'), auto: $('auto'),
       callCount: $('call-count'), callMany: $('btn-call-many'), queueInfo: $('queue-info'),
-      weatherBtn: $('btn-weather'), weatherCard: $('weather-card'), sound: $('btn-sound'),
+      weatherBtn: $('btn-weather'), weatherCard: $('weather-card'), weatherChip: $('weather-chip'), sound: $('btn-sound'),
       banner: $('banner'), toasts: $('toasts'), unitPanel: $('unit-panel'),
       bossBar: $('boss-bar'), bossName: $('boss-name'), bossFill: $('boss-fill'), bossShield: $('boss-shield'), bossHpText: $('boss-hp-text'),
       pause: $('btn-pause'), pauseVeil: $('pause-veil'), fx: $('btn-fx'),
@@ -66,6 +66,22 @@ export class Hud {
     el.callCount.addEventListener('keydown', (ev) => ev.key === 'Enter' && actions.callWaves(count()));
     el.callMany.addEventListener('click', () => actions.callWaves(count()));
     el.weatherBtn.addEventListener('click', () => actions.toggleWeather());
+    // phones: the weather chip expands a compact panel; tapping outside or × collapses it
+    el.weatherChip.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this.setWeatherExpanded(!this.weatherExpanded);
+    });
+    el.weatherCard.addEventListener('click', (ev) => {
+      if (ev.target.closest('.wc-close')) this.setWeatherExpanded(false);
+      if (ev.target.closest('.wc-off')) {
+        this.setWeatherExpanded(false);
+        actions.toggleWeather();
+      }
+      ev.stopPropagation();
+    });
+    document.addEventListener('pointerdown', (ev) => {
+      if (this.weatherExpanded && !ev.target.closest('#weather-card, #weather-chip')) this.setWeatherExpanded(false);
+    });
     el.sound.addEventListener('click', () => actions.toggleSound());
     el.pause.addEventListener('click', () => actions.togglePause());
     el.fx.addEventListener('click', () => actions.toggleEffects());
@@ -204,7 +220,7 @@ export class Hud {
     el.coins.textContent = formatNumber(game.coins);
     el.next.disabled = game.phase === 'gameover';
     el.next.textContent = `Call wave ${game.nextPlan.wave}`;
-    this.renderWeather(game);
+    this.renderWeather(game, ui);
 
     this.renderDeployBar(game, ui);
     this.renderUnitPanel(game, ui);
@@ -264,26 +280,58 @@ export class Hud {
     this.el.sound.classList.toggle('off', !on);
   }
 
-  /** Top-left weather card: name, time left and what it does. */
-  renderWeather(game) {
+  /**
+   * Weather. Desktop: a compact card at the top left of the battlefield.
+   * Phones: a chip (icon + seconds left) in the top bar; tapping it expands the
+   * same card as a small panel. The panel collapses on tap-outside, ×, when
+   * weather ends, and as soon as unit placement starts (and can't be opened
+   * while placing), so it never covers ground the player is choosing.
+   */
+  renderWeather(game, ui) {
     const w = game.weather.current;
     const card = this.el.weatherCard;
+    const chip = this.el.weatherChip;
+    const phone = document.documentElement.classList.contains('phone');
+    this.placing = !!ui?.placingDef;
+    document.getElementById('hud-top').classList.toggle('has-weather', !!w);
     if (!w) {
       if (!card.hidden) card.hidden = true;
+      if (!chip.hidden) chip.hidden = true;
       this.weatherKey = '';
+      this.weatherExpanded = false;
       return;
     }
+    if (this.placing && this.weatherExpanded) this.setWeatherExpanded(false);
     const rem = Math.max(0, game.weather.remaining);
     const key = w.id;
     if (this.weatherKey !== key) {
       this.weatherKey = key;
       card.style.setProperty('--c', w.color);
-      card.innerHTML = `<div class="wc-head"><span class="wc-name">${esc(w.label)}</span><span class="wc-time num"></span></div>
-        <div class="wc-bar"><div></div></div><ul>${w.effects.map((e) => `<li>${esc(e)}</li>`).join('')}</ul><span class="wc-short" title="${esc(w.effects.join(' · '))}">${esc((w.short ?? w.effects).join(' · '))}</span>`;
-      card.hidden = false;
+      chip.style.setProperty('--c', w.color);
+      chip.querySelector('use').setAttribute('href', `#i-wx-${w.id}`);
+      chip.setAttribute('aria-label', `${w.label} weather – show details`);
+      card.innerHTML = `<div class="wc-head"><svg class="wx-ico"><use href="#i-wx-${w.id}" /></svg><span class="wc-name">${esc(w.label)}</span><span class="wc-time num"></span>
+          <button class="wc-close" type="button" aria-label="Close weather details">×</button></div>
+        <div class="wc-bar"><div></div></div><ul>${w.effects.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>
+        <button class="wc-off btn-secondary" type="button">Turn weather off</button>`;
     }
-    card.querySelector('.wc-time').textContent = `${Math.ceil(rem)}s`;
+    chip.hidden = !phone;
+    card.hidden = phone && !this.weatherExpanded;
+    chip.disabled = this.placing;
+    const secs = `${Math.ceil(rem)}s`;
+    const t = chip.querySelector('.wx-time');
+    if (t.textContent !== secs) t.textContent = secs;
+    const ct = card.querySelector('.wc-time');
+    if (ct.textContent !== secs) ct.textContent = secs;
     card.querySelector('.wc-bar div').style.width = `${(rem / game.weather.settings.duration) * 100}%`;
+  }
+
+  setWeatherExpanded(on) {
+    const open = !!on && !this.placing && !!this.weatherKey;
+    this.weatherExpanded = open;
+    this.el.weatherChip.setAttribute('aria-expanded', String(open));
+    this.el.weatherCard.classList.toggle('expanded', open);
+    if (document.documentElement.classList.contains('phone')) this.el.weatherCard.hidden = !open || !this.weatherKey;
   }
 
   updateBoss(game) {

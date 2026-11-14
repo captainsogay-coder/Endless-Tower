@@ -17,10 +17,10 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 
 ## How it plays
 
-1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle.
+1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the roster, or let **Auto Build** pick your strongest types (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at five circles (Military, Advanced Military, Wild West, Gambino and Nuclear War) to unlock new unit types permanently. Tokens are the only summon currency.
+4. **Summoning:** spend Tokens at eight circles (Military, Advanced Military, Village Militia, Town Guard, Siege Workshop, Wild West, Gambino and Nuclear War) to unlock new unit types permanently. Tokens are the only summon currency.
 
 ### Upgrading and range
 
@@ -41,8 +41,9 @@ Abilities grow with the level as well: anything based on damage scales with it, 
 
 Phones get their own layout rather than a shrunken desktop one. It is driven by `src/ui/responsive.js` (`html.phone`, `html.phone-landscape`, `html.narrow`) and the "PHONE LAYOUT" section of `styles.css`.
 
-- **Portrait:** a slim top bar (wave, Tower HP, Tokens earned, Coins, sound, retreat), then the battlefield at full width. Below it sits a compact weather strip, then a horizontally scrolling row of unit cards (or the unit sheet), then a bottom control bar: pause, 1×/2×/3×, Call wave, Call ×N and Auto Skip.
-- **Landscape:** the battlefield takes the full height on the left. Pause and speed sit in the top bar, and a side column holds weather, unit cards (or the unit sheet) and the wave controls.
+- **Portrait:** a slim top bar (wave, Tower HP, Tokens earned, Coins, sound, retreat), then the battlefield at full width. Below it sits a horizontally scrolling row of unit cards (or the unit sheet), then a bottom control bar: pause, 1×/2×/3×, Call wave, Call ×N and Auto Skip.
+- **Weather on phones:** while a weather is active, the top bar shows a small chip (icon + seconds left) in place of the weather toggle. Tap it for a compact panel with the weather's name, time left and buffs, plus *Turn weather off*. Tap outside or × to close. Starting a placement closes it, and the chip stays disabled while you place, so it never covers ground you're building on.
+- **Landscape:** the battlefield takes the full height on the left. Pause and speed sit in the top bar, and a side column holds unit cards (or the unit sheet) and the wave controls.
 - **Narrow phones** (under 380 px): one speed button cycles 1× → 2× → 3×.
 - **Everywhere:** every control is at least 40 px tall (main actions 44 px+), safe areas (notches, home indicator) are respected, menus scroll while the battlefield never does, and nothing overlaps the battlefield except short wave banners.
 - **Menus:** Summoning uses scrollable circle cards (name, Token price, unit preview), a collapsible "Drop rates & units" section and a four-button pull row. Battle Plans uses compact unit cards and a sticky Battle bar.
@@ -61,7 +62,7 @@ Tap a unit card (or press its key) to select it. This is free. Then tap open gro
 
 ### Weather
 
-While weather is on (the cloud button at the top left), every second has a **1% chance** of starting a random weather if none is active. Each weather lasts **20 s**, has its own visuals and sound, and its card at the top left shows the time left and the effects. Bonuses are applied on top of a unit's stats only while the weather lasts, never stack with another weather, and never change base stats.
+While weather is on (the cloud button at the top left), every second has a **1% chance** of starting a random weather if none is active. Each weather lasts **20 s**, has its own visuals and sound, and a compact card at the top left (desktop) or a tappable chip in the top bar (phones) shows the time left and the effects. Bonuses are applied on top of a unit's stats only while the weather lasts, never stack with another weather, and never change base stats.
 
 | Weather | Effects |
 | --- | --- |
@@ -83,6 +84,16 @@ While weather is on (the cloud button at the top left), every second has a **1% 
 | Call wave / `N` | Call the next wave now (or tick **Auto Skip**) |
 | Call ×N | Queue many waves at once |
 | `Space`, `F` | Pause, cycle game speed |
+
+## Battle Plans
+
+- **Plans** hold up to 12 distinct unit *types*. Tap an owned card to add or remove it.
+- **Favourites:** the ☆ on an owned card (or *Pin to front* in its details) pins that unit type. Pinned types always come first, with a gold star and border, separate from the plan's "in plan" highlight. Pinning never uses a plan slot. Pins are saved in the profile and can be removed any time.
+- **Sort:** *Tier* (highest tier first, stronger units first within a tier) or *Acquired* (the order you got them). Both keep pinned units first, and the choice is remembered.
+- **Auto Build** fills the plan with your strongest owned types. It picks the highest tier first, then the higher baseline combat score (single-target DPS combined with area reach, with support/summoner budgets credited back), then acquisition order. It takes up to 12 distinct types and uses fewer if you own fewer.
+  - It never spends Coins or Tokens, summons, or changes ownership.
+  - Before replacing anything it shows a dialog listing what will be added, replaced and kept.
+  - *Undo Auto Build* restores the previous plan, even after a reload.
 
 ## Currencies
 
@@ -123,6 +134,41 @@ There is exactly one summon currency: **Tokens**. `registerBanner` refuses a cir
 | Colonel | 12% | VI |
 | General | 7.5% | VII |
 | Fortress | 0.5% | X |
+
+### Village Militia: 100 Tokens per summon
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Farmer | I | 35% |
+| Spearman | I | 25% |
+| Slingman | II | 20% |
+| Militia Archer | II | 12% |
+| Village Captain | III | 7% |
+| The Village Hero | IV | 1% |
+
+### Town Guard: 250 Tokens per summon
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Guard Recruit | II | 30% |
+| Crossbowman | III | 25% |
+| Guard Sergeant | III | 20% |
+| Halberdier | IV | 14% |
+| Royal Patrol | V | 8% |
+| Grand Captain | VI | 2.5% |
+| The King's Champion | VIII | 0.5% |
+
+### Siege Workshop: 400 Tokens per summon
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Apprentice Engineer | III | 30% |
+| Ballista | IV | 25% |
+| Catapult | V | 20% |
+| Bombardier | V | 13% |
+| Siege Commander | VI | 8% |
+| Trebuchet | VIII | 3% |
+| The Master Engineer | X | 1% |
 
 ### Wild West: 300 Tokens per summon
 
@@ -170,13 +216,14 @@ Every pool is checked at start-up to total exactly 100%.
 ### Duplicates and rare units
 
 - **Duplicate compensation:** a pull of a unit you already own refunds **30% of one summon**. This includes a unit pulled earlier in the same multi-summon. It is shown on each reveal card and totalled in the results.
-  - It's always paid in Tokens: 45 at Military, 75 at Advanced, 90 at Wild West and Gambino, 150 at Nuclear War.
-- **Rare units:** any result with a chance of 1% or less gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, or a hazard-striped Nuclear War launch pad.
+  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War.
+- **Rare units:** any result with a chance of 1% or less gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, or a Siege Workshop gear.
   - **Fastest Hand In The West:** "High Noon". At sundown a revolver cylinder spins in silence, then six shots ring out around the circle.
   - **THE HOUSE:** the circle becomes a slot machine. The reels stop one by one on 7-7-7, then coins pour down.
   - **High Roller:** a chip shower.
   - **Nuclear Warhead:** a launch countdown.
   - **Antimatter Warhead:** space folding into the centre.
+  - **The Village Hero / The King's Champion / The Master Engineer:** HERO, CHAMPION and MASTERWORK stamps.
 
   Odds are never adjusted. Every pull is a plain independent draw, and the outcome is decided before the animation starts. Normal summons keep their short reveal.
 
@@ -231,10 +278,30 @@ Every unit has a base level plus 5 upgrades, bought per copy in battle. Stats co
 
 ### Circle units
 
-Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/wildWest.js`, `gambino.js`, `nuclearWar.js`), the behaviour in `src/game/abilities.js`.
+Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/medieval.js`, `wildWest.js`, `gambino.js`, `nuclearWar.js`), the behaviour in `src/game/abilities.js`.
 
 | Unit | Tier | Price | Damage | Range | Atk/s | DPS | Ability |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| Farmer | I | 15 | 11 | 1.51 | 1.44 | 15.9 | Pitchfork; cheap |
+| Spearman | I | 20 | 12.6 | 2.06 | 1.22 | 15.4 | Spear thrust |
+| Slingman | II | 35 | 10.1 | 3.58 | 2.22 | 22.4 | Fast stones |
+| Militia Archer | II | 35 | 21.6 | 5.16 | 0.89 | 19.2 | Long-range arrows |
+| Village Captain | III | 50 | 24 | 1.93 | 1.33 | 32 | **Rally:** Village Militia within 4 tiles +10% damage |
+| The Village Hero | IV | 75 | 23.4 | 2.75 | 1.44 | 33.8 | Every 10th attack strikes for 4×; +1% damage per other deployed Village Militia unit (max +30%) |
+| Guard Recruit | II | 35 | 16.8 | 1.65 | 1.44 | 24.3 | Sword and shield |
+| Crossbowman | III | 50 | 43.8 | 6.19 | 0.67 | 29.2 | Heavy bolts |
+| Guard Sergeant | III | 50 | 13.8 | 1.79 | 2.44 | 33.7 | Fast sword |
+| Halberdier | IV | 75 | 18 | 2.48 | 1 | 18 | Sweeping halberd (small area) |
+| Royal Patrol | V | 105 | 33.6 | 5.16 | 1.44 | 48.5 | Always targets the enemy closest to the exit |
+| Grand Captain | VI | 140 | 51.6 | 2.2 | 1.33 | 68.8 | Town Guard within 5 tiles +12% damage, +8% attack speed |
+| The King's Champion | VIII | 230 | 76.2 | 2.48 | 1 | 76.2 | Every 12 s a 5× strike at the strongest enemy in range |
+| Apprentice Engineer | III | 40 | 22.8 | 4.13 | 1.33 | 30.4 | Thrown wrenches |
+| Ballista | IV | 75 | 81.6 | 7.7 | 0.44 | 36.3 | Huge bolts at the strongest enemy |
+| Catapult | V | 105 | 40.2 | 5.78 | 0.39 | 15.6 | Boulders, 1.5-tile blast |
+| Bombardier | V | 105 | 21 | 4.4 | 1 | 21 | Lit bombs, small blast |
+| Siege Commander | VI | 140 | 60.6 | 4.4 | 1.11 | 67.3 | Siege Workshop units within 6 tiles +15% damage |
+| Trebuchet | VIII | 230 | 129.6 | 15.4 | 0.17 | 21.6 | Extreme range (15 tiles), enormous 3.75-tile blast, very slow |
+| The Master Engineer | X | 350 | 49.8 | 6.6 | 0.67 | 33.2 | Heavy 2-tile blasts; every 20 s builds a mini-ballista that fights for 10 s (max 2 at once) |
 | Gambler | III | 50 | 16.8 | 3.85 | 1.56 | 26.1 | 15% crits for 3×; every 10th attack is a guaranteed crit and pays 2 coins |
 | Bandit | III | 50 | 13.2 | 3.58 | 2.44 | 32.3 | +3% per consecutive hit on one enemy, up to +30%; resets on a new target |
 | Outlaw | V | 105 | 21.6 | 4.4 | 1.33 | 28.8 | Every 6th attack: dynamite (1.5×, 1.4-tile blast), enemies hit take +10% damage for 4 s |

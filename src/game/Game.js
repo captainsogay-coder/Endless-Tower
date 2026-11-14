@@ -818,8 +818,22 @@ export class Game {
   }
 
   /** Context handed to passives. Counts only units actually on the battlefield. */
-  passiveContext(def) {
-    return { deployed: this.deployedCount(def.id), count: (id) => this.deployedCount(id) };
+  passiveContext(def, { preview = false } = {}) {
+    const faction = def.faction ? this.factionCount(def.faction) : 0;
+    return {
+      deployed: this.deployedCount(def.id),
+      count: (id) => this.deployedCount(id),
+      countFaction: (f) => this.factionCount(f),
+      // units of the same faction other than this copy (a preview isn't on the field yet)
+      factionOthers: Math.max(0, faction - (preview ? 0 : 1)),
+    };
+  }
+
+  /** Player-deployed units of a faction (summoned allies never count). */
+  factionCount(faction) {
+    let n = 0;
+    for (const [id, c] of this.deployed) if (c && getUnit(id)?.faction === faction) n += c;
+    return n;
   }
 
   /** Recomputes effective stats for one unit (level stats + passive + buffs + weather). */
@@ -863,7 +877,11 @@ export class Game {
 
   /** Units whose passive depends on how many of `defId` are deployed (e.g. Outlaw Leader ← Outlaws). */
   refreshWatchers(defId) {
-    for (const u of this.units) if (u.def.passive?.watches?.includes(defId)) this.refreshUnit(u);
+    const faction = getUnit(defId)?.faction;
+    for (const u of this.units) {
+      const p = u.def.passive;
+      if (p?.watches?.includes(defId) || (faction && p?.watchFaction === faction)) this.refreshUnit(u);
+    }
   }
 
   /**
@@ -976,12 +994,13 @@ export class Game {
     for (const s of this.units) {
       for (const b of s.def.buffs ?? []) {
         const r = b.radius === 'range' ? s.stats.range : b.radius;
+        if (b.faction && def.faction !== b.faction) continue;
         if (r === Infinity || (s.x - x) ** 2 + (s.y - y) ** 2 <= r * r) if (!best.has(b.id) || s.level > best.get(b.id)) best.set(b.id, s.level);
       }
     }
     probe.auras = [...best.keys()];
     probe.auraLevels = Object.fromEntries(best);
-    const ctx0 = this.passiveContext(def);
+    const ctx0 = this.passiveContext(def, { preview: true });
     const ctx = { ...ctx0, deployed: ctx0.deployed + 1 };
     const s = def.passive?.bonus ? levelStats(def, 0) : applyPassive(def, levelStats(def, 0), ctx);
     const defs = this.buffDefs();

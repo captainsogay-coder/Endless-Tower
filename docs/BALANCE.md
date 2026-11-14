@@ -130,6 +130,26 @@ tier averages (value): T1 0.91  T2 1.26  T3 2.42  T4 2.90  T5 4.13  T6 5.04  T7 
 
 At level 5 the higher tiers pull further ahead, because their upgrades grow faster.
 
+### Village Militia, Town Guard and Siege Workshop (measured, level 0)
+
+The 20 new units use the same tier generator. Only attack speed, range, area and role are declared, plus a measured `power` trim. All of them land within ±12% of their tier's target (`node scripts/balance.mjs tiers 0`). Buff values (Rally, Grand Captain, Siege Command) are on top, faction-only, and are not included in a unit's own value. Mini-ballistas are temporary allies and are not counted as deployed units.
+
+```
+T 1 spearman             price  20  value 1.00×  target 1.0×     T 5 royal-patrol        price 105  value 3.35×  target 3.6×
+T 1 farmer               price  15  value 1.04×  target 1.0×     T 5 catapult            price 105  value 3.77×  target 3.6×
+T 2 militia-archer       price  35  value 1.34×  target 1.5×     T 5 bombardier          price 105  value 3.83×  target 3.6×
+T 2 slingman             price  35  value 1.45×  target 1.5×     T 6 grand-captain       price 140  value 4.41×  target 4.5×
+T 2 guard-recruit        price  35  value 1.58×  target 1.5×     T 6 siege-commander     price 140  value 4.45×  target 4.5×
+T 3 apprentice-engineer  price  40  value 2.01×  target 2.1×     T 8 trebuchet           price 230  value 6.69×  target 6.6×
+T 3 village-captain      price  50  value 2.05×  target 2.1×     T 8 kings-champion      price 230  value 6.83×  target 6.6×
+T 3 crossbowman          price  50  value 2.08×  target 2.1×     T10 master-engineer     price 350  value 9.99×  target 9.1×
+T 3 guard-sergeant       price  50  value 2.08×  target 2.1×
+T 4 ballista             price  75  value 2.75×  target 2.8×
+T 4 village-hero         price  75  value 2.84×  target 2.8×
+T 4 halberdier           price  75  value 3.01×  target 2.8×
+tier averages (all 55 units): T1 0.98  T2 1.45  T3 2.13  T4 2.87  T5 3.64  T6 4.45  T7 5.69  T8 6.76  T9 8.02  T10 9.77
+```
+
 ### Full games (bot, ≤60 units, waves one at a time, cap 300)
 
 | Army | Wave | Avg level |

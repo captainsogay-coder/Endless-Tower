@@ -45,11 +45,12 @@ import fortress from './defs/fortress.js';
 import { WILD_WEST_UNITS } from './defs/wildWest.js';
 import { GAMBINO_UNITS } from './defs/gambino.js';
 import { NUCLEAR_WAR_UNITS, BATTALION_SOLDIER } from './defs/nuclearWar.js';
+import { VILLAGE_UNITS, GUARD_UNITS, SIEGE_UNITS, MEDIEVAL_ALLIES } from './defs/medieval.js';
 
-export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress, ...WILD_WEST_UNITS, ...GAMBINO_UNITS, ...NUCLEAR_WAR_UNITS];
+export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress, ...WILD_WEST_UNITS, ...GAMBINO_UNITS, ...NUCLEAR_WAR_UNITS, ...VILLAGE_UNITS, ...GUARD_UNITS, ...SIEGE_UNITS];
 
 /** Temporary combatants created by abilities (never summoned, listed or deployed). */
-export const ALLY_DEFS = [BATTALION_SOLDIER];
+export const ALLY_DEFS = [BATTALION_SOLDIER, ...MEDIEVAL_ALLIES];
 
 /** Units every new player owns. Everything else is obtained by summoning. */
 export const STARTER_UNITS = ['dude'];

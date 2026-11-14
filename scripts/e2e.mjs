@@ -336,12 +336,80 @@ await page.click('.speed button[data-speed="1"]');
 await page.click('#btn-retreat');
 await page.click('#btn-retreat-confirm');
 
+// 12. Village Militia / Town Guard / Siege Workshop circles
+await page.click('.tab[data-page="summon"]');
+await page.waitForTimeout(200);
+const med = [];
+for (const id of ['village-militia-circle', 'town-guard-circle', 'siege-workshop-circle']) {
+  await page.click(`[data-banner="${id}"]`);
+  const rows = await page.$$eval('.pool-item', (els) => els.map((e) => ({ name: e.querySelector('.pi-name').textContent.trim(), chance: parseFloat(e.querySelector('.pi-chance').firstChild.textContent), rare: e.classList.contains('rare') })));
+  med.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, card: (await page.textContent(`[data-banner="${id}"] .cc-price`)).trim() });
+}
+check('Village Militia / Town Guard / Siege Workshop: 6/7/7 units, odds total 100%, priced 100/250/400 Tokens', med.every((c) => c.sum === 100) && med.map((c) => c.rows.length).join() === '6,7,7' && med.map((c) => c.card).join('|') === '100 Tokens|250 Tokens|400 Tokens', med.map((c) => `${c.rows.length}/${c.sum}% ${c.card}`).join(' · '));
+check('chase odds: Village Hero 1%, King\'s Champion 0.5%, Master Engineer 1%', med.map((c) => `${c.rows.at(-1).name}=${c.rows.at(-1).chance}`).join('|') === "The Village Hero=1|The King's Champion=0.5|The Master Engineer=1", med.map((c) => `${c.rows.at(-1).name}=${c.rows.at(-1).chance}`).join('|'));
+await page.click('[data-banner="village-militia-circle"]');
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 1000; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="10"]');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const vm = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation })), t: window.endlessTower.profile.balance('tokens'), w: Object.keys(window.endlessTower.profile.data.wallet) }));
+await page.click('#btn-reveal-done');
+check('Village Militia ×10 charges 1,000 Tokens (30 back per duplicate), nothing else', vm.t === vm.res.reduce((a, r) => a + r.comp, 0) && vm.res.every((r) => [0, 30].includes(r.comp)) && vm.w.join() === 'tokens', `tokens ${vm.t}`);
+
+// 13. Battle Plans: favorites, sorting, Auto Build + Undo, manual editing
+await page.click('.tab[data-page="plans"]');
+await page.waitForTimeout(200);
+const owned = await ev(() => window.endlessTower.profile.data.unlocked.length);
+const planBefore = await ev(() => [...window.endlessTower.profile.plan.units]);
+const favId = await page.$$eval('.roster-grid .unit-card:has(.uc-fav)', (els) => els.at(-1).dataset.id);
+const lockedStars = await page.$$eval('.roster-grid .unit-card.locked .uc-fav', (els) => els.length);
+await page.click(`.unit-card[data-id="${favId}"] .uc-fav`);
+await page.waitForTimeout(100);
+const fav = await ev((id) => ({ first: document.querySelector('.roster-grid .unit-card[data-id]').dataset.id, pinned: document.querySelector(`.unit-card[data-id="${id}"]`).classList.contains('pinned'), fav: window.endlessTower.profile.data.favorites, plan: [...window.endlessTower.profile.plan.units], divider: !!document.querySelector('.roster-divider') }), favId);
+check('star pins a unit type to the front, visibly, without using a plan slot', fav.first === favId && fav.pinned && fav.fav.includes(favId) && JSON.stringify(fav.plan) === JSON.stringify(planBefore) && fav.divider && lockedStars === 0, `${favId} first=${fav.first}`);
+await page.click('[data-sort="acquired"]');
+await page.waitForTimeout(100);
+const acq = await ev(() => { const p = window.endlessTower.profile; const ids = [...document.querySelectorAll('.roster-grid .unit-card[data-id]')].map((e) => e.dataset.id).filter((id) => p.isUnlocked(id)); return { ids, mode: p.data.rosterSort }; });
+const acqRest = acq.ids.filter((id) => id !== favId);
+const acqOk = acq.ids[0] === favId && acq.mode === 'acquired';
+const acqIdx = await ev((ids) => ids.map((id) => window.endlessTower.profile.acquiredIndex(id)), acqRest);
+check('"Acquired" sort keeps pinned first, then acquisition order (and is remembered)', acqOk && acqIdx.every((v, i) => i === 0 || v > acqIdx[i - 1]), acq.ids.slice(0, 4).join(', '));
+await page.click('[data-sort="tier"]');
+// manual plan edit still works
+const manual = await page.$$eval('.roster-grid .unit-card:has(.uc-fav)', (els) => els.map((e) => e.dataset.id));
+await ev(() => { window.endlessTower.profile.plan.units.length = 0; window.endlessTower.profile.save(); window.endlessTower.plans.render(); });
+await page.click(`.unit-card[data-id="${manual[0]}"]`);
+await page.click(`.unit-card[data-id="${manual[1]}"]`);
+const man = await ev(() => [...window.endlessTower.profile.plan.units]);
+check('manual plan building still works (tap to add)', JSON.stringify(man) === JSON.stringify(manual.slice(0, 2)), man.join(', '));
+// Auto Build: confirm dialog lists added / replaced, cancel changes nothing
+const wallet0 = await ev(() => JSON.stringify(window.endlessTower.profile.data.wallet) + JSON.stringify(window.endlessTower.profile.data.owned));
+await page.click('#btn-autobuild');
+await page.waitForTimeout(150);
+const dlg = await page.textContent('#autobuild-body');
+await page.click('#btn-autobuild-cancel');
+const afterCancel = await ev(() => [...window.endlessTower.profile.plan.units]);
+check('Auto Build asks first (lists added and replaced units); Cancel changes nothing', /Add/i.test(dlg) && afterCancel.join() === man.join() && (await page.isHidden('#screen-autobuild')), dlg.replace(/\s+/g, ' ').slice(0, 90));
+await page.click('#btn-autobuild');
+await page.click('#btn-autobuild-ok');
+await page.waitForTimeout(150);
+const ab = await ev(() => { const p = window.endlessTower.profile; const R = window.endlessTower.getUnit; const defs = p.plan.units.map(R); return { units: [...p.plan.units], tiers: defs.map((d) => d.tier), allOwned: p.plan.units.every((id) => p.isUnlocked(id)), maxOwnedTier: Math.max(...p.data.unlocked.map((id) => R(id).tier)), backup: p.data.planBackup?.units ?? null, money: JSON.stringify(p.data.wallet) + JSON.stringify(p.data.owned) }; });
+check('Auto Build fills up to 12 unique owned types, strongest tier first, spending nothing', ab.units.length === Math.min(12, owned) && new Set(ab.units).size === ab.units.length && ab.allOwned && ab.tiers[0] === ab.maxOwnedTier && ab.tiers.every((t, i) => i === 0 || t <= ab.tiers[i - 1]) && ab.money === wallet0, `${ab.units.length} types, tiers ${ab.tiers.join(',')}`);
+check('Undo Auto Build is offered and restores the previous plan', (await page.isVisible('#btn-undo-build')) && JSON.stringify(ab.backup) === JSON.stringify(man));
+await page.click('#btn-undo-build');
+const undone = await ev(() => ({ u: [...window.endlessTower.profile.plan.units], b: window.endlessTower.profile.data.planBackup }));
+check('Undo restores the exact manual plan and hides itself', JSON.stringify(undone.u) === JSON.stringify(man) && undone.b === null && (await page.isHidden('#btn-undo-build')), undone.u.join(', '));
+await page.click('#btn-autobuild');
+await page.click('#btn-autobuild-ok');
+
 // 8. Persistence across a restart
-const snap = await ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units] }));
+const snapOf = () => ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units], f: [...window.endlessTower.profile.data.favorites] }));
+const snap = await snapOf();
 await page.reload();
 await page.waitForFunction(() => window.__etBooted === true);
-const after = await ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units] }));
-check('Tokens, unlocked units and the plan persist after restart', JSON.stringify(snap) === JSON.stringify(after), `${after.t} tokens, ${after.u.length} units`);
+const after = await snapOf();
+check('Tokens, unlocked units, the plan and pinned favorites persist after restart', JSON.stringify(snap) === JSON.stringify(after), `${after.t} tokens, ${after.u.length} units`);
 check('wallet shows the persisted balance', (await page.textContent('#wallet-tokens')).length > 0);
 
 // 9. Mobile layout
@@ -368,6 +436,28 @@ await m.touchscreen.tap(ubtn.x + ubtn.width / 2, ubtn.y + ubtn.height / 2);
 await m.waitForTimeout(200);
 const mlv = await m.evaluate(() => window.endlessTower.game.units[0].level);
 check('mobile: the upgrade panel is fully on screen and upgrades by touch; wave controls stay visible', ubtn.y + ubtn.height <= vp.height && mlv === 1 && (await m.isVisible('#btn-next')), `button bottom ${Math.round(ubtn.y + ubtn.height)} / ${vp.height}`);
+
+// mobile weather: compact chip → tap opens details → tap outside closes → placing keeps it collapsed
+await m.evaluate(() => { const g = window.endlessTower.game; g.weatherEnabled = true; g.weather.start('windy'); });
+if (await m.isVisible('.up-close')) await m.tap('.up-close');
+await m.waitForTimeout(400);
+const chipBox = await m.locator('#weather-chip').boundingBox();
+const wxClosed = await m.isHidden('#weather-card');
+await m.tap('#weather-chip');
+await m.waitForTimeout(200);
+const wxOpen = { vis: await m.isVisible('#weather-card'), text: (await m.textContent('#weather-card')).replace(/\s+/g, ' ') };
+await m.touchscreen.tap(vp.width / 2, vp.height * 0.45);
+await m.waitForTimeout(200);
+const wxAfterOutside = await m.isHidden('#weather-card');
+await m.tap('#weather-chip');
+await m.waitForTimeout(150);
+await m.tap('.deploy-card');
+await m.waitForTimeout(200);
+const wxPlacing = { hidden: await m.isHidden('#weather-card'), chipDisabled: await m.$eval('#weather-chip', (b) => b.disabled) };
+check('mobile weather: a small chip in the top bar; tap opens details (name, time, buffs); tap outside closes', chipBox && chipBox.y + chipBox.height < 80 && chipBox.width < 120 && wxClosed && wxOpen.vis && /Windy/.test(wxOpen.text) && /20% range/.test(wxOpen.text) && /\d+s/.test(wxOpen.text) && wxAfterOutside, wxOpen.text.slice(0, 80));
+check('mobile weather: starting placement collapses the panel and keeps it closed while placing', wxPlacing.hidden && wxPlacing.chipDisabled, JSON.stringify(wxPlacing));
+const wxMech = await m.evaluate(() => window.endlessTower.game.weather.current?.id);
+check('weather mechanics unchanged by the UI (Windy still active)', wxMech === 'windy');
 
 check('no runtime errors during the whole run', errors.length === 0, errors.slice(0, 3).join(' | '));
 const failed = results.filter((r) => !r.ok).length;

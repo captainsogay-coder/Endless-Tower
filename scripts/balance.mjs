@@ -13,6 +13,7 @@
 //   crowd  – a stream of wave-scaled Regulars (AOE, chains, summons all count)
 // Enemies are made unkillable so damage is measured, not overkill.
 import { Game } from '../src/game/Game.js';
+import { sampleRoute } from '../src/maps/mapGenerator.js';
 import { registerRoster, ROSTER } from '../src/units/roster.js';
 import { maxLevel, upgradeCost } from '../src/units/unitStats.js';
 import { waveScaling } from '../src/waves/scaling.js';
@@ -81,7 +82,21 @@ function measure(def, wave, scenario, opts = {}) {
   const hp0 = new Map();
   const track = (e) => hp0.set(e, e.hp);
   if (scenario === 'single') {
-    const e = spawn(Math.max(0, route.length * 0.35 - 30));
+    // the dummy stands on the stretch of road closest to the unit, so short-reach melee units can hit it too
+    const ux = best.c * 32 + 16;
+    const uy = best.r * 32 + 16;
+    const at = { x: 0, y: 0, dx: 0, dy: 0 };
+    let nearD = 0;
+    let nearDist = Infinity;
+    for (let d = 0; d < route.length; d += 4) {
+      sampleRoute(route, d, at, 0);
+      const dd = (at.x - ux) ** 2 + (at.y - uy) ** 2;
+      if (dd < nearDist) {
+        nearDist = dd;
+        nearD = d;
+      }
+    }
+    const e = spawn(nearD);
     e.speed = 0;
     track(e);
   }

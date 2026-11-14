@@ -63,7 +63,7 @@ async function audit(page, name, screen) {
         const a = el.getBoundingClientRect();
         const ix = Math.min(a.right, cr.right) - Math.max(a.left, cr.left);
         const iy = Math.min(a.bottom, cr.bottom) - Math.max(a.top, cr.top);
-        if (ix > 4 && iy > 4 && !el.closest('#unit-panel')) res.overlaps.push(`${el.id || el.className} covers the battlefield`);
+        if (ix > 4 && iy > 4 && !el.closest('#unit-panel, #weather-card')) res.overlaps.push(`${el.id || el.className} covers the battlefield`);
       }
     }
     return res;
@@ -90,6 +90,9 @@ for (const [name, opts] of Object.entries(DEVICES)) {
     await audit(page, name, screen);
   };
   await shot('plans');
+  await page.click('#btn-autobuild', T);
+  await shot('autobuild');
+  await page.click('#btn-autobuild-cancel', T);
   await page.click('.tab[data-page="summon"]', T);
   await shot('summon');
     await page.click('.tab[data-page="plans"]', T);
@@ -100,6 +103,18 @@ for (const [name, opts] of Object.entries(DEVICES)) {
   const box = await page.locator('#game').boundingBox();
   await page.mouse.click(box.x + ((pos[0] + 0.5) / 40) * box.width, box.y + ((pos[1] + 0.5) / 22) * box.height);
   await shot('unit');
+  // weather: phones show a chip; tapping it opens the compact panel; starting placement folds it away
+  const phone = await page.evaluate(() => document.documentElement.classList.contains('phone'));
+  if (phone) {
+    await page.keyboard.press('Escape');
+    await page.click('#weather-chip', T);
+    await shot('weather');
+    const open = await page.isVisible('#weather-card');
+    await page.click('.deploy-card', T).catch(() => {});
+    await page.waitForTimeout(150);
+    const afterPlace = await page.isVisible('#weather-card');
+    problems.push({ name, screen: 'wx-fold', issues: open && !afterPlace ? [] : [`weather panel open=${open}, after starting placement=${afterPlace}`] });
+  }
   await ctx.close();
 }
 await b.close();

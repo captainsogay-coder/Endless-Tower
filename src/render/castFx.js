@@ -125,6 +125,32 @@ export class CastFx {
       case 'antimatter':
         this.blast(p.x, p.y, p.splash, 'antimatter');
         return true;
+      // ---- medieval
+      case 'slash':
+      case 'thrust':
+        this.r.fx.burst(p.x, p.y, p.crit ? 4 : 2, '#f2efe6', { speed: 50, life: 0.15, size: 1.3, glow: false });
+        if (p.crit) this.r.fx.ring(p.x, p.y, 2, 16, 0.25, '#ffe9a8', 2);
+        if (p.splash > 0) this.r.fx.ring(p.x, p.y, 3, p.splash, 0.25, '#e6e1d6', 1.5);
+        return true;
+      case 'smite':
+        this.r.fx.ring(p.x, p.y, 3, 30, 0.4, '#ffe08a', 3);
+        this.r.fx.text(p.x, p.y - 12, '5×', '#ffe08a', 11);
+        return true;
+      case 'stone':
+      case 'arrow':
+      case 'xbolt':
+      case 'ballista':
+        if (Math.random() < 0.5 * d) this.r.fx.burst(p.x, p.y, p.kind === 'ballista' ? 4 : 2, '#cbbfa8', { speed: 40, life: 0.25, size: 1.4, glow: false });
+        return true;
+      case 'boulder':
+      case 'trebuchet':
+        this.blast(p.x, p.y, p.splash, 'aftershock');
+        this.r.fx.burst(p.x, p.y, Math.round((p.kind === 'trebuchet' ? 10 : 6) * d), '#8d877c', { speed: 80, life: 0.5, size: 2.2, glow: false, gravity: 160 });
+        if (p.kind === 'trebuchet') this.r.shake(1.2);
+        return true;
+      case 'bombball':
+        this.blast(p.x, p.y, p.splash, 'dynamite');
+        return true;
       default:
         return false;
     }
@@ -259,6 +285,83 @@ export class CastFx {
         ctx.fillStyle = '#ffcf6a';
         circle(ctx, -L - 1.5, 0, big ? 2.4 : 1.4);
         ctx.fill();
+        ctx.restore();
+        return true;
+      }
+      // ---- medieval
+      case 'slash':
+      case 'thrust':
+      case 'smite': {
+        // melee: a quick swipe (or thrust line) at the target, no flying object
+        const ang = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+        ctx.strokeStyle = p.kind === 'smite' || p.crit ? 'rgba(255,224,138,0.95)' : 'rgba(250,246,236,0.85)';
+        ctx.lineWidth = p.kind === 'smite' ? 2.6 : 1.6;
+        ctx.beginPath();
+        if (p.kind === 'thrust') {
+          ctx.moveTo(p.tx - Math.cos(ang) * 12, p.ty - Math.sin(ang) * 12);
+          ctx.lineTo(p.tx, p.ty);
+        } else ctx.arc(p.tx - Math.cos(ang) * 6, p.ty - Math.sin(ang) * 6, p.kind === 'smite' ? 12 : 8, ang - 1.1, ang + 1.1);
+        ctx.stroke();
+        return true;
+      }
+      case 'stone': {
+        const hgt = 4 * 8 * k * (1 - k);
+        ctx.fillStyle = '#8d877c';
+        circle(ctx, p.x, p.y - hgt, 1.5);
+        ctx.fill();
+        return true;
+      }
+      case 'arrow':
+      case 'xbolt':
+      case 'ballista': {
+        const ang = Math.atan2(p.ty - p.sy, p.tx - p.sx);
+        const L = p.kind === 'ballista' ? 14 : p.kind === 'xbolt' ? 7 : 9;
+        const hgt = p.kind === 'arrow' ? 4 * 10 * k * (1 - k) : 0;
+        ctx.save();
+        ctx.translate(p.x, p.y - hgt);
+        ctx.rotate(ang + (p.kind === 'arrow' ? (k - 0.5) * 0.6 : 0));
+        ctx.strokeStyle = p.kind === 'ballista' ? '#3a2a1a' : '#5a3f2a';
+        ctx.lineWidth = p.kind === 'ballista' ? 2 : 1;
+        ctx.beginPath();
+        ctx.moveTo(-L, 0);
+        ctx.lineTo(0, 0);
+        ctx.stroke();
+        ctx.fillStyle = '#b9b6ad';
+        ctx.beginPath();
+        ctx.moveTo(0, -1.4);
+        ctx.lineTo(p.kind === 'ballista' ? 4 : 2.5, 0);
+        ctx.lineTo(0, 1.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#e6e1d6';
+        ctx.fillRect(-L, -1, 2, 2); // fletching
+        ctx.restore();
+        return true;
+      }
+      case 'boulder':
+      case 'trebuchet':
+      case 'bombball': {
+        const big = p.kind === 'trebuchet';
+        const arc = big ? 120 : p.kind === 'boulder' ? 50 : 26;
+        const hgt = 4 * arc * k * (1 - k);
+        ctx.fillStyle = `rgba(20,14,24,${0.12 + 0.2 * k})`;
+        ctx.beginPath();
+        ctx.ellipse(p.tx, p.ty, (big ? 9 : 4) * (0.5 + k), (big ? 4.5 : 2) * (0.5 + k), 0, 0, TAU);
+        ctx.fill();
+        ctx.save();
+        ctx.translate(p.x, p.y - hgt);
+        ctx.rotate(t * 6 + p.sx);
+        ctx.fillStyle = p.kind === 'bombball' ? '#26272b' : '#8d877c';
+        ctx.strokeStyle = '#3a3530';
+        ctx.lineWidth = 0.8;
+        circle(ctx, 0, 0, big ? 5 : p.kind === 'boulder' ? 3.4 : 2.4);
+        ctx.fill();
+        ctx.stroke();
+        if (p.kind === 'bombball') {
+          ctx.fillStyle = Math.sin(t * 50) > 0 ? '#ffe08a' : '#ff8a3a';
+          circle(ctx, 2, -2.2, 1);
+          ctx.fill();
+        }
         ctx.restore();
         return true;
       }

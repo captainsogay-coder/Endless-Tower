@@ -4,7 +4,7 @@
 //   desktop – pause + speed sit in the top HUD
 //   phones  – portrait: they join the bottom control bar next to Call wave / Auto Skip
 //             (landscape keeps them in the wide top bar),
-//             and the weather card moves off the battlefield into the dock
+//             (the weather card becomes a collapsible chip in the top bar – see hud.js)
 // It also tags <html> with the layout so CSS and code agree on it.
 
 export const PHONE_QUERY = '(max-width: 760px), (max-height: 520px)';
@@ -18,10 +18,6 @@ export function initResponsive({ onChange } = {}) {
   const play = document.getElementById('play-controls');
   const topSlot = play.parentElement;
   const dockSlot = document.getElementById('dock-controls');
-  // the weather card overlays the battlefield on desktop; on phones it becomes a strip in the dock
-  const weather = document.getElementById('weather-card');
-  const weatherHome = weather.parentElement;
-  const weatherSlot = document.getElementById('dock-weather');
   const apply = () => {
     const isPhone = phone.matches;
     const sideways = isPhone && landscape.matches;
@@ -32,8 +28,6 @@ export function initResponsive({ onChange } = {}) {
     const toDock = isPhone && !sideways;
     if (toDock && play.parentElement !== dockSlot) dockSlot.appendChild(play);
     if (!toDock && play.parentElement !== topSlot) topSlot.prepend(play);
-    if (isPhone && weather.parentElement !== weatherSlot) weatherSlot.appendChild(weather);
-    if (!isPhone && weather.parentElement !== weatherHome) weatherHome.appendChild(weather);
     onChange?.({ phone: isPhone, landscape: isPhone && landscape.matches });
   };
   phone.addEventListener('change', apply);

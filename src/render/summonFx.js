@@ -26,6 +26,12 @@ const CIRCLE_STYLES = {
   // green felt and a roulette wheel
   'gambino-circle': { paint: '#d6b048', accent: '#b7353a', text: 'PLACE YOUR BETS · THE HOUSE ALWAYS WINS · ', doubleRing: true, chevrons: 8, emblem: 'roulette', floorTint: 'rgba(16,90,52,0.42)', stampText: 'JACKPOT', beacon: '230,190,70' },
   // hazard-striped launch pad (arcade sci-fi)
+  // village green: worn planks and a wheat sheaf
+  'village-militia-circle': { paint: '#d6b67a', accent: '#8fb35a', text: 'TO ARMS · VILLAGE MILITIA · DEFEND THE FIELDS · ', chevrons: 5, emblem: 'sheaf', floorTint: 'rgba(70,90,30,0.3)', planks: true, stampText: 'HERO', beacon: '170,210,90' },
+  // town square cobbles and a heraldic shield
+  'town-guard-circle': { paint: '#c9cfd8', accent: '#3a5a9a', text: 'TOWN GUARD · BY ORDER OF THE CROWN · HOLD THE GATE · ', doubleRing: true, chevrons: 4, emblem: 'shield', floorTint: 'rgba(30,50,90,0.25)', stampText: 'CHAMPION', beacon: '120,150,230' },
+  // workshop floor: timber and a cog
+  'siege-workshop-circle': { paint: '#d99a5a', accent: '#c9a24a', text: 'SIEGE WORKSHOP · TIMBER · ROPE · COUNTERWEIGHT · ', chevrons: 6, emblem: 'gear', floorTint: 'rgba(100,60,20,0.3)', planks: true, stampText: 'MASTERWORK', beacon: '230,160,80' },
   'nuclear-war-circle': { paint: '#d9a12a', accent: '#2fb39a', text: 'ARCADE ARMAGEDDON · PREMIUM HARDWARE · LAUNCH CONTROL · ', doubleRing: true, chevrons: 3, emblem: 'atom', floorTint: 'rgba(20,50,40,0.3)', hazard: true, stampText: 'OMEGA CLEARANCE', beacon: '60,220,180' },
 };
 export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
@@ -228,6 +234,48 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.fillStyle = st.accent;
     circle(ctx, 0, 0, R * 0.045);
     ctx.fill();
+  } else if (st.emblem === 'sheaf') {
+    // wheat sheaf: stalks tied in the middle, grain heads fanned out
+    ctx.strokeStyle = st.accent;
+    ctx.lineWidth = R * 0.016;
+    for (let i = -3; i <= 3; i++) {
+      const a = i * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(Math.sin(a) * R * 0.04, R * 0.2);
+      ctx.lineTo(Math.sin(a) * R * 0.2, -R * 0.12);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(Math.sin(a) * R * 0.22, -R * 0.16, R * 0.025, R * 0.055, a, 0, TAU);
+      ctx.fill();
+    }
+    ctx.fillRect(-R * 0.08, R * 0.02, R * 0.16, R * 0.035);
+  } else if (st.emblem === 'shield') {
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.17, -R * 0.2);
+    ctx.lineTo(R * 0.17, -R * 0.2);
+    ctx.lineTo(R * 0.16, R * 0.02);
+    ctx.quadraticCurveTo(R * 0.1, R * 0.16, 0, R * 0.22);
+    ctx.quadraticCurveTo(-R * 0.1, R * 0.16, -R * 0.16, R * 0.02);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = st.paint;
+    ctx.fillRect(-R * 0.025, -R * 0.16, R * 0.05, R * 0.32);
+    ctx.fillRect(-R * 0.13, -R * 0.06, R * 0.26, R * 0.05);
+  } else if (st.emblem === 'gear') {
+    ctx.save();
+    ctx.rotate((s.rotInner ?? 0) * 2);
+    ctx.beginPath();
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * TAU;
+      const rr = i % 2 ? R * 0.16 : R * 0.21;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#26282b';
+    circle(ctx, 0, 0, R * 0.07);
+    ctx.fill();
+    ctx.restore();
   } else if (st.emblem === 'badge') {
     // six-pointed sheriff star with ball tips
     ctx.beginPath();

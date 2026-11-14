@@ -10,9 +10,11 @@ import { chooseBattlefield } from './maps/rotation.js';
 import { formatNumber } from './core/math.js';
 import { AudioDirector } from './audio/director.js';
 import { registerRoster, STARTER_UNITS } from './units/roster.js';
+import { getUnit } from './units/unitRegistry.js';
 import { Profile } from './meta/profile.js';
 import { randomSeed, createRng } from './core/rng.js';
 import './render/castArt.js';
+import './render/medievalArt.js';
 import { initResponsive } from './ui/responsive.js';
 
 registerRoster();
@@ -140,6 +142,8 @@ const actions = {
   selectDeploy(defId) {
     ui.selected = null;
     ui.placingDef = ui.placingDef?.id === defId ? null : game.loadout.find((d) => d.id === defId) ?? null;
+    // placement starts: the weather panel folds away so it never covers ground being chosen
+    if (ui.placingDef) hud.setWeatherExpanded(false);
   },
   upgradeSelected() {
     if (!ui.selected) return;
@@ -355,7 +359,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Exposed for debugging and automated screenshots.
-window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning };
+window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit };
 
 // Boot complete: hide the loader.
 window.__etBooted = true;

@@ -27,6 +27,16 @@ const MIN_GAP = {
   warhead: 0.4,
   antimatter: 0.4,
   coins: 0.15,
+  slash: 0.05,
+  thrust: 0.05,
+  smite: 0.2,
+  stone: 0.05,
+  arrow: 0.05,
+  xbolt: 0.08,
+  ballista: 0.15,
+  boulder: 0.2,
+  trebuchet: 0.4,
+  bombball: 0.1,
   flyover: 1,
   explosion: 0.05,
   death: 0.08,
@@ -76,7 +86,7 @@ export class AudioDirector {
       if (v) sfx.shot(p.kind, v);
     });
     game.on('impact', (p) => {
-      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter'].includes(p.kind)) return;
+      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball'].includes(p.kind)) return;
       const v = this.allow('explosion');
       if (v) sfx.explosion((p.splash || 32) / 32, v);
     });

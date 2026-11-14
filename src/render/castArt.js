@@ -156,6 +156,115 @@ function hat(ctx, h, o) {
       ctx.fill();
       break;
     }
+    case 'straw': {
+      ctx.beginPath();
+      ctx.ellipse(0.5, -23.4, 9, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0.5, -25.2, 4.6, 2.6, 0, Math.PI, 0);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = h.band ?? '#a0522d';
+      ctx.fillRect(-4, -24.4, 9, 1.1);
+      break;
+    }
+    case 'hood': {
+      ctx.beginPath();
+      ctx.moveTo(-6, -15.5);
+      ctx.quadraticCurveTo(-7.4, -27.5, 0.4, -27);
+      ctx.quadraticCurveTo(6.4, -26.4, 6, -19.5);
+      ctx.lineTo(4.2, -21.4);
+      ctx.quadraticCurveTo(0, -23.2, -3.6, -21);
+      ctx.lineTo(-3.6, -15.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'kettle':
+    case 'plume':
+    case 'coif':
+    case 'greathelm': {
+      if (h.type === 'coif') {
+        // chainmail coif around the face
+        ctx.beginPath();
+        ctx.moveTo(-5.8, -15.6);
+        ctx.quadraticCurveTo(-7, -27, 0.4, -26.6);
+        ctx.quadraticCurveTo(6.6, -26.4, 6, -19.4);
+        ctx.lineTo(4.6, -22);
+        ctx.quadraticCurveTo(0.4, -23.6, -3.6, -21.6);
+        ctx.lineTo(-3.8, -15.6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        for (let i = 0; i < 4; i++) ctx.fillRect(-5 + i * 1.6, -24 + (i % 2), 0.8, 0.8);
+        break;
+      }
+      if (h.type === 'greathelm') {
+        ctx.beginPath();
+        ctx.roundRect(-5.4, -26.4, 11, 11, 2.2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#16161a';
+        ctx.fillRect(-0.4, -21.6, 5.8, 1.1); // visor slit
+        ctx.fillStyle = shade(c, 0.2);
+        ctx.fillRect(-4.6, -25.6, 2.4, 9);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0.3, -21.4, 5.8, Math.PI * 1.02, -0.02);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (h.type === 'kettle') {
+          ctx.beginPath();
+          ctx.ellipse(0.3, -21.6, 8, 1.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+      if (h.plume) {
+        ctx.fillStyle = h.plume;
+        ctx.beginPath();
+        ctx.moveTo(-0.5, -26.6);
+        ctx.quadraticCurveTo(-6, -33, -8.5, -27.5);
+        ctx.quadraticCurveTo(-4.5, -29, -1.5, -25.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (h.crown) {
+        ctx.fillStyle = h.crown;
+        ctx.beginPath();
+        ctx.moveTo(-3.5, -26.4);
+        for (let i = 0; i < 5; i++) ctx.lineTo(-3.5 + i * 1.9 + 0.95, i % 2 ? -27.4 : -29.4);
+        ctx.lineTo(4.8, -26.4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case 'goggles': {
+      // messy hair with brass goggles pushed up
+      ctx.fillStyle = h.hair ?? '#5a4636';
+      ctx.beginPath();
+      ctx.moveTo(-5.5, -20.5);
+      ctx.quadraticCurveTo(-6, -26.5, 0, -26);
+      ctx.quadraticCurveTo(4.5, -26.8, 5.6, -21.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#3a2f25';
+      ctx.fillRect(-5.4, -23.6, 11, 1.4);
+      for (const gx of [0.4, 3.4]) {
+        ctx.fillStyle = '#c9a24a';
+        circle(ctx, gx, -23.4, 1.7);
+        ctx.fill();
+        ctx.fillStyle = '#9fd0e8';
+        circle(ctx, gx, -23.4, 1);
+        ctx.fill();
+      }
+      break;
+    }
     default:
   }
 }
@@ -252,6 +361,28 @@ function prop(ctx, f, frame, o) {
   ctx.fillStyle = hand;
   circle(ctx, -6.1, -7.2, 1.1);
   ctx.fill();
+  if (f.shield) {
+    // round or heater shield on the back arm
+    ctx.fillStyle = f.shield;
+    ctx.strokeStyle = o;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (f.shieldShape === 'heater') {
+      ctx.moveTo(-10, -14);
+      ctx.lineTo(-3.6, -14);
+      ctx.lineTo(-3.8, -9);
+      ctx.quadraticCurveTo(-5, -5, -6.8, -4);
+      ctx.quadraticCurveTo(-9, -5, -10, -9);
+      ctx.closePath();
+    } else circle(ctx, -6.6, -10, 4);
+    ctx.fill();
+    ctx.stroke();
+    if (f.shieldMark) {
+      ctx.fillStyle = f.shieldMark;
+      ctx.fillRect(-7.4, -12.5, 1.6, 6);
+      ctx.fillRect(-9, -10.4, 4.8, 1.6);
+    }
+  }
   const hx = aim ? 8 : 5.6;
   const hy = aim ? -13.4 : -8.2;
   const draw = () => {
@@ -362,6 +493,217 @@ function prop(ctx, f, frame, o) {
         ctx.stroke();
         break;
       }
+      // ---------------- medieval gear (Village Militia, Town Guard, Siege Workshop)
+      case 'pitchfork':
+      case 'spear':
+      case 'halberd': {
+        // a long pole: held upright at rest, levelled forward (and pushed further on the thrust frame)
+        const push = frame === 2 ? 4 : 0;
+        ctx.save();
+        ctx.translate(hx + push, hy);
+        ctx.rotate(aim ? 0 : -1.2);
+        ctx.strokeStyle = '#6b4a2c';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-7, 0);
+        ctx.lineTo(w === 'pitchfork' ? 9 : 12, 0);
+        ctx.stroke();
+        ctx.fillStyle = '#b9b6ad';
+        ctx.strokeStyle = '#4a4850';
+        ctx.lineWidth = 0.7;
+        if (w === 'pitchfork') {
+          ctx.beginPath();
+          for (const t of [-1.6, 0, 1.6]) {
+            ctx.moveTo(9, t);
+            ctx.lineTo(13, t);
+          }
+          ctx.moveTo(9, -1.6);
+          ctx.lineTo(9, 1.6);
+          ctx.stroke();
+        } else if (w === 'spear') {
+          ctx.beginPath();
+          ctx.moveTo(12, -1.4);
+          ctx.lineTo(16, 0);
+          ctx.lineTo(12, 1.4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          // halberd: spike, axe blade, back hook
+          ctx.beginPath();
+          ctx.moveTo(12, -0.8);
+          ctx.lineTo(16, 0);
+          ctx.lineTo(12, 0.8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(9.5, 0);
+          ctx.quadraticCurveTo(12.5, -4.5, 11.5, -5);
+          ctx.lineTo(9.5, -3.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillRect(10, 0.5, 1, 2.5);
+        }
+        ctx.restore();
+        break;
+      }
+      case 'sword':
+      case 'greatsword':
+      case 'dualswords': {
+        // raised for the wind-up (frame 1), swung forward on the strike (frame 2)
+        const big = w === 'greatsword';
+        const ang = frame === 1 ? -2.2 : frame === 2 ? 0.15 : -0.6;
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.rotate(ang);
+        ctx.fillStyle = f.blade ?? '#d9d6cc';
+        ctx.strokeStyle = '#4a4850';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(1.5, -0.8 * (big ? 1.4 : 1));
+        ctx.lineTo(big ? 14 : 10, 0);
+        ctx.lineTo(1.5, 0.8 * (big ? 1.4 : 1));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = f.hilt ?? '#c9a24a';
+        ctx.fillRect(0.6, -2, 1, 4); // crossguard
+        ctx.restore();
+        if (frame === 2) {
+          // the swing: a short pale arc in front
+          ctx.strokeStyle = 'rgba(255,248,230,0.75)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(hx - 2, hy - 2, big ? 13 : 10, -1.2, 0.5);
+          ctx.stroke();
+        }
+        if (w === 'dualswords') {
+          ctx.fillStyle = '#d9d6cc';
+          ctx.save();
+          ctx.translate(-6.4, -7.4);
+          ctx.rotate(frame === 2 ? -0.4 : 0.9);
+          ctx.fillRect(0, -0.6, 7, 1.2);
+          ctx.restore();
+        }
+        break;
+      }
+      case 'sling': {
+        ctx.strokeStyle = '#8a6a4a';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        if (frame === 1) {
+          // whirling over the head
+          ctx.moveTo(hx - 1, hy);
+          ctx.lineTo(2, -28);
+          ctx.stroke();
+          ctx.fillStyle = '#8d877c';
+          circle(ctx, 2, -28.5, 1.4);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+          ctx.beginPath();
+          ctx.ellipse(1, -26, 6, 2, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.moveTo(hx, hy);
+          ctx.lineTo(hx + 1, hy + (frame === 2 ? -4 : 5));
+          ctx.stroke();
+          if (frame !== 2) {
+            ctx.fillStyle = '#8d877c';
+            circle(ctx, hx + 1, hy + 5.5, 1.3);
+            ctx.fill();
+          }
+        }
+        break;
+      }
+      case 'bow': {
+        const bx = aim ? 8.5 : 6;
+        const by = aim ? -14 : -10;
+        ctx.strokeStyle = '#6b4a2c';
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.arc(bx - 3, by, 7, -1.1, 1.1);
+        ctx.stroke();
+        ctx.strokeStyle = '#e6e1d6';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        const pull = frame === 1 ? -3 : 0;
+        ctx.moveTo(bx - 3 + 7 * Math.cos(-1.1), by + 7 * Math.sin(-1.1));
+        ctx.lineTo(bx - 1 + pull, by);
+        ctx.lineTo(bx - 3 + 7 * Math.cos(1.1), by + 7 * Math.sin(1.1));
+        ctx.stroke();
+        if (frame === 1) {
+          ctx.strokeStyle = '#4a3a2a';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(bx - 4, by);
+          ctx.lineTo(bx + 6, by);
+          ctx.stroke();
+        }
+        break;
+      }
+      case 'crossbow': {
+        ctx.save();
+        ctx.translate(aim ? 2 : 2.5, aim ? -13.2 : -10.5);
+        ctx.rotate(aim ? 0 : 0.35);
+        ctx.fillStyle = '#6b4a2c';
+        ctx.fillRect(-3, -0.9, 12, 1.8);
+        ctx.strokeStyle = '#3a3d42';
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(8, -4);
+        ctx.quadraticCurveTo(10, 0, 8, 4);
+        ctx.stroke();
+        ctx.strokeStyle = '#e6e1d6';
+        ctx.lineWidth = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(8, -4);
+        ctx.lineTo(frame === 2 ? 8.5 : 5, 0);
+        ctx.lineTo(8, 4);
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
+      case 'bomb': {
+        const bx = frame === 1 ? 6 : hx + 0.5;
+        const by = frame === 1 ? -21 : hy - 1.5;
+        if (frame !== 2) {
+          ctx.fillStyle = '#26272b';
+          circle(ctx, bx, by, 2.4);
+          ctx.fill();
+          ctx.strokeStyle = '#8a6a4a';
+          ctx.lineWidth = 0.6;
+          ctx.beginPath();
+          ctx.moveTo(bx + 1.2, by - 1.8);
+          ctx.lineTo(bx + 2.4, by - 3.4);
+          ctx.stroke();
+          ctx.fillStyle = '#ffb04a';
+          circle(ctx, bx + 2.5, by - 3.6, 0.7);
+          ctx.fill();
+        }
+        break;
+      }
+      case 'wrench':
+      case 'scroll': {
+        if (w === 'wrench') {
+          ctx.save();
+          ctx.translate(hx, hy);
+          ctx.rotate(aim ? -0.8 : 0.9);
+          ctx.fillStyle = '#9aa1aa';
+          ctx.fillRect(0, -0.6, 6, 1.2);
+          ctx.beginPath();
+          ctx.arc(6.5, 0, 1.6, 0.6, Math.PI * 2 - 0.6);
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#e8dcc0';
+          ctx.strokeStyle = '#6b521c';
+          ctx.lineWidth = 0.5;
+          ctx.fillRect(hx - 1, hy - 4, 2.4, 6);
+          ctx.strokeRect(hx - 1, hy - 4, 2.4, 6);
+        }
+        break;
+      }
       default:
     }
   };
@@ -379,7 +721,7 @@ function prop(ctx, f, frame, o) {
 }
 
 /** One parametric character. All people in the three circles use it. */
-function figure(f) {
+export function figure(f) {
   return (ctx, { frame = 0, facing = 1, level = 0 } = {}) => {
     const o = f.outline ?? '#1a1612';
     shadow(ctx, f.wide ? 8.5 : 7.5);
@@ -878,19 +1220,19 @@ function antimatter(ctx, { frame = 0, level = 0 } = {}) {
 
 // ---------------------------------------------------------------- animation personalities
 
-const since = (u, t) => t - (u.lastFire ?? -99);
-const special = (u, t) => t - (u.lastSpecial ?? -99);
-const sway = (u, t, k = 1) => Math.round(Math.sin(t * 1.4 * k + u.uid * 1.3) * 0.8) / 2;
+export const since = (u, t) => t - (u.lastFire ?? -99);
+export const special = (u, t) => t - (u.lastSpecial ?? -99);
+export const sway = (u, t, k = 1) => Math.round(Math.sin(t * 1.4 * k + u.uid * 1.3) * 0.8) / 2;
 
 /** Default gunfighter: draws, fires (recoil frame), holsters after a while. */
-const gunfighter = (holdTime = 0.6, draw = 0.06) => (u, t) => {
+export const gunfighter = (holdTime = 0.6, draw = 0.06) => (u, t) => {
   const s = since(u, t);
   if (s < draw) return { frame: 2, dx: -0.6 };
   if (s < holdTime || special(u, t) < 0.6) return { frame: 1 };
   return { frame: 0, dy: sway(u, t) };
 };
 
-const ANIM = {
+export const ANIM = {
   gambler(u, t) {
     const a = gunfighter(0.4)(u, t);
     // idle: flips a coin now and then (a little hop)
