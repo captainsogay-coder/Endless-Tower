@@ -17,6 +17,7 @@ import { randomSeed, createRng } from './core/rng.js';
 import './render/castArt.js';
 import './render/medievalArt.js';
 import './render/pack2Art.js';
+import './render/pack3Art.js';
 import { initResponsive } from './ui/responsive.js';
 
 registerRoster();

@@ -65,7 +65,7 @@ await page.click('#btn-retreat-confirm');
 await page.click('.tab[data-page="summon"]');
 await page.waitForTimeout(200);
 const order = await page.$$eval('.circle-card', (els) => els.map((e) => ({ id: e.dataset.banner, price: Number(e.querySelector('.cc-price').textContent.replace(/[^0-9]/g, '')), active: e.classList.contains('active') })));
-check('all 13 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 13 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,180,250,250,300,300,400,500,500,850,1200,1800', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
+check('all 17 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 17 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,180,220,250,250,300,300,400,500,500,650,850,950,1200,1500,1800', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
 const poolStrips = await page.$$eval('.pool-item', (els) => els.every((e) => e.querySelectorAll('.st-cell').length === 5));
 check('drop-rate list shows each unit\'s five side tiers', poolStrips);
 await page.click('[data-banner="military-circle"]');
@@ -394,6 +394,36 @@ const p2deploy = await ev((pulled) => {
 }, astral.res[0].unit);
 check('a summoned Astral unit and every Pack 2 chase unit deploy, upgrade and fight', p2deploy.placed.length === 6 && p2deploy.levels.every((l) => l >= 1) && p2deploy.kills > 0, `${p2deploy.placed.join(', ')} · lv ${p2deploy.levels.join(',')} · wave ${p2deploy.wave} kills ${p2deploy.kills}`);
 
+// 12c. Summoning Circle Pack 3: four circles, 28 units, Tokens only, chase reveals, deploy + abilities
+const p3 = [];
+for (const id of ['royal-academy-circle', 'frostbound-legion-circle', 'arcane-library-circle', 'titan-foundry-circle']) {
+  await page.click(`[data-banner="${id}"]`);
+  const rows = await ev(() => window.endlessTower.summoning.banner.pool.map((e) => ({ id: e.unit, chance: Math.round(e.chance * 1e5) / 1e3, chase: !!e.chase })));
+  p3.push({ id, rows, sum: Math.round(rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000, card: (await page.textContent(`[data-banner="${id}"] .cc-price`)).trim() });
+}
+check('Pack 3: four circles, 7 units each, odds total 100%, priced 220/650/950/1,500 Tokens', p3.every((c) => c.sum === 100 && c.rows.length === 7) && p3.map((c) => c.card).join('|') === '220 Tokens|650 Tokens|950 Tokens|1,500 Tokens', p3.map((c) => `${c.rows.length}/${c.sum}% ${c.card}`).join(' · '));
+check('Pack 3 chase units are 2% and flagged for a rare reveal', p3.every((c) => c.rows.at(-1).chance === 2 && c.rows.at(-1).chase && c.rows.filter((r) => r.chase).length === 1), p3.map((c) => c.rows.at(-1).id).join(', '));
+await page.click('[data-banner="titan-foundry-circle"]');
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 1500 * 25; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="25"]');
+await page.click('#btn-confirm-ok');
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const titan = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation })), t: window.endlessTower.profile.balance('tokens'), w: Object.keys(window.endlessTower.profile.data.wallet), pool: window.endlessTower.summoning.banner.pool.map((e) => e.unit) }));
+await page.click('#btn-reveal-done');
+check('Titan Foundry ×25 charges 37,500 Tokens, gives 25 Titan units, duplicates refund Tokens only', titan.res.length === 25 && titan.res.every((r) => titan.pool.includes(r.unit)) && titan.t === titan.res.reduce((a, r) => a + r.comp, 0) && titan.w.join() === 'tokens', `tokens back ${titan.t}`);
+const p3deploy = await ev((pulled) => {
+  const g = window.endlessTower.game; const ids = [pulled, 'grandmaster', 'eternal-winter', 'forbidden-author', 'worldbreaker', 'squire', 'frost-mage'];
+  g.newRun({ loadout: ids }); g.coins = 1e7; const placed = [];
+  for (const id of ids) { let done = false; for (let y = 0; y < 22 && !done; y++) for (let x = 0; x < 40 && !done; x++) if (g.map.pathDist[y * 40 + x] <= 2 && g.canPlace(x, y)) { const u = g.deploy(id, x, y); if (u) { placed.push(u); done = true; } } }
+  for (const u of placed) g.upgrade(u);
+  const casts = [];
+  g.on('chaseCast', (c) => casts.push(c.kind));
+  g.towerHp = g.towerMaxHp = 1e12; g.autoSkip = true; g.callWaves(30); for (let i = 0; i < 20 * 90; i++) g.update(1 / 20); g.autoSkip = false;
+  return { placed: placed.map((u) => u.def.id), levels: placed.map((u) => u.level), kills: g.stats.kills ?? null, wave: g.wave, casts: [...new Set(casts)] };
+}, titan.res[0].unit);
+check('a summoned Titan unit and every Pack 3 chase unit deploy, upgrade, fight and cast their chase abilities', p3deploy.placed.length === 7 && p3deploy.levels.every((l) => l >= 1) && p3deploy.kills > 0 && ['blizzard', 'forbidden', 'worldbreak-charge'].every((k) => p3deploy.casts.includes(k)), `${p3deploy.placed.join(', ')} · kills ${p3deploy.kills} · ${p3deploy.casts.join('/')}`);
+
 // 13. Battle Plans: favorites, sorting, Auto Build + Undo, manual editing
 await page.click('.tab[data-page="plans"]');
 await page.waitForTimeout(200);
@@ -463,7 +493,7 @@ check("circle + ownership filters combine (Wild West · not owned · Economy)", 
 await page.click('#roster-reset');
 await page.waitForTimeout(100);
 const reset = await ev(() => ({ f: window.endlessTower.profile.data.rosterFilter, n: document.querySelectorAll('.roster-grid .unit-card').length, sort: window.endlessTower.profile.data.rosterSort }));
-check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 90 && reset.sort === 'tier', JSON.stringify(reset));
+check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 118 && reset.sort === 'tier', JSON.stringify(reset));
 // combat sheet + comparison in the unit details panel
 await ev(() => { window.endlessTower.plans.focusId = 'glorious-leader'; window.endlessTower.plans.compare = null; window.endlessTower.plans.render(); });
 const sheet = await ev(() => ({ rows: [...document.querySelectorAll('#dossier .cmp-sheet tbody th')].map((e) => e.textContent.trim()), against: document.getElementById('compare-with').value, verdict: document.querySelector('#dossier .cmp-verdict')?.textContent ?? '' }));

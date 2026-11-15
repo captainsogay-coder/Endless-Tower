@@ -347,3 +347,81 @@ registerBanner({
     { unit: 'singularity-monarch', chance: 0.02, chase: true },
   ],
 });
+
+// ---------------------------------------------------------------- CIRCLE PACK 3
+
+export const ROYAL_ACADEMY_CIRCLE = 'royal-academy-circle';
+registerBanner({
+  id: ROYAL_ACADEMY_CIRCLE,
+  name: 'Royal Academy',
+  tagline: 'Squires, duelists and the masters who drill them.',
+  currency: 'tokens',
+  price: 220,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'squire', chance: 0.3 },
+    { unit: 'trainee-guard', chance: 0.25 },
+    { unit: 'practice-archer', chance: 0.18 },
+    { unit: 'duelist', chance: 0.12 },
+    { unit: 'battle-instructor', chance: 0.08 },
+    { unit: 'royal-graduate', chance: 0.05 },
+    { unit: 'grandmaster', chance: 0.02, chase: true },
+  ],
+});
+
+export const FROSTBOUND_LEGION_CIRCLE = 'frostbound-legion-circle';
+registerBanner({
+  id: FROSTBOUND_LEGION_CIRCLE,
+  name: 'Frostbound Legion',
+  tagline: 'Ice, iron discipline and a winter that marches.',
+  currency: 'tokens',
+  price: 650,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'frost-recruit', chance: 0.3 },
+    { unit: 'ice-archer', chance: 0.23 },
+    { unit: 'snow-berserker', chance: 0.18 },
+    { unit: 'frost-mage', chance: 0.13 },
+    { unit: 'glacier-knight', chance: 0.09 },
+    { unit: 'winter-general', chance: 0.05 },
+    { unit: 'eternal-winter', chance: 0.02, chase: true },
+  ],
+});
+
+export const ARCANE_LIBRARY_CIRCLE = 'arcane-library-circle';
+registerBanner({
+  id: ARCANE_LIBRARY_CIRCLE,
+  name: 'Arcane Library',
+  tagline: 'Spellbooks, runes and the pages nobody should read.',
+  currency: 'tokens',
+  price: 950,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'page-apprentice', chance: 0.3 },
+    { unit: 'rune-caster', chance: 0.23 },
+    { unit: 'spellblade', chance: 0.18 },
+    { unit: 'arcane-scholar', chance: 0.13 },
+    { unit: 'void-reader', chance: 0.09 },
+    { unit: 'archmage', chance: 0.05 },
+    { unit: 'forbidden-author', chance: 0.02, chase: true },
+  ],
+});
+
+export const TITAN_FOUNDRY_CIRCLE = 'titan-foundry-circle';
+registerBanner({
+  id: TITAN_FOUNDRY_CIRCLE,
+  name: 'Titan Foundry',
+  tagline: 'Molten steel, giant engines and the ground giving way.',
+  currency: 'tokens',
+  price: 1500,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'iron-hauler', chance: 0.3 },
+    { unit: 'forge-brute', chance: 0.23 },
+    { unit: 'molten-giant', chance: 0.18 },
+    { unit: 'steel-colossus', chance: 0.13 },
+    { unit: 'warforged-titan', chance: 0.09 },
+    { unit: 'foundry-overseer', chance: 0.05 },
+    { unit: 'worldbreaker', chance: 0.02, chase: true },
+  ],
+});

@@ -11,6 +11,7 @@ import { circle, drawGlow } from './canvas.js';
 import { drawUnit } from './unitArt.js';
 import { impactWeight } from './impact.js';
 import { Pack2Fx } from './pack2Fx.js';
+import { Pack3Fx } from './pack3Fx.js';
 
 const BLAST_STYLE = {
   dynamite: { palette: 'hot', max: 0.3 },
@@ -21,6 +22,8 @@ const BLAST_STYLE = {
   warhead: { palette: 'energy', max: 0.7 },
   antimatter: { palette: 'antimatter', max: 0.7 },
   singularity: { palette: 'antimatter', max: 0.8 },
+  frostwave: { palette: 'frost', max: 0.45 },
+  slam: { palette: 'dust', max: 0.5 },
   icbm: { palette: 'hot', max: 0.5 },
   missile: { palette: null, max: 0.28 },
   sequin: { palette: 'pink', max: 0.22 },
@@ -34,12 +37,14 @@ export const BLAST_PALETTES = {
   energy: ['#2fb39a', '#e9fff6'],
   antimatter: ['#7a4fe0', '#f3e9ff'],
   pink: ['#c45cc9', '#ffd9fb'],
+  frost: ['#8fc4e8', '#f2faff'],
 };
 
 export class CastFx {
   constructor(renderer) {
     this.r = renderer;
     this.p2 = new Pack2Fx(renderer);
+    this.p3 = new Pack3Fx(renderer);
     this.planes = [];
     this.pulses = [];
     this.popups = [];
@@ -47,6 +52,7 @@ export class CastFx {
 
   reset() {
     this.p2.reset();
+    this.p3.reset();
     this.planes = [];
     this.pulses = [];
     this.popups = [];
@@ -55,6 +61,7 @@ export class CastFx {
   attach(game, on) {
     this.game = game;
     this.p2.attach(game, on);
+    this.p3.attach(game, on);
     on('blast', (b) => this.blast(b.x, b.y, b.radius, b.kind, b.focus, b.damage));
     on('flyover', (f) => this.planes.push({ ...f, t: 0 }));
     on('pulse', (p) => this.pulses.push({ ...p, t: 0, max: p.radius === Infinity ? 0.9 : 0.6 }));
@@ -90,7 +97,8 @@ export class CastFx {
     }
     r.decals.push({ x, y, r: radius * 0.5 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: 5, seed: Math.random() * 6 });
     if (r.decals.length > 140) r.decals.shift();
-    const col = { energy: '#9ff5dd', antimatter: '#cdb6ff', gold: '#f2d38a' }[st.palette] ?? '#d8cbb0';
+    const col = { energy: '#9ff5dd', antimatter: '#cdb6ff', gold: '#f2d38a', frost: '#e4f4ff' }[st.palette] ?? '#d8cbb0';
+    if (kind === 'slam' && w > 0.4) r.shake(Math.min(2.5, 2 * w));
     r.fx.ring(x, y, radius * 0.25, radius * 1.0, 0.3 + 0.1 * w, col, 1 + w);
     if (heavy && w > 0.5) {
       r.fx.ring(x, y, radius * 0.5, radius * 1.25, 0.7, col, 1 + 2 * w);
@@ -169,7 +177,7 @@ export class CastFx {
         this.blast(p.x, p.y, p.splash, 'dynamite', null, p.damage, p.target);
         return true;
       default:
-        return this.p2.onImpact(p);
+        return this.p3.onImpact(p) || this.p2.onImpact(p);
     }
   }
 
@@ -509,6 +517,7 @@ export class CastFx {
   /** Above everything: planes on bombing runs and coin pop-ups. */
   drawOver(ctx, dt) {
     this.p2.draw(ctx, dt);
+    this.p3.draw(ctx, dt);
     let w = 0;
     for (let i = 0; i < this.planes.length; i++) {
       const pl = this.planes[i];

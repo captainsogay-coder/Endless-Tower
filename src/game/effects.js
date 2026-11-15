@@ -30,6 +30,8 @@ export const STATUSES = {
   slowed: { id: 'slowed', label: 'Slowed', variable: 'slow', slow: 0, damageTaken: 1, duration: 3, color: '#6fb6d9' },
   // Jungle Covenant spores: a little extra damage from every source (never stacks with stronger weakness)
   infected: { id: 'infected', label: 'Infected', slow: 0, damageTaken: 1.05, duration: 4, color: '#8fbf4a' },
+  // Frostbound Legion: a brief hard freeze (bosses are only slowed by half; see Game.freeze)
+  frozen: { id: 'frozen', label: 'Frozen', slow: 1, damageTaken: 1, duration: 0.6, color: '#bfe6ff' },
   // visual-only: radiation-free arcade "energy" scorch from warheads
   charged: { id: 'charged', label: 'Charged', slow: 0, damageTaken: 1, duration: 0.6, color: '#7af0d2' },
 };
@@ -58,6 +60,11 @@ export function applyStatus(e, id, now, opts = null) {
     return;
   }
   e.statuses[id] = Math.max(e.statuses[id] ?? 0, until);
+}
+
+/** True while any active status slows the enemy (slowed, frozen, wounded, crippled...). */
+export function isSlowed(e, now) {
+  return !!e.statuses && statusSpeedMultiplier(e, now) < 1;
 }
 
 export function hasStatus(e, id, now) {
@@ -133,6 +140,7 @@ export function scaledBuff(b, level = 0) {
   if (b.damageMult) out.damageMult = 1 + (b.damageMult - 1) * k;
   if (b.rangeMult) out.rangeMult = 1 + (b.rangeMult - 1) * k;
   if (b.cooldownMult) out.cooldownMult = Math.max(0.5, 1 - (1 - b.cooldownMult) * k);
+  if (b.vsSlowed) out.vsSlowed = b.vsSlowed * k;
   return out;
 }
 

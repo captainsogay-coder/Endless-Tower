@@ -7,6 +7,7 @@
 import { TAU } from '../core/math.js';
 import { circle, drawGlow } from './canvas.js';
 import { impactWeight } from './impact.js';
+import { STYLE3, drawProjectile3, decorate3 } from './pack3Fx.js';
 
 /**
  * Projectile looks, data-driven:
@@ -43,6 +44,9 @@ const STYLE = {
   shade: { shape: 'orb', color: '#2a2450', trail: '#6a4fb0', size: 2.6 },
   void: { shape: 'orb', color: '#0d0a18', trail: '#8a7ad8', size: 4.4, arc: 18, ring: '#b8a6f0' },
 };
+
+// Circle Pack 3 kinds share the same painter (their own impacts live in pack3Fx.js)
+Object.assign(STYLE, STYLE3);
 
 const IMPACT = {
   parcel: '#b48a5a', pan: '#d9d4c8', trinket: '#e0a23a', inkshot: '#6a7fa8', coinshot: '#f2c14a',
@@ -94,6 +98,8 @@ export class Pack2Fx {
     }
     const x = p.x;
     const y = p.y - hgt;
+    if (drawProjectile3(ctx, p, st, x, y, ang, t)) return true;
+    if (st.rune || st.ember || st.frost) decorate3(ctx, p, st, x, y, t);
     switch (st.shape) {
       case 'bolt': {
         const c = Math.cos(ang);
@@ -181,6 +187,8 @@ export class Pack2Fx {
         ctx.lineWidth = 0.7;
         ctx.beginPath();
         if (st.leaf) ctx.ellipse(0, 0, st.size * 1.4, st.size * 0.6, 0, 0, TAU);
+        else if (st.stick) ctx.rect(-st.size * 2, -st.size * 0.35, st.size * 4, st.size * 0.7);
+        else if (st.page) ctx.rect(-st.size, -st.size * 0.7, st.size * 2, st.size * 1.4);
         else if (st.gold) ctx.ellipse(0, 0, st.size, st.size * Math.abs(Math.cos(t * 14)), 0, 0, TAU);
         else ctx.rect(-st.size, -st.size * 0.8, st.size * 2, st.size * 1.6);
         ctx.fill();
@@ -201,7 +209,8 @@ export class Pack2Fx {
             ctx.moveTo(p.tx - Math.cos(a2) * st.size + ox, p.ty - Math.sin(a2) * st.size + oy);
             ctx.lineTo(p.tx + ox, p.ty + oy);
           }
-        } else ctx.arc(p.tx - Math.cos(a2) * 6, p.ty - Math.sin(a2) * 6, st.size, a2 - 1, a2 + 1);
+        } else ctx.arc(p.tx - Math.cos(a2) * 6, p.ty - Math.sin(a2) * 6, st.size, a2 - (st.wide ? 1.4 : 1), a2 + (st.wide ? 1.4 : 1));
+        if (st.wide) ctx.lineWidth = 3.4;
         ctx.stroke();
         return true;
       }
@@ -410,6 +419,30 @@ export class Pack2Fx {
       z.t += dt;
       if (z.t >= z.max) continue;
       const a = 1 - z.t / z.max;
+      if (z.kind === 'arcane' || z.kind === 'forbidden') {
+        // a rune circle drawn on the target, closing as it strikes
+        const col = z.kind === 'arcane' ? '79,208,192' : '190,110,255';
+        const rr = 12 * (1 - 0.5 * (1 - a));
+        ctx.strokeStyle = `rgba(${col},${a})`;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.ellipse(z.x, z.y, rr, rr * 0.6, 0, 0, TAU);
+        ctx.stroke();
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const ang = z.seed + (i / 3) * TAU + z.t * 6;
+          ctx.moveTo(z.x + Math.cos(ang) * rr, z.y + Math.sin(ang) * rr * 0.6);
+          ctx.lineTo(z.x + Math.cos(ang + 2.1) * rr, z.y + Math.sin(ang + 2.1) * rr * 0.6);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(${col},${0.7 * a})`;
+        ctx.beginPath();
+        ctx.moveTo(z.x, z.y - 40 * a);
+        ctx.lineTo(z.x, z.y);
+        ctx.stroke();
+        this.zaps[w++] = z;
+        continue;
+      }
       const gold = z.kind === 'zenith';
       ctx.strokeStyle = gold ? `rgba(255,226,140,${a})` : `rgba(225,238,255,${a})`;
       ctx.lineWidth = gold ? 2.2 : 1.6;

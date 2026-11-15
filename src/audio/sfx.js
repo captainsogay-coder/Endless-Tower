@@ -294,7 +294,67 @@ const PACK2_SHOTS = {
   moonray: (v) => tone('sine', 2200, 2000, 0.15, 0.03 * v),
   shade: (v) => tone('sine', 300, 180, 0.15, 0.04 * v),
   void: (v) => tone('sine', 120, 60, 0.4, 0.06 * v),
+  // ---- Circle Pack 3
+  // Royal Academy: wood knocks, steel rings, a clean bowstring
+  trainingsword: (v) => (tone('square', 520, 380, 0.04, 0.03 * v), burst(0.03, 0.04 * v, 'bandpass', 900, 700, 3)),
+  spearjab: (v) => burst(0.05, 0.06 * v, 'bandpass', 1600, 1100, 2),
+  blunt: (v) => burst(0.05, 0.05 * v, 'bandpass', 1300, 900, 3),
+  rapier: (v) => (tone('sine', 2600, 3200, 0.06, 0.03 * v), burst(0.03, 0.05 * v, 'highpass', 3500)),
+  baton: (v) => tone('triangle', 480, 360, 0.06, 0.035 * v),
+  saber: (v) => (tone('sine', 1900, 2400, 0.1, 0.03 * v), burst(0.05, 0.06 * v, 'highpass', 2800)),
+  graduate: (v) => (tone('sine', 1320, 1980, 0.25, 0.05 * v), burst(0.08, 0.08 * v, 'highpass', 2400)),
+  // Frostbound Legion: brittle ice and wind
+  icespear: (v) => (burst(0.05, 0.06 * v, 'bandpass', 2400, 1600, 2), tone('sine', 2600, 2200, 0.05, 0.02 * v)),
+  icearrow: (v) => burst(0.05, 0.05 * v, 'bandpass', 2800, 2200, 3),
+  freezearrow: (v) => (tone('sine', 3200, 1800, 0.25, 0.04 * v), burst(0.12, 0.05 * v, 'highpass', 4000)),
+  frostaxe: (v) => (burst(0.08, 0.09 * v, 'bandpass', 1400, 2400, 1.5), tone('sine', 140, 90, 0.1, 0.06 * v)),
+  frostorb: (v) => tone('sine', 1500, 900, 0.18, 0.035 * v),
+  icesword: (v) => (tone('sine', 2200, 2600, 0.12, 0.03 * v), burst(0.05, 0.06 * v, 'highpass', 3000)),
+  hailstone: (v) => (burst(0.2, 0.06 * v, 'bandpass', 2000, 900, 1.5), tone('sine', 1100, 500, 0.3, 0.04 * v)),
+  // Arcane Library: page flutters and chimes
+  pagebolt: (v) => burst(0.06, 0.04 * v, 'bandpass', 3000, 2400, 3),
+  rune: (v) => tone('sine', 1046, 1568, 0.12, 0.035 * v),
+  spellcut: (v) => (burst(0.04, 0.05 * v, 'highpass', 3000), tone('sine', 1760, 1760, 0.05, 0.02 * v)),
+  spellstrike: (v) => (tone('sine', 880, 1760, 0.2, 0.05 * v), burst(0.08, 0.07 * v, 'highpass', 2600)),
+  arcanebolt: (v) => tone('triangle', 1318, 1760, 0.1, 0.035 * v),
+  voidbolt: (v) => (tone('sine', 200, 110, 0.25, 0.05 * v), tone('sine', 300, 165, 0.25, 0.025 * v)),
+  // Titan Foundry: weight and heat
+  ingot: (v) => (tone('sine', 110, 70, 0.14, 0.09 * v), burst(0.06, 0.06 * v, 'lowpass', 900, 400)),
+  forgehammer: (v) => (tone('square', 220, 180, 0.06, 0.05 * v), tone('sine', 1760, 1700, 0.3, 0.02 * v), burst(0.1, 0.08 * v, 'lowpass', 1200, 300)),
+  magma: (v) => (burst(0.25, 0.06 * v, 'lowpass', 600, 200, 0.8), tone('sine', 90, 60, 0.3, 0.06 * v)),
+  steelfist: (v) => (tone('sine', 70, 40, 0.25, 0.12 * v), burst(0.12, 0.08 * v, 'lowpass', 700, 200)),
+  titanshell: (v) => (tone('sine', 80, 45, 0.3, 0.1 * v), burst(0.15, 0.09 * v, 'lowpass', 1100, 250)),
+  rivetburst: (v) => (burst(0.03, 0.08 * v, 'highpass', 2600), tone('square', 500, 380, 0.03, 0.025 * v)),
 };
+
+/** Circle Pack 3 chase abilities: short, distinct stingers (never longer than the effect). */
+export function chaseCast(kind, v = 1) {
+  switch (kind) {
+    case 'blizzard':
+      burst(1.6, 0.07 * v, 'bandpass', 900, 2200, 0.8);
+      tone('sine', 1568, 1046, 1.2, 0.03 * v);
+      break;
+    case 'forbidden':
+      tone('sine', 110, 55, 1.4, 0.08 * v);
+      tone('sine', 165, 82, 1.4, 0.05 * v);
+      burst(0.9, 0.05 * v, 'bandpass', 3000, 1200, 2);
+      break;
+    case 'worldbreak-charge':
+      tone('sawtooth', 40, 90, 2, 0.05 * v);
+      burst(2, 0.05 * v, 'lowpass', 200, 500, 0.7);
+      break;
+    default:
+      blessing(v);
+  }
+}
+export function worldbreak(v = 1) {
+  tone('sine', 55, 28, 1.4, 0.2 * v);
+  burst(1.2, 0.14 * v, 'lowpass', 400, 60, 0.7);
+}
+export function freeze(v = 1) {
+  tone('sine', 2800, 3600, 0.15, 0.03 * v);
+  burst(0.1, 0.04 * v, 'highpass', 5000);
+}
 
 /** Piercing lines, sky strikes and blessings (Circle Pack 2 abilities). */
 export function pierce(kind, v = 1) {

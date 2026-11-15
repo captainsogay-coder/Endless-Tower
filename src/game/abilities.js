@@ -18,6 +18,8 @@
 // derives stats from scratch (base → passive → buffs → bonuses → weather),
 // so nothing accumulates beyond its cap.
 
+import { isSlowed } from './effects.js';
+
 export const ABILITY_LEVEL_BONUS = 0.12;
 export const abilityPower = (u) => 1 + ABILITY_LEVEL_BONUS * (u.level ?? 0);
 
@@ -545,7 +547,7 @@ const kingsChampion = {
       return;
     }
     u.lastSpecial = game.time;
-    shoot(game, u, e, a.strikeMult, { kind: 'smite', speed: 1600, crit: true });
+    shoot(game, u, e, a.strikeMult, { kind: a.strikeKind ?? 'smite', speed: 1600, crit: true });
   },
   describe(u) {
     const a = u.def.ability;
@@ -991,7 +993,257 @@ const singularityMonarch = {
   },
 };
 
+// ------------------------------------------------------------------ CIRCLE PACK 3
+
+/** +X% damage while another unit of the same faction stands within `radius` (checked twice a second). */
+const traineeGuard = {
+  update(u, dt, game) {
+    if (!every(u, 'drill', 0.5, dt)) return;
+    const a = u.def.ability;
+    const r2 = a.radius * a.radius;
+    const near = game.units.some((o) => o !== u && o.def.faction === u.def.faction && (o.x - u.x) ** 2 + (o.y - u.y) ** 2 <= r2);
+    setBonus(u, game, 'damage', near ? a.bonus : 0);
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`+${pct(a.bonus)} damage while another Royal Academy unit is within ${(a.radius / 32).toFixed(0)} tiles · ${u.bonus?.damage ? 'active' : 'inactive'}`];
+  },
+};
+
+const grandmaster = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'exam', a.every, dt)) return;
+    if (!game.enemies.length) {
+      u.timers.exam = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    const k = abilityPower(u);
+    game.timedBuff(u, { id: 'grandmaster-exam', label: 'Final Examination', faction: u.def.faction, damageMult: 1 + a.damage * k, cooldownMult: 1 / (1 + a.rate * k), color: '#d8b24a' }, a.duration, Infinity);
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const k = abilityPower(u);
+    const others = game ? game.passiveContext(u.def).factionOthers : 0;
+    return [`Every ${a.every} s: Royal Academy allies +${pct(a.damage * k)} damage, +${pct(a.rate * k)} attack speed for ${a.duration} s · next in ${timeLeft(u, 'exam', a.every).toFixed(0)} s`, `+3% own damage per other Royal Academy unit deployed (max +30%) · now +${Math.min(30, others * 3)}%`];
+  },
+};
+
+const iceArcher = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const frost = count(u) % a.freezeEvery === 0;
+    const p = shoot(game, u, target, 1, { crit: frost, kind: frost ? 'freezearrow' : undefined });
+    if (frost) {
+      u.lastSpecial = game.time;
+      p.freeze = a.freezeDuration;
+    }
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.freezeEvery}th shot freezes the enemy for ${a.freezeDuration} s (bosses: −50% speed) · next in ${a.freezeEvery - ((u.shots ?? 0) % a.freezeEvery)}`];
+  },
+};
+
+const snowBerserker = {
+  fire(u, target, game) {
+    const cold = isSlowed(target, game.time);
+    shoot(game, u, target, cold ? 1 + u.def.ability.vsSlowed : 1, { crit: cold });
+  },
+  describe(u) {
+    return [`+${pct(u.def.ability.vsSlowed)} damage to slowed or frozen enemies`];
+  },
+};
+
+const glacierKnight = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'shockwave', a.waveEvery, dt)) return;
+    if (!game.hash.best(u.x, u.y, a.waveRadius, () => 1)) {
+      u.timers.shockwave = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.explode(u.x, u.y, a.waveRadius, u.stats.damage * a.waveMult, u, { kind: 'frostwave', onHit: [{ status: 'slowed', chance: 1, amount: a.slow, duration: a.slowDuration }] });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.waveEvery} s: icy shockwave (${(a.waveRadius / 32).toFixed(1)} tiles) for ${a.waveMult}× damage, slowing ${pct(a.slow)} for ${a.slowDuration} s · next in ${timeLeft(u, 'shockwave', a.waveEvery).toFixed(0)} s`];
+  },
+};
+
+const eternalWinter = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'blizzard', a.every, dt)) return;
+    const e = game.findTarget(u, u.stats.range);
+    if (!e) {
+      u.timers.blizzard = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.addZone({ x: e.x, y: e.y, radius: a.radius, duration: a.duration, dps: u.stats.damage * a.dps, kind: 'blizzard', status: 'slowed', statusOpts: { amount: a.slow, duration: 0.6 }, source: u });
+    game.emit('chaseCast', { unit: u, x: e.x, y: e.y, radius: a.radius, kind: 'blizzard' });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.every} s: a blizzard (${(a.radius / 32).toFixed(1)} tiles) for ${a.duration} s – enemies inside −${pct(a.slow)} speed and take continuous damage · next in ${timeLeft(u, 'blizzard', a.every).toFixed(0)} s`];
+  },
+};
+
+/** Three fast cuts, then one slow heavy strike: the cooldown after each attack follows the cycle. */
+const spellblade = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const n = count(u) % a.cycle;
+    const heavy = n === 0;
+    const base = 1 / Math.max(0.01, u.stats.rate);
+    u.cooldown = base * (heavy ? a.heavyCooldown : a.fastCooldown);
+    if (heavy) u.lastSpecial = game.time;
+    shoot(game, u, target, heavy ? a.heavyMult : 1, { crit: heavy, kind: heavy ? 'spellstrike' : undefined });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`${a.cycle - 1} fast cuts, then a ${a.heavyMult}× strike · next strike in ${a.cycle - ((u.shots ?? 0) % a.cycle)}`];
+  },
+};
+
+const arcaneScholar = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'verse', a.spellEvery, dt)) return;
+    const near = [];
+    game.hash.each(u.x, u.y, u.stats.range, (e) => e.alive && near.push(e));
+    if (!near.length) {
+      u.timers.verse = 0.5;
+      return;
+    }
+    near.sort((x, y) => y.d - x.d);
+    u.lastSpecial = game.time;
+    game.zap(u, near.slice(0, a.spellCount), a.spellMult, 'arcane');
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.spellEvery} s: a spell hits up to ${a.spellCount} enemies for ${a.spellMult}× damage · next in ${timeLeft(u, 'verse', a.spellEvery).toFixed(0)} s`];
+  },
+};
+
+const forbiddenAuthor = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'chapter', a.every, dt)) return;
+    const all = game.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+    if (!all.length) {
+      u.timers.chapter = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: Infinity, kind: 'forbidden' });
+    for (const e of all) {
+      game.damageEnemy(e, u.stats.damage * a.mult, u);
+      if (e.alive) game.applyStatusTo(e, 'exposed', { amount: a.exposed, duration: a.exposedDuration });
+    }
+    // a capped number of visual strikes; the damage above already reached everyone
+    for (const e of all.slice(0, 30)) game.emit('zap', { x: e.x, y: e.y, kind: 'forbidden', source: u });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.every} s: every enemy on the map takes ${a.mult}× damage and +${pct(a.exposed)} damage taken for ${a.exposedDuration} s · next in ${timeLeft(u, 'chapter', a.every).toFixed(0)} s`];
+  },
+};
+
+const steelColossus = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'slam', a.slamEvery, dt)) return;
+    const e = game.findTarget(u, u.stats.range + a.slamRadius * 0.5);
+    if (!e) {
+      u.timers.slam = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.explode(e.x, e.y, a.slamRadius, u.stats.damage * a.slamMult, u, { kind: 'slam' });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.slamEvery} s: ground slam (${(a.slamRadius / 32).toFixed(1)} tiles) for ${a.slamMult}× damage · next in ${timeLeft(u, 'slam', a.slamEvery).toFixed(0)} s`];
+  },
+};
+
+const warforgedTitan = {
+  fire(u, target, game) {
+    const big = !!target.isBoss || target.category === 'elite';
+    shoot(game, u, target, big ? 1 + u.def.ability.bonus : 1, { crit: big });
+  },
+  describe(u) {
+    return [`+${pct(u.def.ability.bonus)} damage to bosses and elite enemies`];
+  },
+};
+
+const foundryOverseer = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'surge', a.surgeEvery, dt)) return;
+    if (!game.enemies.length) {
+      u.timers.surge = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.timedBuff(u, { id: 'foundry-surge', label: 'Furnace Surge', damageMult: 1 + a.surgeDamage * abilityPower(u), color: '#e07a2e' }, a.surgeDuration, a.surgeRadius);
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.surgeEvery} s: allies within ${(a.surgeRadius / 32).toFixed(0)} tiles +${pct(a.surgeDamage * abilityPower(u))} damage for ${a.surgeDuration} s · next in ${timeLeft(u, 'surge', a.surgeEvery).toFixed(0)} s`];
+  },
+};
+
+/** Charges, then hits every enemy on the map; more enemies alive → harder slam, up to a fixed cap. */
+export function worldbreakMult(a, alive) {
+  return a.mult * (1 + Math.min(a.maxMult - 1, a.perEnemy * alive));
+}
+const worldbreaker = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (u.charging) return;
+    if (!every(u, 'worldbreak', a.every, dt)) return;
+    if (!game.enemies.some((e) => e.alive)) {
+      u.timers.worldbreak = 0.5;
+      return;
+    }
+    u.charging = true;
+    u.lastSpecial = game.time;
+    game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: Infinity, kind: 'worldbreak-charge', duration: a.charge });
+    game.after(a.charge, () => {
+      u.charging = false;
+      if (!u.placed) return;
+      const all = game.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+      const m = worldbreakMult(a, all.length);
+      for (const e of all) game.damageEnemy(e, u.stats.damage * m, u);
+      game.emit('worldbreak', { unit: u, hits: all.length, mult: m });
+    });
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const alive = game ? game.enemies.filter((e) => e.alive).length : 0;
+    return [`Every ${a.every} s: charges ${a.charge} s, then every enemy on the map takes ${a.mult}× damage +${pct(a.perEnemy)} per enemy alive (max ${a.mult * a.maxMult}×) · now ${worldbreakMult(a, alive).toFixed(1)}×`, u.charging ? 'Charging…' : `Next in ${timeLeft(u, 'worldbreak', a.every).toFixed(0)} s`];
+  },
+};
+
 export const ABILITIES = {
+  'trainee-guard': traineeGuard,
+  grandmaster,
+  'ice-archer': iceArcher,
+  'snow-berserker': snowBerserker,
+  'glacier-knight': glacierKnight,
+  'eternal-winter': eternalWinter,
+  spellblade,
+  'arcane-scholar': arcaneScholar,
+  'forbidden-author': forbiddenAuthor,
+  'steel-colossus': steelColossus,
+  'warforged-titan': warforgedTitan,
+  'foundry-overseer': foundryOverseer,
+  worldbreaker,
   'heavy-every': heavyEvery,
   'pierce-shot': pierceShot,
   'pierce-every': pierceEvery,

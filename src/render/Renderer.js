@@ -286,7 +286,7 @@ export class Renderer {
     const hz = this.game.hazards;
     if (!hz.length) return;
     for (const h of hz) {
-      if (this.castFx.p2.drawHazard(ctx, h, t)) continue;
+      if (this.castFx.p3.drawHazard(ctx, h, t) || this.castFx.p2.drawHazard(ctx, h, t)) continue;
       const life = Math.min(1, h.ttl / h.max, (h.max - h.ttl) * 6 + 0.2);
       if (h.kind === 'energy') {
         // arcade energy zone: a humming teal disc with drifting rings
@@ -777,6 +777,27 @@ export class Renderer {
       const fl = 0.8 + 0.2 * Math.sin(t * 16 + e.phase);
       this.flame(ctx, e.x - r * 0.35, e.y + r * 0.2 + bob, r * 0.8 * fl);
       this.flame(ctx, e.x + r * 0.3, e.y + r * 0.35 + bob, r * 0.6 * fl);
+    }
+    if (e.statuses && (e.statuses.frozen ?? 0) > this.game.time) {
+      // frozen solid: a faceted ice shell over the body, a cold rim at its feet
+      ctx.fillStyle = 'rgba(214,240,255,0.55)';
+      ctx.strokeStyle = 'rgba(240,250,255,0.9)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0; k < 7; k++) {
+        const a = (k / 7) * TAU + 0.3;
+        const rr = r * (k % 2 ? 1.05 : 1.3);
+        ctx.lineTo(e.x + Math.cos(a) * rr, e.y + bob + Math.sin(a) * rr * 0.95);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(e.x - r * 0.5, e.y + bob - r * 0.6, r * 0.3, r * 0.5);
+    } else if (e.statuses && (e.statuses.slowed ?? 0) > this.game.time && (e.statusAmount?.slowed ?? 0) >= 0.1) {
+      // chilled: a few frost specks (only for real slows, so a 5% nick stays quiet)
+      ctx.fillStyle = 'rgba(214,240,255,0.85)';
+      for (let k = 0; k < 3; k++) ctx.fillRect(e.x - r * 0.6 + k * r * 0.55, e.y + bob - r * 0.9 + ((k * 7) % 5), 1.4, 1.4);
     }
     if (e.regen > 0 && e.hp < e.maxHp) {
       ctx.fillStyle = '#7fd98a';

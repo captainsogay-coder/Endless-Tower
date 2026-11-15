@@ -38,6 +38,15 @@ const CIRCLE_STYLES = {
   'jungle-covenant-circle': { paint: '#8fbf5a', accent: '#2fae8a', text: 'JUNGLE COVENANT · ROOT · VINE · CANOPY · ', chevrons: 5, emblem: 'leaf', floorTint: 'rgba(30,80,40,0.35)', stampText: 'WILD HEART', beacon: '140,220,120' },
   'skybound-order-circle': { paint: '#cfe4ff', accent: '#6fa8d8', text: 'SKYBOUND ORDER · WIND · WING · THUNDER · ', doubleRing: true, chevrons: 4, emblem: 'wings', floorTint: 'rgba(40,70,110,0.3)', stampText: 'ZENITH', beacon: '170,210,255' },
   'astral-observatory-circle': { paint: '#d8c9ff', accent: '#f2d38a', text: 'ASTRAL OBSERVATORY · STAR · MOON · GRAVITY · ', doubleRing: true, chevrons: 7, emblem: 'moon', floorTint: 'rgba(40,30,80,0.38)', stampText: 'EVENT HORIZON', beacon: '190,170,255' },
+  // Circle Pack 3
+  // academy parade ground: royal blue with a crowned crest
+  'royal-academy-circle': { paint: '#e0b84a', accent: '#2f5aa8', text: 'ROYAL ACADEMY · DISCIPLINE · HONOUR · MASTERY · ', doubleRing: true, chevrons: 4, emblem: 'crest', floorTint: 'rgba(30,50,110,0.3)', stampText: 'GRANDMASTER', beacon: '120,160,240' },
+  // packed ice with a six-armed snowflake
+  'frostbound-legion-circle': { paint: '#dff3ff', accent: '#6fa8d8', text: 'FROSTBOUND LEGION · ICE · IRON · THE LONG WINTER · ', chevrons: 6, emblem: 'snowflake', floorTint: 'rgba(120,170,210,0.32)', stampText: 'ETERNAL WINTER', beacon: '200,235,255' },
+  // library floor: dark wood and an open tome ringed in runes
+  'arcane-library-circle': { paint: '#4fd0c0', accent: '#c9a24a', text: 'ARCANE LIBRARY · RUNE · VERSE · THE CHAINED SHELF · ', doubleRing: true, chevrons: 5, emblem: 'tome', floorTint: 'rgba(40,20,60,0.36)', planks: true, stampText: 'FORBIDDEN', beacon: '120,240,220' },
+  // foundry floor: riveted iron and an anvil, embers in the cracks
+  'titan-foundry-circle': { paint: '#e07a2e', accent: '#c9a24a', text: 'TITAN FOUNDRY · IRON · FIRE · THE GROUND GIVES WAY · ', doubleRing: true, chevrons: 3, emblem: 'anvil', floorTint: 'rgba(90,40,20,0.36)', hazard: true, stampText: 'WORLDBREAKER', beacon: '255,150,70' },
 };
 export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
 const STEEL = '#9aa1aa';
@@ -358,6 +367,85 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     ctx.fillStyle = st.accent;
     for (const [x, y, r] of [[0.13, 0.1, 0.03], [0.05, 0.16, 0.018], [0.17, -0.12, 0.02]]) {
       circle(ctx, x * R, y * R, r * R);
+      ctx.fill();
+    }
+  } else if (st.emblem === 'crest') {
+    // a heater shield with a crown over it
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.15, -R * 0.12);
+    ctx.lineTo(R * 0.15, -R * 0.12);
+    ctx.lineTo(R * 0.15, R * 0.04);
+    ctx.quadraticCurveTo(R * 0.13, R * 0.17, 0, R * 0.22);
+    ctx.quadraticCurveTo(-R * 0.13, R * 0.17, -R * 0.15, R * 0.04);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = st.paint;
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.12, -R * 0.14);
+    for (let i = 0; i < 5; i++) ctx.lineTo(-R * 0.12 + (i + 0.5) * R * 0.048, i % 2 ? -R * 0.17 : -R * 0.23);
+    ctx.lineTo(R * 0.12, -R * 0.14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(-R * 0.015, -R * 0.08, R * 0.03, R * 0.22);
+    ctx.fillRect(-R * 0.1, -R * 0.01, R * 0.2, R * 0.03);
+  } else if (st.emblem === 'snowflake') {
+    ctx.strokeStyle = st.accent;
+    ctx.lineWidth = R * 0.022;
+    ctx.lineCap = 'round';
+    ctx.save();
+    ctx.rotate((s.rotInner ?? 0) * 0.5);
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -R * 0.22);
+      for (const d of [0.09, 0.15]) {
+        ctx.moveTo(0, -R * d);
+        ctx.lineTo(-R * 0.05, -R * (d + 0.05));
+        ctx.moveTo(0, -R * d);
+        ctx.lineTo(R * 0.05, -R * (d + 0.05));
+      }
+      ctx.stroke();
+      ctx.rotate(TAU / 6);
+    }
+    ctx.restore();
+  } else if (st.emblem === 'tome') {
+    // an open book with a rune hovering over it
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.2, -R * 0.05);
+    ctx.quadraticCurveTo(-R * 0.1, -R * 0.1, 0, -R * 0.04);
+    ctx.quadraticCurveTo(R * 0.1, -R * 0.1, R * 0.2, -R * 0.05);
+    ctx.lineTo(R * 0.2, R * 0.12);
+    ctx.quadraticCurveTo(R * 0.1, R * 0.07, 0, R * 0.13);
+    ctx.quadraticCurveTo(-R * 0.1, R * 0.07, -R * 0.2, R * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = st.paint;
+    ctx.lineWidth = R * 0.016;
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.04);
+    ctx.lineTo(0, R * 0.13);
+    ctx.moveTo(-R * 0.05, -R * 0.2);
+    ctx.lineTo(R * 0.05, -R * 0.12);
+    ctx.moveTo(R * 0.05, -R * 0.2);
+    ctx.lineTo(-R * 0.05, -R * 0.12);
+    ctx.stroke();
+  } else if (st.emblem === 'anvil') {
+    ctx.beginPath();
+    ctx.moveTo(-R * 0.22, -R * 0.1);
+    ctx.lineTo(R * 0.12, -R * 0.1);
+    ctx.quadraticCurveTo(R * 0.22, -R * 0.1, R * 0.24, -R * 0.03);
+    ctx.lineTo(R * 0.1, -R * 0.02);
+    ctx.lineTo(R * 0.06, R * 0.06);
+    ctx.lineTo(R * 0.13, R * 0.14);
+    ctx.lineTo(-R * 0.13, R * 0.14);
+    ctx.lineTo(-R * 0.06, R * 0.06);
+    ctx.lineTo(-R * 0.1, -R * 0.02);
+    ctx.lineTo(-R * 0.22, -R * 0.04);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = st.paint;
+    for (const [x, y] of [[-0.05, -0.2], [0.04, -0.24], [0.1, -0.17]]) {
+      circle(ctx, x * R, y * R, R * 0.015);
       ctx.fill();
     }
   } else if (st.emblem === 'badge') {

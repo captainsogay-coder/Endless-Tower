@@ -133,3 +133,31 @@ They also drive the collection filters and sorting, and Auto Pick priorities.
 | Nebula Architect | XVI | 14 | N/A | N/A | 7 | N/A | 14 |  |
 | Celestial Oracle | XIX | 18 | N/A | N/A | 2 | N/A | 18 |  |
 | Singularity Monarch | XXIII | 17 | 24 | N/A | 1 | N/A | 21 |  |
+| Squire | I | 1 | N/A | N/A | N/A | N/A | 1 |  |
+| Trainee Guard | II | 2 | N/A | N/A | N/A | N/A | 2 |  |
+| Practice Archer | II | 2 | N/A | N/A | N/A | N/A | 2 |  |
+| Duelist | IV | 4 | N/A | N/A | N/A | N/A | 4 |  |
+| Battle Instructor | V | 4 | N/A | N/A | 5 | N/A | 4 |  |
+| Royal Graduate | VII | 7 | N/A | N/A | N/A | N/A | 7 |  |
+| The Grandmaster | X | 9 | 1 | N/A | 5 | N/A | 9 |  |
+| Frost Recruit | III | 3 | N/A | N/A | N/A | N/A | 3 |  |
+| Ice Archer | V | 5 | 1 | N/A | N/A | N/A | 5 |  |
+| Snow Berserker | VII | 7 | N/A | N/A | N/A | N/A | 7 |  |
+| Frost Mage | IX | 6 | 9 | N/A | N/A | N/A | 8 |  |
+| Glacier Knight | XI | 9 | 11 | N/A | N/A | N/A | 11 |  |
+| Winter General | XV | 14 | N/A | N/A | 6 | N/A | 14 |  |
+| The Eternal Winter | XIX | 14 | 20 | N/A | N/A | N/A | 17 |  |
+| Page Apprentice | IV | 4 | N/A | N/A | N/A | N/A | 4 |  |
+| Rune Caster | VI | 4 | 5 | N/A | N/A | N/A | 6 |  |
+| Spellblade | VIII | 8 | N/A | N/A | N/A | N/A | 8 |  |
+| Arcane Scholar | X | 8 | 6 | N/A | N/A | N/A | 9 |  |
+| Void Reader | XIII | 12 | N/A | N/A | N/A | N/A | 12 |  |
+| Archmage | XVII | 15 | N/A | N/A | 6 | N/A | 15 |  |
+| The Forbidden Author | XXI | 18 | 16 | N/A | 2 | N/A | 20 |  |
+| Iron Hauler | VI | 6 | N/A | N/A | N/A | N/A | 6 |  |
+| Forge Brute | IX | 6 | 10 | N/A | N/A | N/A | 9 |  |
+| Molten Giant | XII | 8 | 13 | N/A | N/A | N/A | 11 |  |
+| Steel Colossus | XV | 11 | 18 | N/A | N/A | N/A | 15 |  |
+| Warforged Titan | XVIII | 14 | 16 | N/A | N/A | N/A | 17 |  |
+| Foundry Overseer | XXI | 19 | N/A | N/A | 6 | N/A | 19 |  |
+| The Worldbreaker | XXV | 20 | 27 | N/A | N/A | N/A | 25 |  |

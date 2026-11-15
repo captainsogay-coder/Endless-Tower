@@ -544,6 +544,13 @@ export class Game {
     this.emit('blast', { x, y, radius, kind, damage, focus: focus ? { x: focus.x, y: focus.y } : null });
   }
 
+  /** A full stop for a moment (Frostbound Legion); bosses shrug it down to a 50% slow. */
+  freeze(e, duration) {
+    if (e.isBoss) this.applyStatusTo(e, 'slowed', { amount: 0.5, duration });
+    else this.applyStatusTo(e, 'frozen', { duration });
+    this.emit('freeze', { enemy: e, duration });
+  }
+
   applyStatusTo(e, id, opts) {
     if (e.alive && !e.invulnerable) applyStatus(e, id, this.time, opts);
   }
@@ -618,6 +625,7 @@ export class Game {
     p.crit = !!spec?.crit;
     p.stumble = !!spec?.stumble;
     p.summoned = !!spec?.summoned;
+    p.freeze = 0;
     p.color = proj.color ?? '#ffffff';
     p.tier = u.tier;
     p.source = u;
@@ -682,6 +690,7 @@ export class Game {
     };
     if (p.splash > 0) this.hash.each(p.x, p.y, p.splash, hit);
     else if (p.target) hit(p.target);
+    if (p.freeze && p.target?.alive) this.freeze(p.target, p.freeze);
     if (def?.impactHazard && !isDrone(p)) this.addHazard(p.x, p.y, def.impactHazard, p.damage, p.source);
     const a = def?.ability;
     if (a?.aftershock && p.kind === def.projectile?.kind) {
@@ -803,7 +812,10 @@ export class Game {
   damageEnemy(e, amount, source = null) {
     if (!e.alive || e.invulnerable) return 0;
     let dmg = amount * (1 - e.armor);
-    if (e.statuses) dmg *= statusDamageTakenMultiplier(e, this.time);
+    if (e.statuses) {
+      dmg *= statusDamageTakenMultiplier(e, this.time);
+      if (source?.stats?.vsSlowed && statusSpeedMultiplier(e, this.time) < 1) dmg *= 1 + source.stats.vsSlowed;
+    }
     if (e.shield > 0) {
       const absorbed = Math.min(e.shield, dmg);
       e.shield -= absorbed;
@@ -1076,8 +1088,9 @@ export class Game {
     const s = p?.bonus ? levelStats(u.def, level) : applyPassive(u.def, levelStats(u.def, level), ctx);
     const defs = this.buffDefs();
     // every distinct buff id once, then the combined effect is capped (power creep)
-    const agg = { damageMult: 1, cooldownMult: 1, rangeMult: 1 };
+    const agg = { damageMult: 1, cooldownMult: 1, rangeMult: 1, vsSlowed: 0 };
     const add = (b) => {
+      if (b?.vsSlowed) agg.vsSlowed += b.vsSlowed;
       if (b?.damageMult) agg.damageMult *= b.damageMult;
       if (b?.cooldownMult) agg.cooldownMult *= b.cooldownMult;
       if (b?.rangeMult) agg.rangeMult *= b.rangeMult;
@@ -1090,6 +1103,8 @@ export class Game {
     agg.cooldownMult = Math.max(1 / C.buffRate, agg.cooldownMult);
     agg.rangeMult = Math.min(C.buffRange, agg.rangeMult);
     applyModifiers(s, agg);
+    // bonus damage against slowed enemies (Winter General), capped with the other buffs
+    s.vsSlowed = Math.min(C.buffDamage - 1, agg.vsSlowed);
     // ADDITIVE bucket: wave scaling + capped self bonuses (jackpots, soldiers) + battle-long bonuses
     const dmg = Math.min(C.additiveDamage, this.waveBonus(u.def) + (p?.bonus ? p.bonus(ctx) : 0) + (u.bonus?.damage ?? 0) + (this.battleBonus?.damage ?? 0));
     if (dmg) s.damage *= 1 + dmg;

@@ -1,6 +1,26 @@
 # Endless Tower: Progression Balance
 
-## Summoning Circle Pack 2 (current)
+## Summoning Circle Pack 3 (current)
+
+Four circles, 28 units, built with the tier generator and calibrated like every other unit (table above; ratings in `docs/SIDE_TIERS.md`). Within every circle, price, base damage and measured combat rating rise with tier (`tests/pack3.test.js`). T1–T2 stay cheap (Squire 10 coins, Practice Archer 30), and the T25 Worldbreaker has the highest combat rating in the game.
+
+| Circle | Price | Tiers | Chase unit (2%) |
+| --- | --- | --- | --- |
+| Royal Academy | 220 | I–X | The Grandmaster (X) |
+| Frostbound Legion | 650 | III–XIX | The Eternal Winter (XIX) |
+| Arcane Library | 950 | IV–XXI | The Forbidden Author (XXI) |
+| Titan Foundry | 1,500 | VI–XXV | The Worldbreaker (XXV) |
+
+Limits:
+
+- **Grandmaster:** +3% damage per other Royal Academy unit, capped at +30%. Its Final Examination (+25% damage, +20% attack speed for 6 s) reaches Academy units only and refreshes rather than stacks.
+- **Winter General:** +15% damage against slowed or frozen enemies for every ally, applied once however many Generals are deployed and capped with the other buffs.
+- **Freezes** (Ice Archer) stop regular enemies for 0.8 s; bosses are only slowed by 50%.
+- **Forbidden Author:** every 35 s, 4× to every enemy plus +25% damage taken for 8 s. That is the strongest-weakness-only rule, so it never stacks with other marks.
+- **Worldbreaker:** every 40 s, after a 2 s charge, 3× damage to every enemy, +5% per enemy alive, capped at 6×.
+- **Molten Giant:** its burning pools were reduced (0.15× damage per second for 3 s) because overlapping pools exceeded the tier even at the minimum trim.
+
+## Summoning Circle Pack 2
 
 Five circles, 35 units, all built with the tier generator and calibrated with `scripts/calibrate.mjs` like every other unit (table above). Their measured side tiers and combat ratings are in `docs/SIDE_TIERS.md`; each unit's combat rating lands within about two tiers of its nominal tier.
 
@@ -49,14 +69,18 @@ T 1 dude                     gunner    value   0.73 target   1.00 ×0.73  trim 0
 T 1 farmer                   gunner    value   0.99 target   1.00 ×0.99  trim 1.15 → 1.16
 T 1 porter                   gunner    value   1.02 target   1.00 ×1.02  trim 1.00 → 0.99
 T 1 spearman                 gunner    value   1.00 target   1.00 ×1.00  trim 1.07 → 1.07
+T 1 squire                   gunner    value   1.00 target   1.00 ×1.00  trim 0.96 → 0.96
 T 2 camp-cook                economy   value   1.19 target   1.20 ×1.00  trim 1.04 → 1.05
 T 2 guard-recruit            gunner    value   1.60 target   1.60 ×1.00  trim 1.13 → 1.13
 T 2 gunnerman                gunner    value   1.61 target   1.60 ×1.01  trim 0.98 → 0.97
 T 2 militia-archer           gunner    value   1.60 target   1.60 ×1.00  trim 0.95 → 0.95
+T 2 practice-archer          gunner    value   1.60 target   1.60 ×1.00  trim 1.00 → 1.00
 T 2 slingman                 gunner    value   1.61 target   1.60 ×1.00  trim 0.97 → 0.97
+T 2 trainee-guard            gunner    value   1.62 target   1.60 ×1.01  trim 1.02 → 1.01
 T 3 apprentice-engineer      gunner    value   2.39 target   2.40 ×1.00  trim 0.96 → 0.96
 T 3 bandit                   gunner    value   2.41 target   2.40 ×1.00  trim 0.77 → 0.77
 T 3 crossbowman              gunner    value   2.39 target   2.40 ×1.00  trim 0.97 → 0.97
+T 3 frost-recruit            gunner    value   2.42 target   2.40 ×1.01  trim 0.97 → 0.96
 T 3 gambler                  gunner    value   2.36 target   2.40 ×0.98  trim 0.67 → 0.68
 T 3 grenade-launcher         gunner    value   2.43 target   2.40 ×1.01  trim 0.86 → 0.85
 T 3 guard-sergeant           gunner    value   2.41 target   2.40 ×1.00  trim 1.15 → 1.15
@@ -66,11 +90,14 @@ T 3 traveling-trader         economy   value   1.81 target   1.80 ×1.01  trim 0
 T 3 village-captain          support   value   2.04 target   2.04 ×1.00  trim 1.07 → 1.07
 T 4 ballista                 gunner    value   3.43 target   3.40 ×1.01  trim 1.00 → 0.99
 T 4 cartographer             support   value   2.90 target   2.89 ×1.00  trim 0.96 → 0.96
+T 4 duelist                  gunner    value   3.45 target   3.40 ×1.01  trim 1.08 → 1.06
 T 4 halberdier               gunner    value   3.39 target   3.40 ×1.00  trim 0.89 → 0.89
 T 4 missile-launcher         gunner    value   3.35 target   3.40 ×0.98  trim 0.69 → 0.70
+T 4 page-apprentice          gunner    value   3.36 target   3.40 ×0.99  trim 0.83 → 0.84
 T 4 springling               gunner    value   3.39 target   3.40 ×1.00  trim 0.78 → 0.78
 T 4 village-hero             gunner    value   3.43 target   3.40 ×1.01  trim 0.76 → 0.75
 T 4 vine-tender              gunner    value   3.39 target   3.40 ×1.00  trim 0.95 → 0.95
+T 5 battle-instructor        support   value   3.97 target   4.00 ×0.99  trim 0.93 → 0.94
 T 5 bombardier               gunner    value   4.70 target   4.70 ×1.00  trim 0.87 → 0.87
 T 5 bounty-hunter            gunner    value   4.73 target   4.70 ×1.01  trim 0.81 → 0.81
 T 5 catapult                 gunner    value   4.72 target   4.70 ×1.00  trim 0.83 → 0.83
@@ -79,6 +106,7 @@ T 5 commander                support   value   4.06 target   4.00 ×1.02  trim 1
 T 5 dartkeeper               gunner    value   4.67 target   4.70 ×0.99  trim 0.85 → 0.86
 T 5 drone                    gunner    value   4.72 target   4.70 ×1.00  trim 0.71 → 0.71
 T 5 gearshot                 gunner    value   4.75 target   4.70 ×1.01  trim 0.57 → 0.56
+T 5 ice-archer               gunner    value   4.72 target   4.70 ×1.00  trim 1.00 → 1.00
 T 5 outlaw                   gunner    value   4.68 target   4.70 ×0.99  trim 0.64 → 0.64
 T 5 royal-patrol             gunner    value   4.71 target   4.70 ×1.00  trim 0.94 → 0.94
 T 5 special-force-battalion  summoner  value   3.80 target   3.76 ×1.01  trim 0.85 → 0.84
@@ -87,7 +115,9 @@ T 6 caravan-master           support   value   5.41 target   5.35 ×1.01  trim 0
 T 6 colonel                  economy   value   4.75 target   4.72 ×1.01  trim 0.93 → 0.92
 T 6 dealer                   support   value   5.38 target   5.35 ×1.00  trim 0.92 → 0.92
 T 6 grand-captain            support   value   5.36 target   5.35 ×1.00  trim 1.04 → 1.04
+T 6 iron-hauler              gunner    value   6.34 target   6.30 ×1.01  trim 0.95 → 0.94
 T 6 night-dancer             gunner    value   6.26 target   6.30 ×0.99  trim 0.88 → 0.89
+T 6 rune-caster              gunner    value   6.24 target   6.30 ×0.99  trim 0.87 → 0.88
 T 6 siege-commander          support   value   5.35 target   5.35 ×1.00  trim 0.93 → 0.93
 T 7 bomber                   gunner    value   8.35 target   8.30 ×1.01  trim 0.81 → 0.80
 T 7 desperate-gambler        gunner    value   8.31 target   8.30 ×1.00  trim 0.66 → 0.66
@@ -96,42 +126,60 @@ T 7 general                  support   value   7.04 target   7.06 ×1.00  trim 0
 T 7 gunslinger               gunner    value   8.26 target   8.30 ×0.99  trim 0.59 → 0.59
 T 7 icbm                     gunner    value   8.30 target   8.30 ×1.00  trim 0.65 → 0.65
 T 7 panther                  gunner    value   8.29 target   8.30 ×1.00  trim 1.09 → 1.09
+T 7 royal-graduate           gunner    value   8.23 target   8.30 ×0.99  trim 0.77 → 0.78
+T 7 snow-berserker           gunner    value   8.36 target   8.30 ×1.01  trim 1.03 → 1.02
 T 7 star-reader              gunner    value   8.31 target   8.30 ×1.00  trim 0.81 → 0.81
 T 7 steam-golem              gunner    value   8.27 target   8.30 ×1.00  trim 0.82 → 0.82
 T 8 kings-champion           gunner    value  10.80 target  10.80 ×1.00  trim 0.72 → 0.72
+T 8 spellblade               gunner    value  10.82 target  10.80 ×1.00  trim 0.72 → 0.72
 T 8 spore-shaman             support   value   9.15 target   9.18 ×1.00  trim 0.76 → 0.76
 T 8 trebuchet                gunner    value  10.84 target  10.80 ×1.00  trim 0.89 → 0.89
 T 9 b2                       gunner    value  13.80 target  13.80 ×1.00  trim 0.62 → 0.62
 T 9 chrono-mechanic          support   value  11.78 target  11.73 ×1.00  trim 0.82 → 0.82
 T 9 comet-scribe             gunner    value  14.12 target  13.80 ×1.02  trim 0.45 → 0.45  <-- at trim bound
+T 9 forge-brute              gunner    value  13.70 target  13.80 ×0.99  trim 0.86 → 0.87
+T 9 frost-mage               gunner    value  13.70 target  13.80 ×0.99  trim 0.81 → 0.82
 T 9 golden-merchant          economy   value  10.35 target  10.35 ×1.00  trim 0.91 → 0.91
 T 9 outlaw-leader            summoner  value  11.01 target  11.04 ×1.00  trim 0.88 → 0.88
 T 9 pit-boss                 support   value  11.76 target  11.73 ×1.00  trim 0.92 → 0.92
 T 9 roc-rider                gunner    value  13.81 target  13.80 ×1.00  trim 0.95 → 0.95
 T 9 sheriff                  support   value  11.72 target  11.73 ×1.00  trim 0.75 → 0.75
+T10 arcane-scholar           gunner    value  17.51 target  17.50 ×1.00  trim 0.58 → 0.58
 T10 elder-treant             gunner    value  17.48 target  17.50 ×1.00  trim 0.76 → 0.76
 T10 fortress                 summoner  value  14.06 target  14.00 ×1.00  trim 0.81 → 0.81
+T10 grandmaster              support   value  15.01 target  14.88 ×1.01  trim 0.82 → 0.81
 T10 high-roller              gunner    value  17.49 target  17.50 ×1.00  trim 0.55 → 0.55
 T10 master-engineer          gunner    value  17.63 target  17.50 ×1.01  trim 0.78 → 0.77
+T11 glacier-knight           gunner    value  22.28 target  22.00 ×1.01  trim 0.51 → 0.50
 T11 stormcaller              gunner    value  21.95 target  22.00 ×1.00  trim 0.58 → 0.58
 T12 fastest-hand             gunner    value  27.72 target  27.50 ×1.01  trim 0.78 → 0.77
 T12 grand-automaton          gunner    value  27.55 target  27.50 ×1.00  trim 0.58 → 0.58
 T12 marshal                  support   value  23.37 target  23.38 ×1.00  trim 0.58 → 0.58
+T12 molten-giant             gunner    value  27.33 target  27.50 ×0.99  trim 0.48 → 0.48
 T12 moon-prism               gunner    value  27.43 target  27.50 ×1.00  trim 0.51 → 0.51
+T13 void-reader              support   value  28.92 target  28.90 ×1.00  trim 0.76 → 0.76
 T14 canopy-warden            support   value  35.71 target  35.70 ×1.00  trim 0.87 → 0.87
 T14 eclipse-adept            support   value  35.58 target  35.70 ×1.00  trim 0.80 → 0.80
 T14 sky-admiral              support   value  35.59 target  35.70 ×1.00  trim 0.86 → 0.86
 T15 glorious-leader          support   value  43.60 target  43.35 ×1.01  trim 0.86 → 0.86
+T15 steel-colossus           gunner    value  51.54 target  51.00 ×1.01  trim 0.49 → 0.48
 T15 the-house                support   value  43.39 target  43.35 ×1.00  trim 0.55 → 0.55
+T15 winter-general           support   value  43.28 target  43.35 ×1.00  trim 0.86 → 0.86
 T16 eternal-engine           gunner    value  61.46 target  61.20 ×1.00  trim 0.70 → 0.70
 T16 nebula-architect         support   value  51.89 target  52.02 ×1.00  trim 0.85 → 0.85
+T17 archmage                 support   value  62.47 target  62.42 ×1.00  trim 0.85 → 0.85
 T17 nuclear-warhead          gunner    value  73.77 target  73.44 ×1.00  trim 0.62 → 0.62
 T17 tempest-sovereign        gunner    value  73.44 target  73.44 ×1.00  trim 0.57 → 0.57
 T18 heart-of-the-wild        gunner    value  88.17 target  88.13 ×1.00  trim 0.53 → 0.53
+T18 warforged-titan          gunner    value  87.67 target  88.13 ×0.99  trim 0.71 → 0.71
 T19 antimatter-warhead       gunner    value 105.88 target 105.75 ×1.00  trim 0.92 → 0.92
 T19 celestial-oracle         support   value  89.67 target  89.89 ×1.00  trim 0.81 → 0.81
+T19 eternal-winter           gunner    value 105.20 target 105.75 ×0.99  trim 0.57 → 0.57
 T21 eye-of-the-zenith        gunner    value 152.40 target 152.29 ×1.00  trim 0.48 → 0.48
+T21 forbidden-author         gunner    value 152.39 target 152.29 ×1.00  trim 0.51 → 0.51
+T21 foundry-overseer         support   value 129.30 target 129.44 ×1.00  trim 0.79 → 0.79
 T23 singularity-monarch      gunner    value 213.64 target 219.29 ×0.97  trim 0.45 → 0.46
+T25 worldbreaker             gunner    value 317.56 target 315.78 ×1.01  trim 0.69 → 0.69
 ```
 
 ### Full campaigns: waves survived (bot, ≤40 units, waves one at a time)

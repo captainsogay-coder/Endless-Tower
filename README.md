@@ -20,7 +20,7 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the collection, filter by role, or let **Auto Pick** choose your strongest types, optionally by DPS, AOE, Summon, Empower or Economy (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at thirteen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
+4. **Summoning:** spend Tokens at seventeen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
 
 ### Upgrading and range
 
@@ -255,6 +255,34 @@ Fictional, arcade-style sci-fi: toy-like hardware and stylised energy blasts.
 | Nebula Architect | XVI | 1,500 | 592.8 | 5.5 | 1.11 | 658.7 | Allies within 5 tiles attack 20% faster (more per upgrade; nebulae do not stack). |
 | Celestial Oracle | XIX | 2,670 | 937.2 | 6.6 | 1.11 | 1041.3 | Every 25 s: every ally on the map gains +25% damage for 6 s. |
 | Singularity Monarch | XXIII | 5,740 | 1542 | 7.7 | 0.44 | 685.3 | Every 35 s: a singularity pulls enemies toward its centre for 3 s, then detonates for massive area damage; enemies hit take +25% damage for 8 s. |
+| Squire | I | 10 | 10.68 | 2.06 | 1.44 | 15.43 | Very cheap melee unit. Every 10th attack deals 2× damage. |
+| Trainee Guard | II | 35 | 19.8 | 2.34 | 1.33 | 26.4 | Balanced melee attacker. +10% damage while another Royal Academy unit is within 4 tiles. |
+| Practice Archer | II | 30 | 19.2 | 4.68 | 1.11 | 21.33 | Cheap ranged attacker with consistent damage. |
+| Duelist | IV | 70 | 35.4 | 2.2 | 1.67 | 59 | High single-target damage. +20% damage to enemies below 50% health. |
+| Battle Instructor | V | 100 | 52.8 | 3.3 | 1.11 | 58.67 | Royal Academy units within 5 tiles gain +12% damage (more per upgrade; Instructors do not stack). |
+| Royal Graduate | VII | 185 | 83.4 | 3.03 | 1.22 | 101.9 | Every 15 s a powerful 5× strike at the strongest enemy in reach. |
+| The Grandmaster | X | 400 | 145.2 | 3.85 | 1.33 | 193.6 | Every 20 s: Royal Academy allies gain +25% damage and +20% attack speed for 6 s. +3% own damage per other deployed Royal Academy unit (max +30%). |
+| Frost Recruit | III | 45 | 28.2 | 2.75 | 1.33 | 37.6 | Affordable attacker. Every hit slows the enemy by 5% for 2 s. |
+| Ice Archer | V | 100 | 51 | 6.6 | 1.11 | 56.67 | Long-range attacks. Every 6th shot freezes the enemy solid for 0.8 s (bosses are slowed 50% instead). |
+| Snow Berserker | VII | 185 | 94.8 | 2.2 | 1.44 | 136.9 | High damage, and +40% more against slowed or frozen enemies. |
+| Frost Mage | IX | 310 | 93.6 | 5.5 | 1 | 93.6 | Small area attacks that slow every enemy hit by 15% for 2.5 s. |
+| Glacier Knight | XI | 510 | 162 | 2.75 | 1.11 | 180 | Every 12 s: an icy shockwave around itself (3.5 tiles) deals 3× damage and slows enemies by 20% for 3 s. |
+| Winter General | XV | 1,240 | 494.4 | 5.5 | 1.11 | 549.3 | All allies on the map deal +15% damage to slowed or frozen enemies (more per upgrade; Generals do not stack). |
+| The Eternal Winter | XIX | 2,670 | 592.8 | 7.15 | 0.78 | 461.1 | Every 30 s: a large blizzard (5.5 tiles) for 8 s slows every enemy inside by 25% and deals continuous damage. |
+| Page Apprentice | IV | 60 | 27.6 | 4.4 | 1.44 | 39.87 | Cheap magic attacker. Every 8th attack deals 2× damage. |
+| Rune Caster | VI | 140 | 42.6 | 5.5 | 1.11 | 47.33 | Ranged attacks that burst in a small area. |
+| Spellblade | VIII | 240 | 79.8 | 2.75 | 1.56 | 124.1 | Alternates three fast cuts with one slower, powerful strike for 2.4× damage. |
+| Arcane Scholar | X | 400 | 123.6 | 6.05 | 1.11 | 137.3 | Every 12 s: a spell strikes up to 5 enemies in range for 3× damage each. |
+| Void Reader | XIII | 810 | 250.8 | 6.05 | 1.22 | 306.5 | Every hit marks the enemy: it takes +15% damage from all sources for 5 s (does not stack with stronger weaknesses). |
+| Archmage | XVII | 1,820 | 693.6 | 6.05 | 1.11 | 770.7 | Allies within 5 tiles gain +15% damage and +10% range (more per upgrade; Archmages do not stack). |
+| The Forbidden Author | XXI | 3,920 | 1198.8 | 7.7 | 0.89 | 1065.6 | Every 35 s: a spell strikes every enemy on the map for 4× damage; survivors take +25% damage from all sources for 8 s. |
+| Iron Hauler | VI | 140 | 123.6 | 2.75 | 0.78 | 96.13 | Slow, heavy single-target blows. |
+| Forge Brute | IX | 310 | 187.2 | 2.75 | 0.61 | 114.4 | Slow attacks with high damage that splash a small area. |
+| Molten Giant | XII | 650 | 172.8 | 4.95 | 0.67 | 115.2 | Area attacks that leave a burning pool damaging enemies inside for 3 s. |
+| Steel Colossus | XV | 1,240 | 321.6 | 3.3 | 0.78 | 250.1 | Every 15 s: a massive ground slam on the leading enemy in reach hits everything within 3.5 tiles for 5× damage. |
+| Warforged Titan | XVIII | 2,200 | 694.8 | 6.05 | 0.89 | 617.6 | Deals +25% damage to bosses and elite (high-HP) enemies. |
+| Foundry Overseer | XXI | 3,920 | 1533.6 | 6.05 | 1 | 1533.6 | Allies within 5 tiles gain +15% damage. Every 25 s: those allies gain a further +25% damage for 5 s. |
+| The Worldbreaker | XXV | 8,420 | 2490 | 7.15 | 0.67 | 1660 | Every 40 s: charges for 2 s, then slams the whole battlefield. Every enemy takes 3× damage, +5% per enemy alive (up to 2× more, so 6× at most). |
 
 ### Traveling Caravan: 180 Tokens per summon
 
@@ -326,13 +354,69 @@ Starlight, gravity and the weak points of everything.
 | Celestial Oracle | XIX | 5% |
 | Singularity Monarch | XXIII | 2% |
 
+### Royal Academy: 220 Tokens per summon
+
+Squires, duelists and the masters who drill them.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Squire | I | 30% |
+| Trainee Guard | II | 25% |
+| Practice Archer | II | 18% |
+| Duelist | IV | 12% |
+| Battle Instructor | V | 8% |
+| Royal Graduate | VII | 5% |
+| The Grandmaster | X | 2% |
+
+### Frostbound Legion: 650 Tokens per summon
+
+Ice, iron discipline and a winter that marches.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Frost Recruit | III | 30% |
+| Ice Archer | V | 23% |
+| Snow Berserker | VII | 18% |
+| Frost Mage | IX | 13% |
+| Glacier Knight | XI | 9% |
+| Winter General | XV | 5% |
+| The Eternal Winter | XIX | 2% |
+
+### Arcane Library: 950 Tokens per summon
+
+Spellbooks, runes and the pages nobody should read.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Page Apprentice | IV | 30% |
+| Rune Caster | VI | 23% |
+| Spellblade | VIII | 18% |
+| Arcane Scholar | X | 13% |
+| Void Reader | XIII | 9% |
+| Archmage | XVII | 5% |
+| The Forbidden Author | XXI | 2% |
+
+### Titan Foundry: 1,500 Tokens per summon
+
+Molten steel, giant engines and the ground giving way.
+
+| Unit | Tier | Chance |
+| --- | --- | --- |
+| Iron Hauler | VI | 30% |
+| Forge Brute | IX | 23% |
+| Molten Giant | XII | 18% |
+| Steel Colossus | XV | 13% |
+| Warforged Titan | XVIII | 9% |
+| Foundry Overseer | XXI | 5% |
+| The Worldbreaker | XXV | 2% |
+
 Every pool is checked at start-up to total exactly 100%.
 
 ### Duplicates and rare units
 
 - **Duplicate compensation:** a pull of a unit you already own refunds **30% of one summon**. This includes a unit pulled earlier in the same multi-summon. It is shown on each reveal card and totalled in the results.
-  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War and Clockwork Atelier, 54 at Traveling Caravan, 255 at Jungle Covenant, 360 at Skybound Order and 540 at Astral Observatory.
-- **Rare units:** any result with a chance of 1% or less, and every Pack 2 chase unit (2%), gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, a Siege Workshop gear, a caravan compass, a clockwork dial, a jungle leaf, Skybound wings or an Astral moon.
+  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War and Clockwork Atelier, 54 at Traveling Caravan, 66 at Royal Academy, 195 at Frostbound Legion, 255 at Jungle Covenant, 285 at Arcane Library, 360 at Skybound Order, 450 at Titan Foundry and 540 at Astral Observatory.
+- **Rare units:** any result with a chance of 1% or less, and every Pack 2 and Pack 3 chase unit (2%), gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, a Siege Workshop gear, a caravan compass, a clockwork dial, a jungle leaf, Skybound wings, an Astral moon, a Royal Academy crest, a Frostbound snowflake, an Arcane tome or a Titan Foundry anvil.
   - **Fastest Hand In The West:** "High Noon". At sundown a revolver cylinder spins in silence, then six shots ring out around the circle.
   - **THE HOUSE:** the circle becomes a slot machine. The reels stop one by one on 7-7-7, then coins pour down.
   - **High Roller:** a chip shower.
@@ -340,6 +424,7 @@ Every pool is checked at start-up to total exactly 100%.
   - **Antimatter Warhead:** space folding into the centre.
   - **The Village Hero / The King's Champion / The Master Engineer:** HERO, CHAMPION and MASTERWORK stamps.
   - **The Golden Merchant / The Eternal Engine / Heart of the Wild / Eye of the Zenith / Singularity Monarch:** FORTUNE, PERPETUAL, WILD HEART, ZENITH and EVENT HORIZON stamps.
+  - **The Grandmaster / The Eternal Winter / The Forbidden Author / The Worldbreaker:** GRANDMASTER, ETERNAL WINTER, FORBIDDEN and WORLDBREAKER stamps. Their abilities also get a short in-battle callout (BLIZZARD, THE UNWRITTEN CHAPTER, WORLDBREAK).
 
   Odds are never adjusted. Every pull is a plain independent draw, and the outcome is decided before the animation starts. Normal summons keep their short reveal.
 
@@ -416,7 +501,7 @@ Every unit has a base level plus 5 upgrades, bought per copy in battle. Stats co
 
 ### Circle units
 
-Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/medieval.js`, `wildWest.js`, `gambino.js`, `nuclearWar.js`, `pack2.js`), the behaviour in `src/game/abilities.js`.
+Range is in tiles; ability numbers live in each unit's `ability` block (`src/units/defs/medieval.js`, `wildWest.js`, `gambino.js`, `nuclearWar.js`, `pack2.js`, `pack3.js`), the behaviour in `src/game/abilities.js`.
 
 | Unit | Tier | Price | Damage | Range | Atk/s | DPS | Ability |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -474,7 +559,7 @@ Selling refunds 70% of everything spent on that copy.
 - Every buff and coin bonus has an id and applies **at most once per unit**, however many copies are on the map. If several copies reach the same unit, the highest-level one counts.
 - Different buffs multiply together, so a stack is bounded. This covers Tank, Commander, Colonel, General, Sheriff, Dealer, Pit Boss, THE HOUSE, Marshal, Glorious Leader and weather.
 - A unit never buffs itself.
-- Self-bonuses are capped per unit: Bandit +30%, High Roller +25%, Fastest Hand +40% attack speed, Battalion +15%. House Edge is capped at +20% for the battle and resets every battle. Heart of the Wild is capped at +30%, the Eternal Engine's Overdrive extension at +5 s, the Golden Merchant at 20 kill coins and the Traveling Trader at 20 coins per payout. Timed buffs (Caravan Master, Chrono Mechanic, Celestial Oracle, Overdrive) refresh rather than stack and go through the same global buff caps as auras.
+- Self-bonuses are capped per unit: Bandit +30%, High Roller +25%, Fastest Hand +40% attack speed, Battalion +15%. House Edge is capped at +20% for the battle and resets every battle. Heart of the Wild is capped at +30%, the Eternal Engine's Overdrive extension at +5 s, the Golden Merchant at 20 kill coins and the Traveling Trader at 20 coins per payout. Pack 3: the Grandmaster's count bonus is capped at +30%, the Worldbreaker's multiplier at 6×, Winter General's bonus against slowed enemies applies once (any number of Generals) and is capped with the other buffs, and freezes only slow bosses by 50%. Timed buffs (Caravan Master, Chrono Mechanic, Celestial Oracle, Overdrive) refresh rather than stack and go through the same global buff caps as auras.
 - Stats are re-derived from scratch: level, then passive, then buffs, then bonuses, then weather. Nothing ever accumulates beyond its cap.
 - Statuses don't stack. Wounded, Crippled, Exposed (+X% damage taken) and Slowed each keep only their strongest active strength. Damage-taken statuses don't multiply each other: the strongest one applies.
 - Drone and ability timers are fixed and not affected by cooldown buffs.

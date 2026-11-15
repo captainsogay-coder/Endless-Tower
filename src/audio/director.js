@@ -49,6 +49,23 @@ const MIN_GAP = {
   flyover: 1,
   explosion: 0.05,
   death: 0.08,
+  // Circle Pack 3
+  trainingsword: 0.05,
+  spearjab: 0.05,
+  blunt: 0.05,
+  rapier: 0.04,
+  icearrow: 0.05,
+  icespear: 0.05,
+  pagebolt: 0.05,
+  rune: 0.06,
+  spellcut: 0.04,
+  rivetburst: 0.04,
+  magma: 0.12,
+  titanshell: 0.12,
+  steelfist: 0.15,
+  forgehammer: 0.12,
+  freeze: 0.1,
+  chase: 0.5,
 };
 const BUDGET_WINDOW = 0.1;
 const BUDGET = 10;
@@ -107,7 +124,7 @@ export class AudioDirector {
       if (v) sfx.blessing(v);
     });
     game.on('impact', (p) => {
-      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball', 'seedpod', 'stormball', 'comet', 'void', 'thornburst'].includes(p.kind)) return;
+      if (!['grenade', 'shell', 'siege', 'artillery', 'drone', 'explosive-drone', 'dynamite', 'missile', 'icbm', 'warhead', 'antimatter', 'boulder', 'trebuchet', 'bombball', 'seedpod', 'stormball', 'comet', 'void', 'thornburst', 'magma', 'titanshell', 'hailstone', 'forgehammer'].includes(p.kind)) return;
       const v = this.allow('explosion');
       // louder and deeper only when the hit really matters
       const w = Math.min(1, impactWeight(game, p.damage, p.target));
@@ -129,6 +146,15 @@ export class AudioDirector {
     game.on('field', (f) => this.active && sfx.implode(f.duration));
     game.on('houseWheel', () => this.active && sfx.reelStop(1.2));
     game.on('lightning', () => this.active && sfx.lightning());
+    game.on('chaseCast', (c) => {
+      const v = this.allow('chase');
+      if (v) sfx.chaseCast(c.kind, v);
+    });
+    game.on('worldbreak', () => this.active && sfx.worldbreak());
+    game.on('freeze', () => {
+      const v = this.allow('freeze');
+      if (v) sfx.freeze(v);
+    });
     game.on('bossArrived', () => this.active && sfx.bossRoar());
     game.on('waveStart', () => {
       const v = this.allow('wave');

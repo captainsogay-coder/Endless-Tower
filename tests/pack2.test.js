@@ -45,7 +45,7 @@ test('five new circles: exact prices, names, tiers and odds (100%), Tokens only,
   // all thirteen circles, cheapest first; the new ones sit by price among the old
   const order = listCirclesByPrice().map((b) => b.price);
   assert.deepEqual(order, [...order].sort((a, b) => a - b));
-  assert.equal(listCirclesByPrice().length, 13);
+  assert.equal(listCirclesByPrice().length, 17);
 });
 
 test('every one of the 35 can be summoned (Tokens only), is saved, and duplicates refund Tokens', () => {

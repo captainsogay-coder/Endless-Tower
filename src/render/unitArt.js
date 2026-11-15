@@ -1036,10 +1036,17 @@ const PAINTERS = { dude, cadet, gunnerman, grenadier, tank, specialForces, comma
  * Adds art for a unit (used by castArt.js for the circle units). `anim(u, t)`
  * returns { frame, dx?, dy?, flip? } like the built-in personalities.
  */
-export function registerPainter(key, painter, anim = null) {
+/**
+ * Registers a unit painter. `box` (optional) widens the sprite bounds for art
+ * larger than a standard figure (Titan Foundry giants); portraits shrink such
+ * art to fit their frame.
+ */
+export function registerPainter(key, painter, anim = null, { box = null } = {}) {
   PAINTERS[key] = painter;
   if (anim) ANIMS[key] = anim;
+  if (box) BOXES[key] = box;
 }
+const BOXES = {};
 
 
 /** Bounds (in world px) of every unit sprite, relative to the feet. */
@@ -1051,13 +1058,14 @@ export function unitSprite(artKey, frame, facing, level) {
   const key = `${artKey}|${frame}|${facing}|${level}`;
   let s = cache.get(key);
   if (s) return s;
-  const w = BOX.right - BOX.left;
-  const h = BOX.bottom - BOX.top;
+  const B = BOXES[artKey] ?? BOX;
+  const w = B.right - B.left;
+  const h = B.bottom - B.top;
   const c = makeCanvas(w * RES, h * RES);
   const ctx = c.getContext('2d');
-  ctx.setTransform(RES, 0, 0, RES, -BOX.left * RES, -BOX.top * RES);
+  ctx.setTransform(RES, 0, 0, RES, -B.left * RES, -B.top * RES);
   (PAINTERS[artKey] ?? fallback)(ctx, { frame, facing, level });
-  s = { img: c, ox: BOX.left, oy: BOX.top, w, h };
+  s = { img: c, ox: B.left, oy: B.top, w, h };
   cache.set(key, s);
   return s;
 }
@@ -1301,7 +1309,10 @@ function drawTank(ctx, u, t) {
 export function unitPortrait(artKey, size = 96, level = 0, def = null) {
   const c = makeCanvas(size, size);
   const ctx = c.getContext('2d');
-  const k = size / 40;
+  // tall art (a custom sprite box) is shrunk until it fits the frame
+  const B = BOXES[artKey];
+  const fit = B ? Math.min(1, 32 / -B.top, 42 / (B.right - B.left)) : 1;
+  const k = (size / 40) * fit;
   ctx.setTransform(k, 0, 0, k, size / 2, size * 0.8);
   // the same miniature base as on the battlefield (tier metal, faction edge)
   if (def) {
