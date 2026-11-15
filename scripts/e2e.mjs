@@ -415,7 +415,12 @@ check('Titan Foundry ×25 charges 37,500 Tokens, gives 25 Titan units, duplicate
 const p3deploy = await ev((pulled) => {
   const g = window.endlessTower.game; const ids = [pulled, 'grandmaster', 'eternal-winter', 'forbidden-author', 'worldbreaker', 'squire', 'frost-mage'];
   g.newRun({ loadout: ids }); g.coins = 1e7; const placed = [];
-  for (const id of ids) { let done = false; for (let y = 0; y < 22 && !done; y++) for (let x = 0; x < 40 && !done; x++) if (g.map.pathDist[y * 40 + x] <= 2 && g.canPlace(x, y)) { const u = g.deploy(id, x, y); if (u) { placed.push(u); done = true; } } }
+  // near the entrance, where every enemy passes (ranged abilities need targets in reach)
+  const p0 = g.map.routes[0].points[0];
+  const spots = [];
+  for (let y = 0; y < 22; y++) for (let x = 0; x < 40; x++) if (g.map.pathDist[y * 40 + x] <= 2 && g.canPlace(x, y)) spots.push([x, y, Math.hypot(x * 32 + 16 - p0.x, y * 32 + 16 - p0.y)]);
+  spots.sort((a, b) => a[2] - b[2]);
+  for (const id of ids) { const sp = spots.shift(); const u = sp && g.deploy(id, sp[0], sp[1]); if (u) placed.push(u); }
   for (const u of placed) g.upgrade(u);
   const casts = [];
   g.on('chaseCast', (c) => casts.push(c.kind));
@@ -520,6 +525,83 @@ check('Undo after a side-tier Auto Pick restores the plan', JSON.stringify(await
 await page.click('#btn-autobuild');
 await page.click('#ab-primary [data-prio=""]');
 await page.click('#btn-autobuild-ok');
+
+// 15. Immersion update: settings, collection + showcase, summon preview, map events, bosses
+await page.click('#btn-settings-menu');
+await page.click('#set-quality [data-q="low"]');
+const lowQ = await ev(() => ({ q: window.endlessTower.renderer.q.id, max: window.endlessTower.renderer.fx.max, saved: window.endlessTower.profile.data.settings.graphics }));
+await page.click('#set-shake');
+await page.click('#btn-settings-done');
+check('Settings: Low preset applies at once (render budget) and is saved; screen shake can be turned off', lowQ.q === 'low' && lowQ.max === 300 && lowQ.saved === 'low' && (await ev(() => window.endlessTower.profile.data.settings.shake)) === false, JSON.stringify(lowQ));
+await page.click('.tab[data-page="collection"]');
+await page.waitForTimeout(300);
+const colPage = await ev(() => ({ cards: document.querySelectorAll('.col-card').length, owned: document.querySelectorAll('.col-card.owned').length, locked: document.querySelectorAll('.col-card.locked').length, circles: document.querySelectorAll('.col-circle').length, total: document.getElementById('col-total').textContent }));
+check('Collection: every unit (118) grouped by circle with completion, owned vs undiscovered', colPage.cards === 118 && colPage.owned > 0 && colPage.locked > 0 && colPage.circles === 18 && /of 118 units obtained/.test(colPage.total), JSON.stringify(colPage));
+const ownedId = await ev(() => document.querySelector('.col-card.owned').dataset.unit);
+await page.click(`.col-card[data-unit="${ownedId}"]`);
+await page.waitForTimeout(300);
+const scOwned = await ev(() => ({ open: !document.getElementById('screen-showcase').hidden, rows: document.querySelectorAll('#sc-stats tr').length, ability: document.getElementById('sc-ability').textContent.length }));
+await page.click('#sc-done');
+const lockedId = await ev(() => document.querySelector('.col-card.locked').dataset.unit);
+await page.click(`.col-card[data-unit="${lockedId}"]`);
+await page.waitForTimeout(200);
+const scLocked = await ev(() => ({ rows: document.querySelectorAll('#sc-stats tr').length, desc: document.getElementById('sc-desc').textContent, ability: document.getElementById('sc-ability').textContent, sil: window.endlessTower.showcase.stage.silhouette }));
+await page.click('#sc-done');
+check('Showcase: an owned unit shows its live model, ability and stats; an undiscovered one stays a silhouette with nothing revealed', scOwned.open && scOwned.rows >= 6 && scOwned.ability > 10 && scLocked.rows === 0 && scLocked.ability === '' && scLocked.sil && /Revealed when summoned/.test(scLocked.desc), `${ownedId} / ${lockedId}`);
+await page.click('.tab[data-page="summon"]');
+await page.click('[data-banner="arcane-library-circle"]');
+await ev(() => { document.getElementById('pool-details').open = true; });
+await page.click('[data-preview="rune-caster"]');
+await page.waitForTimeout(200);
+const pvSum = await ev(() => ({ sil: window.endlessTower.showcase.stage.silhouette, name: document.getElementById('sc-name').textContent }));
+await page.click('#sc-done');
+check('Summoning: tapping a unit in the drop list previews its appearance', pvSum.sil === false && pvSum.name === 'Rune Caster', JSON.stringify(pvSum));
+await page.click('.tab[data-page="plans"]');
+await page.click('#btn-battle');
+await page.waitForTimeout(400);
+// the bundle doesn't expose modules, so drive the event through the game object
+const merchant = await ev(() => {
+  const g = window.endlessTower.game;
+  const evDef = { id: 'merchant', name: 'Traveling Merchant', kind: 'offer', realms: [], duration: 30, weight: 1, text: 'A merchant offers to trade coins for Tokens. Optional.' };
+  g.coins = 100000;
+  g.events.start(evDef, { wave: 8, reward: 150 });
+  return { offer: { ...g.events.offer }, tokens: window.endlessTower.profile.balance('tokens') };
+});
+await page.waitForTimeout(300);
+const evCardInfo = await ev(() => ({ visible: !document.getElementById('event-card').hidden, text: document.getElementById('event-card').textContent.replace(/\s+/g, ' ') }));
+await page.click('#event-card .ev-accept');
+await page.waitForTimeout(200);
+const traded = await ev(() => ({ tokens: window.endlessTower.profile.balance('tokens'), taken: window.endlessTower.game.events.offer?.taken ?? true }));
+check('Map event: the merchant card shows terms and Trade works (Tokens saved, coins spent)', evCardInfo.visible && /Pay .* coins for .* Tokens/.test(evCardInfo.text) && traded.tokens === merchant.tokens + merchant.offer.tokens, `${evCardInfo.text.slice(0, 60)} · +${traded.tokens - merchant.tokens}`);
+const bossInfo = await ev(() => {
+  const g = window.endlessTower.game;
+  const W = { number: 10, alive: 0, plan: { wave: 10, scaling: { hp: 1, speed: 1, damage: 1, reward: 1 } } };
+  const e = g.spawnEnemy({ category: 'boss', route: 0, offset: 150, cinematic: false }, W);
+  g.boss = e;
+  g.emit('bossArrived', e);
+  return { name: e.bossDef?.name, kind: e.bossKind };
+});
+await page.waitForTimeout(300);
+const bossBar = await ev(() => ({ shown: !document.getElementById('boss-bar').hidden, name: document.getElementById('boss-name').textContent }));
+check('Bosses: a boss gets an archetype and its own named health bar', !!bossInfo.kind && bossBar.shown && bossBar.name === bossInfo.name, `${bossInfo.kind}: ${bossBar.name}`);
+const lowRun = await ev(async () => {
+  const t0 = performance.now();
+  let frames = 0;
+  await new Promise((res) => {
+    const tick = () => (++frames < 60 ? requestAnimationFrame(tick) : res());
+    requestAnimationFrame(tick);
+  });
+  return { ms: (performance.now() - t0) / 60, q: window.endlessTower.renderer.q.id };
+});
+check('Low preset battle renders (with boss, event and units on the field)', lowRun.q === 'low' && lowRun.ms < 200, `${lowRun.ms.toFixed(1)} ms/frame`);
+await ev(() => { const g = window.endlessTower.game; g.events.end(); g.boss.alive = false; g.removeEnemy?.(g.boss); g.boss = null; });
+await page.click('#btn-settings');
+await page.click('#set-quality [data-q="high"]');
+await page.click('#set-shake');
+await page.click('#btn-settings-done');
+await page.click('#btn-retreat');
+await page.click('#btn-retreat-confirm');
+await page.waitForTimeout(200);
 
 // 8. Persistence across a restart
 const snapOf = () => ev(() => ({ t: window.endlessTower.profile.balance('tokens'), u: [...window.endlessTower.profile.data.unlocked].sort(), p: [...window.endlessTower.profile.plan.units], f: [...window.endlessTower.profile.data.favorites] }));

@@ -6,6 +6,7 @@
 // Also runs the realm ambience and the weather layer.
 import { impactWeight } from '../render/impact.js';
 import * as sfx from './sfx.js';
+import { Music } from './music.js';
 
 const MIN_GAP = {
   pierce: 0.08,
@@ -49,6 +50,7 @@ const MIN_GAP = {
   flyover: 1,
   explosion: 0.05,
   death: 0.08,
+  bossWarn: 0.5,
   // Circle Pack 3
   trainingsword: 0.05,
   spearjab: 0.05,
@@ -78,6 +80,7 @@ export class AudioDirector {
     this.ambience = null;
     this.weatherLoop = null;
     this.active = false;
+    this.music = new Music();
     sfx.setMuted(muted);
   }
 
@@ -156,6 +159,18 @@ export class AudioDirector {
       if (v) sfx.freeze(v);
     });
     game.on('bossArrived', () => this.active && sfx.bossRoar());
+    game.on('bossTelegraph', () => {
+      const v = this.allow('bossWarn');
+      if (v) sfx.bossWarn(v);
+    });
+    game.on('warCry', () => this.active && sfx.bossRoar());
+    game.on('bossDefeated', () => this.active && sfx.bossFanfare());
+    game.on('mapEvent', (e) => {
+      if (!this.active) return;
+      if (e.phase === 'start') sfx.eventChime(e.event.def.kind);
+      if (e.phase === 'start' && e.event.def.id === 'meteor-shower') sfx.meteor();
+      if (e.phase === 'trade') sfx.coins(true);
+    });
     game.on('waveStart', () => {
       const v = this.allow('wave');
       if (v) sfx.click(0.6);
@@ -169,10 +184,29 @@ export class AudioDirector {
     sfx.unlock();
     this.startAmbience(game.biome.id);
     this.setWeather(game.weather.current);
+    this.music.start(game.biome.id);
+    this.music.setIntensity('calm');
+  }
+
+  /** Once per frame in battle: the music follows the fight (calm → combat → boss). */
+  update(game) {
+    if (!this.active) return;
+    this.music.setIntensity(game.boss?.alive ? 'boss' : game.phase === 'wave' ? 'combat' : 'calm');
+  }
+
+  /** Menus: calm music once audio is allowed (after the first click or tap). */
+  menuMusic() {
+    sfx.unlock();
+    if (!this.active) {
+      this.music.start('menu');
+      this.music.setIntensity('calm');
+    }
   }
 
   stopBattle() {
     this.active = false;
+    this.music.start('menu');
+    this.music.setIntensity('calm');
     this.ambience?.stop();
     this.ambience = null;
     this.weatherLoop?.stop();

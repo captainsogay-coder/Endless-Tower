@@ -20,7 +20,8 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the collection, filter by role, or let **Auto Pick** choose your strongest types, optionally by DPS, AOE, Summon, Empower or Economy (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at seventeen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency.
+4. **Summoning:** spend Tokens at seventeen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency. Tap a unit in a circle's drop list to preview it.
+5. **Collection:** an encyclopedia of all 118 units by circle, with your completion and a live showcase of every unit you own (see [Collection](#collection)).
 
 ### Upgrading and range
 
@@ -606,6 +607,85 @@ The game is staged as a **campaign table**. Units are painted miniatures on a di
   - Most units draw in a single scaled blit.
   - With more than 160 units and allies on the field, decorative cues (breathing, chevrons, ability rings) switch off.
 
+## The living battlefield
+
+Every battle draws its own light and life, so the same realm never plays out quite the same way twice. It is all cosmetic unless stated, and it all scales with the graphics preset ([Settings](#settings)).
+
+- **Light moods:** each battle rolls one of the realm's moods: dawn, midday, golden hour, overcast or dusk. Light washes over the ground under the actors, so units and enemies keep their true colours. A low sun leaves one side of the field darker, and the light breathes slowly as the battle goes on (`src/render/lifeLayer.js`).
+- **Wildlife and details:**
+  - **Enchanted Forest:** birds, rabbits, butterflies, pollen and sun dapples.
+  - **Frozen Frontier:** crows and hares.
+  - **Volcanic Wasteland:** bats, lizards and ash.
+  - **Ancient Ruins:** circling vultures, lizards and dust.
+  - **Sky Islands:** gulls and distant airships.
+  - **Mechanical Wasteland:** crows and airships.
+  - **Everywhere:** flyers cast shadows on the ground, and water glints.
+- **Weather presentation:**
+  - **Rain:** soaks the ground over about 20 s, forms puddles that ripple and dry afterwards, and turns to sleet in the Frozen Frontier.
+  - **Thunderstorms:** darken the sky in slow waves and show lightning far off.
+  - **Wind:** drives dust clouds and bends the trees.
+  - **Aurora:** pools coloured light on the ground.
+  - **Nova:** sends a slow shimmer through the air.
+
+  The gameplay modifiers, chances and durations are unchanged. With **Weather visuals** off, only lightning strikes are still drawn, because they deal damage.
+- **Combat feedback:**
+  - heavy hits knock enemies back slightly, and the fallen collapse and fade (no gore);
+  - heavy critical hits show `CRIT ×n`;
+  - a unit using its ability flashes a ring and names the ability;
+  - chase units get a short cinematic beat (with Intense effects on);
+  - upgrades rise from the unit. From level 3 a silver ring marks the base, and at the maximum level it turns gold with a glint.
+
+### Map events
+
+Now and then something happens on the field (`src/game/mapEvents.js`, tested in `tests/mapEvents.test.js`):
+
+- **When:** never before wave 3 or during a boss wave, at most one at a time, and at least 4 waves and 75 s apart. Each realm has its own pool, and an event never repeats twice in a row. Events draw from their own random stream, so they never change spawns or combat rolls.
+- **Cosmetic:** Meteor Shower (harmless meteors light up the field), Wildlife Migration and Eclipse.
+- **Traveling Merchant:** an optional trade of coins for Tokens. It costs about 2.5 wave rewards in coins for 15% of a wave's Tokens, happens at most twice per battle, and declining costs nothing.
+- **Treasure Discovery:** a hidden cache opens and pays about one wave's coin reward, at most twice per battle. It never blocks a tile.
+- **Environmental surges:** one per realm, shown with its effect and a countdown. Each goes through the same capped buff layer as unit buffs and ends on time:
+  - **Verdant Surge** (forest): +10% attack speed.
+  - **Whiteout** (frozen): enemies 10% slower.
+  - **Lava Surge** (volcanic): +10% damage.
+  - **The Ruins Awaken** (ruins): +10% range.
+  - **Tailwind** (sky): +10% range.
+  - **Power Surge** (mechanical): +10% attack speed.
+
+### Bosses
+
+Every boss wave brings one of four archetypes (`src/enemies/bosses.js`, `tests/bosses.test.js`). It is chosen from the battle seed and the wave number, never the same twice in a row, and never changes the wave plans. Each ability is **telegraphed** first: a ring that closes, an exclamation mark, a pulsing boss bar and a low horn.
+
+| Boss | Health | Ability |
+| --- | --- | --- |
+| Ironhide Juggernaut | 100% | Every 11 s braces for 3 s and takes 60% less damage (its armour glows) |
+| The Broodmother | 85% | Every 9 s a brood of 4 minions joins its wave (at most 32) |
+| Warlord of the Pass | 95% | Every 12 s a war cry stuns units inside its red ring (3.5 tiles) for 2 s |
+| The Pale Phantom | 80%, 10% faster | Every 8 s steps 3 tiles forward, untouchable for 0.45 s, never into the Tower |
+
+Each boss has its own colours and parts: plates and horns, egg sacs, a banner and crown, a veil. It also has an introduction banner and a named, coloured health bar. The field dims while it lives and birds scatter when it arrives. A defeat ends with a pillar of light, a burst of coins and a short fanfare.
+
+## Settings
+
+The gear button (menu bar and battle HUD) opens Settings. Opening it in battle pauses the game. Everything is saved in the profile and sanitised on load (`src/meta/settings.js`).
+
+- **Graphics presets:** Auto, Low, Medium, High and Ultra set the render resolution, particle budget, environment detail, weather density and how many scorch marks stay on the ground. Auto picks Medium for phones and small screens and Low for 2-core devices. Low draws static scenery and no wildlife at standard resolution.
+- **Living environment:** animated scenery, wildlife, clouds and changing light.
+- **Weather visuals:** the gameplay effect of weather has its own toggle (the cloud button in the HUD).
+- **Intense effects:** flashes, ability cinematics and big particle bursts.
+- **Screen shake:** a short shake on major impacts only.
+- **Audio:** separate volume and mute for **music**, **sound effects** and **ambient** (realm and weather), plus the master switch.
+
+Measured in headless Chromium with software rendering, in a stress battle of 680 enemies on screen: Low and Ultra differ by about 4 ms per frame on desktop, so the cost is the crowd itself. On a phone-sized screen, Low and Medium hold 60 fps while Ultra (full device resolution) drops to about 30.
+
+## Collection
+
+The **Collection** tab is an encyclopedia of all 118 units, grouped by summoning circle in price order:
+
+- overall progress and a completion card per circle;
+- a portrait for each unit you own and a silhouette for each one you don't. Names, tiers and drop chances are public anyway, because the circles list them. Artwork, description, abilities and statistics stay hidden until you obtain the unit.
+
+Tapping an owned unit opens the **showcase**: the unit alive on a small stage, attacking a practice target with its own animation and using its ability now and then. An upgrade slider shows it at every level, rank rings included, next to its combat numbers, ability and side tiers. In Summoning, tapping a unit in the drop list previews its appearance. Chase units stay a silhouette until summoned. A rare pull shows the unit alive on its reveal card.
+
 ## Waves, scaling and realms
 
 - **Waves:** endless, built from four archetypes (Swarm, Army, Commando and Boss), with gradual, finite-forever scaling and progressive encounter traits.
@@ -614,7 +694,9 @@ The game is staged as a **campaign table**. Units are painted miniatures on a di
 
 ## Audio
 
-All sound is synthesized with WebAudio, so nothing is downloaded. Effects, ambience and weather run on separate buses into a compressor. Each realm has its own ambience loop and each weather its own layer. Huge waves stay listenable: each sound kind has a minimum gap, at most 10 voices start per 100 ms, and loudness eases off as that budget fills. The sound button in the HUD mutes everything, and the setting is saved.
+All sound is synthesized with WebAudio, so nothing is downloaded. Effects, ambience, weather and music run on separate buses into a compressor, and Settings has a volume and mute for each channel.
+
+**Music** (`src/audio/music.js`) is generative and layered. A calm layer (pad and a sparse melody) plays in menus and between waves, a combat layer (arpeggio, bass and light percussion) fades in while waves run, and a boss layer (low ostinato, war drums and brass stabs) takes over while a boss lives. Every realm has its own mode and tempo. Chords follow a small Markov walk and melodies are rewritten every four bars, so nothing loops identically. Bosses add a warning horn and a defeat fanfare, and map events a soft chime. Each realm has its own ambience loop and each weather its own layer. Huge waves stay listenable: each sound kind has a minimum gap, at most 10 voices start per 100 ms, and loudness eases off as that budget fills. The sound button in the HUD mutes everything, and the setting is saved.
 
 ## Architecture
 
@@ -626,14 +708,16 @@ src/
   game/effects.js           statuses (Wounded, Crippled, Exposed, Slowed, Burning), hazards, buffs
   game/abilities.js         circle unit abilities (crits, bursts, bounties, summons, bombing runs, fields)
   game/weather.js           weather rolls and modifiers
+  game/mapEvents.js         map events: cosmetic, timed surges, merchant, treasure (own RNG stream)
   maps/                     generator, biomes + variants, rotation, painters, contour fields, set pieces
   waves/                    archetypes, director, scaling, traits, spawn schedules
-  enemies/                  weight classes + roster variant hook
+  enemies/                  weight classes + roster variant hook; bosses.js (boss archetypes)
   units/                    tiers, registry, roster, defs/, stats/upgrades, summoning banners
-  meta/                     battle plans, profile, roster order/filters/Auto Pick, side tiers (+ measuring bench)
-  render/                   renderer, unit art & animation, miniature bases (unitIdentity), impact weight, summoning, effects
-  audio/sfx.js              synthesized sound effects (WebAudio, no assets)
-  ui/                       Battle Plans, Summoning, battle HUD
+  meta/                     battle plans, profile, settings (presets), roster order/filters/Auto Pick, side tiers (+ measuring bench)
+  render/                   renderer, unit art & animation, miniature bases (unitIdentity), impact weight, summoning, effects,
+                            lifeLayer (light/wildlife), eventsFx, bossFx, combatFx, unitStage (showcase)
+  audio/sfx.js, music.js    synthesized sound effects and generative music (WebAudio, no assets)
+  ui/                       Battle Plans, Summoning, Collection + showcase, Settings, battle HUD
 ```
 
 ## Development

@@ -20,6 +20,7 @@ import './render/pack2Art.js';
 import './render/pack3Art.js';
 import { initResponsive } from './ui/responsive.js';
 import { SettingsView } from './ui/settingsView.js';
+import { CollectionView, Showcase } from './ui/collectionView.js';
 import { qualityOf, AUDIO_CHANNELS } from './meta/settings.js';
 import * as sfx from './audio/sfx.js';
 
@@ -81,6 +82,7 @@ function showPage(page) {
   });
   plans.show(page === 'plans');
   summoning.show(page === 'summon');
+  collection.show(page === 'collection');
   updateWallet();
 }
 
@@ -217,7 +219,9 @@ const settingsView = new SettingsView({
 });
 document.getElementById('btn-settings-menu').addEventListener('click', () => actions.openSettings());
 const plans = new BattlePlansView({ profile, onBattle: startBattle, onGoto: (p) => showPage(p) });
-const summoning = new SummoningView({ profile, onChange: () => updateWallet() });
+const showcase = new Showcase({ profile });
+const summoning = new SummoningView({ profile, onChange: () => updateWallet(), showcase });
+const collection = new CollectionView({ profile, starterUnits: STARTER_UNITS, showcase });
 document.querySelector('.tabs').addEventListener('click', (ev) => {
   const t = ev.target.closest('.tab');
   if (t) showPage(t.dataset.page);
@@ -397,13 +401,18 @@ function frame(now) {
     if (ui.selected && !ui.selected.placed) ui.selected = null;
     renderer.render(dt, gameDt);
     hud.update(game, ui);
+    audio.update(game);
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 // Exposed for debugging and automated screenshots.
-window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit, sideTiers, settingsView, applySettings };
+// music needs a user gesture before browsers allow audio: start it on the first one
+window.addEventListener('pointerdown', () => audio.menuMusic(), { once: true });
+window.addEventListener('keydown', () => audio.menuMusic(), { once: true });
+
+window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit, sideTiers, settingsView, applySettings, audio, collection, showcase };
 
 // Boot complete: hide the loader.
 window.__etBooted = true;

@@ -23,6 +23,7 @@ import { QUALITY } from '../meta/settings.js';
 import { EventsFx } from './eventsFx.js';
 import { BossFx } from './bossFx.js';
 import { BOSSES } from '../enemies/bosses.js';
+import { CombatFx } from './combatFx.js';
 
 const DEATH_PARTICLES = { minion: 4, regular: 6, elite: 12, boss: 40 };
 const PLAYER_COLOR = '#e3a33b';
@@ -53,6 +54,8 @@ export class Renderer {
     this.castFx = new CastFx(this);
     this.eventsFx = new EventsFx(this);
     this.bossFx = new BossFx(this);
+    this.combatFx = new CombatFx(this);
+    this.frameDt = 0;
     this.unsub = [];
   }
 
@@ -73,6 +76,7 @@ export class Renderer {
       this.castFx.reset();
       this.eventsFx.reset();
       this.bossFx.reset();
+      this.combatFx.reset();
       this.weatherFx.biome = game.biome.id;
       this.ui.selected = null;
       this.ui.placingDef = null;
@@ -83,6 +87,7 @@ export class Renderer {
     this.castFx.attach(game, on);
     this.eventsFx.attach(game, on);
     this.bossFx.attach(game, on);
+    this.combatFx.attach(game, on);
     on('spawn', (e) => {
       this.breachPulse[e.routeIndex] = Math.min(1, (this.breachPulse[e.routeIndex] ?? 0) + (e.isBoss ? 1 : 0.3));
     });
@@ -94,9 +99,6 @@ export class Renderer {
     });
     on('place', (u) => {
       this.fx.burst(u.x, u.y + 6, 5, '#d9cdb5', { speed: 28, life: 0.35, size: 2, glow: false });
-    });
-    on('upgrade', (u) => {
-      this.fx.ring(u.x, u.y + 4, 4, 16, 0.35, PLAYER_COLOR, 1.5);
     });
     on('sell', ({ unit }) => {
       this.fx.burst(unit.x, unit.y + 4, 6, '#d9cdb5', { speed: 34, life: 0.4, size: 2, glow: false });
@@ -271,6 +273,7 @@ export class Renderer {
     this.fx.update(gameDt);
     this.weatherFx.update(dt, this.game.weather?.current, this.effectsLevel);
     this.eventsFx.update(gameDt);
+    this.frameDt = gameDt;
     this.towerHit = Math.max(0, this.towerHit - dt * 3);
     this.bossFlash = Math.max(0, this.bossFlash - dt);
     for (let i = 0; i < this.breachPulse.length; i++) this.breachPulse[i] = Math.max(0, this.breachPulse[i] - dt * 1.2);
@@ -304,6 +307,7 @@ export class Renderer {
     this.drawBlasts(ctx, gameDt);
     this.castFx.drawOver(ctx, gameDt);
     this.bossFx.drawOver(ctx, gameDt);
+    this.combatFx.drawOver(ctx, gameDt);
     this.drawPlacementGhost(ctx);
     this.fx.draw(ctx);
     scene.drawOver(ctx);
@@ -677,6 +681,7 @@ export class Renderer {
     const enemies = game.enemies;
     // Level of detail: with huge crowds, drop shadows, per-enemy bars and marks.
     this.lite = enemies.length > 900;
+    this.combatFx.drawCorpses(ctx, this.frameDt, this.sprites, this.bossSprites);
     for (let order = 0; order <= 3; order++) {
       for (let i = 0; i < enemies.length; i++) {
         const e = enemies[i];
@@ -685,7 +690,17 @@ export class Renderer {
     }
   }
 
+  /** Draws an enemy, offset by a heavy hit's recoil when there is one. */
   drawEnemy(ctx, e, t) {
+    if (this.combatFx.kick(e, this.frameDt)) {
+      ctx.save();
+      ctx.translate(e.kickX, e.kickY);
+      this.drawEnemyBody(ctx, e, t);
+      ctx.restore();
+    } else this.drawEnemyBody(ctx, e, t);
+  }
+
+  drawEnemyBody(ctx, e, t) {
     const spr = (e.bossKind && this.bossSprites[e.bossKind]) || this.sprites[e.category];
     const r = e.radius;
     let scale = 1;

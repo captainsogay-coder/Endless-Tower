@@ -87,3 +87,14 @@ The motif is a stencilled requisition circle on a concrete slab under one hangin
 ## Audio mix
 
 Gunfire is short and dry, explosions are low thumps, and lightning is a sharp crack with a rolling tail. Realm ambience and weather loops sit well below combat. A per-kind rate limit and a voice budget keep thousands of enemies from turning into noise.
+
+## Living battlefields (light, life, events, bosses)
+
+The environment layer follows the same restraint as the units: atmosphere comes from composition and motion, not from glow.
+
+- **Light moods** (dawn, midday, golden hour, overcast, dusk) are a single wash plus a soft side shade, drawn **under** the actors. Units and enemies always keep their true colours, so a dusk battle is dramatic but every silhouette still reads.
+- **Wildlife is small and peripheral.** Flyers are a few strokes high above the field with a faint ground shadow. Critters appear only on quiet tiles at least four tiles from the road, and never near units.
+- **Darkening effects stay under the actors** (Eclipse, storms, a boss on the field), and anything drawn over them is faint (meteors, snow, tailwind lines). Nothing flashes the full screen at more than 12% opacity, and with **Intense effects** off nothing flashes at all.
+- **Bosses are recognised by shape and colour first:** each archetype has its own palette and parts (horns, egg sacs, banner and crown, veil). Telegraphs use the boss's own colour, and the Warlord's war cry shows its true reach.
+- **Callouts are rationed:** ability names and crits are rate-limited, and chase-unit cinematics come at most once every 4 s.
+- **Budgets are explicit** (`src/meta/settings.js`): every layer reads its preset (particles, decals, wildlife level, weather density, render resolution), so Low draws static scenery at standard resolution.

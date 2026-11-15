@@ -198,12 +198,18 @@ export class LifeLayer {
       ctx.fillRect(0, 0, WORLD_W, WORLD_H);
     }
     if (L.shade > 0) {
-      // the low sun leaves one side of the field a little darker
-      const grad = ctx.createLinearGradient(L.sun > 0 ? WORLD_W : 0, 0, L.sun > 0 ? 0 : WORLD_W, 0);
-      grad.addColorStop(0, 'rgba(10,12,30,0)');
-      grad.addColorStop(1, `rgba(10,12,30,${(L.shade * L.k).toFixed(3)})`);
-      ctx.fillStyle = grad;
+      // the low sun leaves one side of the field a little darker (gradient built once per mood)
+      if (!this.shadeGrad || this.shadeMood !== this.mood) {
+        const grad = ctx.createLinearGradient(L.sun > 0 ? WORLD_W : 0, 0, L.sun > 0 ? 0 : WORLD_W, 0);
+        grad.addColorStop(0, 'rgba(10,12,30,0)');
+        grad.addColorStop(1, `rgba(10,12,30,${L.shade.toFixed(3)})`);
+        this.shadeGrad = grad;
+        this.shadeMood = this.mood;
+      }
+      ctx.globalAlpha = L.k;
+      ctx.fillStyle = this.shadeGrad;
       ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      ctx.globalAlpha = 1;
     }
     if (this.level <= 0) return;
     if (this.dapples.length && this.mood.id !== 'overcast' && this.mood.id !== 'dusk') {

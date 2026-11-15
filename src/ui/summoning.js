@@ -12,6 +12,7 @@ import * as sfx from '../audio/sfx.js';
 import { esc } from './format.js';
 import { portrait } from './battlePlans.js';
 import { sideTierStrip } from './sideTierView.js';
+import { UnitStage } from '../render/unitStage.js';
 
 const $ = (id) => document.getElementById(id);
 // keep sub-percent odds exact (0.5%, 7.5%)
@@ -19,9 +20,10 @@ const pct = (c) => `${Math.round(c * 10000) / 100}%`;
 const tokenIcon = '<svg class="ico token"><use href="#i-token" /></svg>';
 
 export class SummoningView {
-  constructor({ profile, onChange }) {
+  constructor({ profile, onChange, showcase = null }) {
     this.profile = profile;
     this.onChange = onChange;
+    this.showcase = showcase;
     this.banner = listCirclesByPrice()[0];
     this.rng = createRng();
     this.pending = 0;
@@ -62,6 +64,14 @@ export class SummoningView {
       b.blur();
       this.el.tabs.querySelector('.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
+    // tap a unit in the drop-rate list to preview it (chase units stay hidden until summoned)
+    const preview = (ev) => {
+      const li = ev.target.closest('[data-preview]');
+      if (!li || !this.showcase) return;
+      this.showcase.open(li.dataset.preview, { preview: true, chase: li.dataset.chase === '1', chance: Number(li.dataset.chance), circle: this.banner.name });
+    };
+    el.pool.addEventListener('click', preview);
+    el.pool.addEventListener('keydown', (ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), preview(ev)));
     el.buttons.addEventListener('click', (ev) => {
       const b = ev.target.closest('[data-count]');
       if (b && !b.disabled) this.askConfirm(Number(b.dataset.count));
@@ -136,7 +146,7 @@ export class SummoningView {
         const def = getUnit(p.unit);
         const tier = getTier(def.tier);
         const owned = profile.ownedCount(p.unit);
-        return `<li class="pool-item ${isRareEntry(p) ? 'rare' : ''}" style="--c:${tier.color}">
+        return `<li class="pool-item ${isRareEntry(p) ? 'rare' : ''}" style="--c:${tier.color}" data-preview="${esc(p.unit)}" data-chance="${p.chance}" data-chase="${isRareEntry(p) ? 1 : 0}" tabindex="0" title="Preview ${esc(def.name)}">
           <img alt="" src="${portrait(def, 104)}" />
           <div class="pi-main"><div class="pi-name">${esc(def.name)}</div><div class="pi-sub"><span style="color:${tier.color}">${esc(tier.label)}</span>, ${owned ? `<b>Owned</b> ×${owned}` : 'Not obtained'}</div>${sideTierStrip(def, { label: false })}</div>
           <div class="pi-chance">${pct(p.chance)}<span>Chance</span></div>
@@ -231,7 +241,16 @@ export class SummoningView {
       <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
       ${r.rare ? `<div class="rc-rare">Rare asset, ${pct(r.chance)}</div>` : ''}
       <div class="rc-meta">${esc(def.role ?? '')}, ${pct(r.chance)} chance${r.isNew ? ', Unlocked in Battle Plans' : `, Owned ×${this.profile.ownedCount(r.unit)}, duplicate refunded`}</div>
-      ${sideTierStrip(def)}`;
+      ${sideTierStrip(def)}
+      ${r.rare ? '<canvas class="rc-stage" aria-hidden="true"></canvas>' : ''}`;
+    // a rare pull shows the unit alive on its card: its own animation, attacking a target
+    this.cardStage?.stop();
+    const cv = el.card.querySelector('.rc-stage');
+    if (cv) {
+      this.cardStage = new UnitStage(cv);
+      this.cardStage.setUnit(def, 0);
+      requestAnimationFrame(() => this.cardStage.start());
+    }
     if (this.results.length === 1) {
       el.skip.hidden = true;
       el.done.hidden = false;
@@ -286,6 +305,7 @@ export class SummoningView {
       if (this.results.length > 1) return;
     }
     this.seq = null;
+    this.cardStage?.stop();
     this.el.reveal.hidden = true;
     this.render();
     if (!this.el.page.hidden) this.stage.start();

@@ -434,6 +434,30 @@ export function lightning() {
   tone('sine', 60, 30, 1.4, 0.25, 'weather', 0.1);
 }
 
+/** A boss is about to use its ability: a short low horn (the visual telegraph runs at the same time). */
+export function bossWarn(v = 1) {
+  tone('sawtooth', 110, 104, 0.5, 0.05 * v);
+  tone('sawtooth', 165, 156, 0.5, 0.03 * v);
+}
+/** Boss defeated: a rising brass fanfare, under two seconds. */
+export function bossFanfare(v = 1) {
+  const notes = [392, 494, 587, 784];
+  notes.forEach((f, i) => {
+    tone('sawtooth', f, f, 0.28, 0.05 * v, 'sfx', i * 0.12);
+    tone('triangle', f * 2, f * 2, 0.3, 0.02 * v, 'sfx', i * 0.12);
+  });
+  tone('sine', 98, 49, 1.2, 0.12 * v);
+}
+/** A map event begins: a soft two-note chime (gold for rewards and trades). */
+export function eventChime(kind = 'cosmetic', v = 1) {
+  const base = kind === 'modifier' ? 660 : kind === 'cosmetic' ? 523 : 784;
+  tone('sine', base, base, 0.5, 0.05 * v, 'ambience');
+  tone('sine', base * 1.5, base * 1.5, 0.6, 0.04 * v, 'ambience', 0.14);
+}
+export function meteor(v = 1) {
+  burst(0.7, 0.04 * v, 'bandpass', 3000, 600, 1.2, 'ambience');
+}
+
 export function bossRoar() {
   tone('sawtooth', 70, 45, 1.2, 0.18);
   burst(1.0, 0.15, 'lowpass', 300, 120);

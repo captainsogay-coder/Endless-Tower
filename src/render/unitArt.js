@@ -9,7 +9,7 @@
 
 import { makeCanvas, circle } from './canvas.js';
 import { shade } from '../core/color.js';
-import { baseSprite, unitScale, trimOf } from './unitIdentity.js';
+import { baseSprite, unitScale, trimOf, baseRadius } from './unitIdentity.js';
 
 const RES = 2;
 
@@ -1213,6 +1213,27 @@ function supportCue(ctx, u, t, x, y) {
 }
 
 /** Draws a deployed unit (or a summoned ally) on its base. Feet sit slightly below the tile centre. */
+/**
+ * Rank marks on a unit's base: from level 3 a silver ring, at the top level a
+ * gold ring with a slow glint – the maximum upgrade is recognisable at a glance.
+ */
+function rankCue(ctx, u, t, x, feetY) {
+  const lv = u.level ?? 0;
+  if (lv < 3 || u.ally) return;
+  const max = lv >= u.def.levels.length - 1;
+  const br = baseRadius(u.def) + 1.5;
+  ctx.strokeStyle = max ? '#e8c255' : 'rgba(225,230,238,0.85)';
+  ctx.lineWidth = max ? 1.6 : 1.1;
+  ctx.beginPath();
+  ctx.ellipse(x, feetY, br, br * 0.44, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  if (max) {
+    const a = (t * 0.9 + (u.uid ?? 0) * 0.37) % (Math.PI * 2);
+    ctx.fillStyle = '#fff6d8';
+    ctx.fillRect(x + Math.cos(a) * br - 1, feetY + Math.sin(a) * br * 0.44 - 1, 2, 2);
+  }
+}
+
 export function drawUnit(ctx, u, t) {
   if (u.def.art === 'tank') return drawTank(ctx, u, t);
   if (u.def.art === 'fortress') return drawFortress(ctx, u, t);
@@ -1223,6 +1244,7 @@ export function drawUnit(ctx, u, t) {
   const feetY = u.y + 9;
   const b = baseSprite(u.def, !!u.ally);
   ctx.drawImage(b.img, u.x + b.ox, feetY + b.oy, b.w, b.h);
+  rankCue(ctx, u, t, u.x, feetY);
   abilityCue(ctx, u, t, u.x, feetY);
   const S = unitScale(u.def);
   const p = pose(u, t, facing);

@@ -57,7 +57,6 @@ export class Profile {
       autoPick: { primary: null, secondary: null }, // Auto Pick priorities (null = balanced Auto Build)
       planBackup: null, // the plan replaced by the last Auto Build, for Undo
       settings: defaultSettings(), // graphics quality, accessibility toggles, audio mix
-      seen: [], // unit types the player has seen (encyclopedia: silhouettes become portraits)
     };
   }
 
@@ -95,7 +94,6 @@ export class Profile {
       autoPick: { primary: side(d.autoPick?.primary), secondary: side(d.autoPick?.secondary) },
       planBackup: d.planBackup && Array.isArray(d.planBackup.units) ? createPlan(String(d.planBackup.name ?? 'Battle Plan').slice(0, 32), d.planBackup.units.filter((x) => typeof x === 'string')) : null,
       settings: sanitizeSettings(d.settings),
-      seen: Array.isArray(d.seen) ? [...new Set(d.seen.filter((x) => typeof x === 'string'))] : [],
     };
   }
 
