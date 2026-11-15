@@ -24,6 +24,8 @@ import { EventsFx } from './eventsFx.js';
 import { BossFx } from './bossFx.js';
 import { BOSSES } from '../enemies/bosses.js';
 import { CombatFx } from './combatFx.js';
+import { GhostWeatherFx } from './ghostWeatherFx.js';
+import { ChaseFx } from './chaseStandard.js';
 
 const DEATH_PARTICLES = { minion: 4, regular: 6, elite: 12, boss: 40 };
 const PLAYER_COLOR = '#e3a33b';
@@ -55,6 +57,8 @@ export class Renderer {
     this.eventsFx = new EventsFx(this);
     this.bossFx = new BossFx(this);
     this.combatFx = new CombatFx(this);
+    this.ghostWx = new GhostWeatherFx();
+    this.chaseFx = new ChaseFx(this);
     this.frameDt = 0;
     this.unsub = [];
   }
@@ -88,6 +92,9 @@ export class Renderer {
     this.eventsFx.attach(game, on);
     this.bossFx.attach(game, on);
     this.combatFx.attach(game, on);
+    this.chaseFx.attach(game, on);
+    on('starfall', (s) => this.ghostWx.star(s.x, s.y));
+    on('celestialPulse', (p) => this.ghostWx.pulse(p.x, p.y, p.radius));
     on('spawn', (e) => {
       this.breachPulse[e.routeIndex] = Math.min(1, (this.breachPulse[e.routeIndex] ?? 0) + (e.isBoss ? 1 : 0.3));
     });
@@ -155,6 +162,8 @@ export class Renderer {
     if (this.scene) this.scene.life = flags.ambientLife ? q.life : 0;
     this.weatherFx.enabled = flags.weatherFx;
     this.weatherFx.detail = q.weather;
+    this.ghostWx.enabled = flags.weatherFx;
+    this.ghostWx.detail = q.weather;
     this.weatherFx.flashScale = flags.intenseFx ? 1 : 0;
     if (!flags.shake) this.shakeAmt = 0;
     this.resize();
@@ -273,6 +282,7 @@ export class Renderer {
     this.fx.update(gameDt);
     this.weatherFx.update(dt, this.game.weather?.current, this.effectsLevel);
     this.eventsFx.update(gameDt);
+    this.ghostWx.update(dt, this.game.weather?.current);
     this.frameDt = gameDt;
     this.towerHit = Math.max(0, this.towerHit - dt * 3);
     this.bossFlash = Math.max(0, this.bossFlash - dt);
@@ -292,6 +302,7 @@ export class Renderer {
     scene.drawTerrain(ctx);
     scene.drawUnder(ctx);
     this.weatherFx.drawUnder(ctx);
+    this.ghostWx.drawUnder(ctx);
     this.eventsFx.drawUnder(ctx);
     this.bossFx.drawUnder(ctx, WORLD_W, WORLD_H);
     this.drawDecals(ctx, gameDt);
@@ -303,6 +314,7 @@ export class Renderer {
     this.drawRangePreview(ctx);
     this.drawCinematicUnder(ctx, t);
     this.drawActors(ctx, t);
+    this.chaseFx.draw(ctx);
     this.drawProjectiles(ctx);
     this.drawBlasts(ctx, gameDt);
     this.castFx.drawOver(ctx, gameDt);
@@ -313,6 +325,7 @@ export class Renderer {
     scene.drawOver(ctx);
     this.eventsFx.drawOver(ctx);
     this.weatherFx.drawOver(ctx);
+    this.ghostWx.drawOver(ctx);
     this.drawCinematicOver(ctx);
   }
 

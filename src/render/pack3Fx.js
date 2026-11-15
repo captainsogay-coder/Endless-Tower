@@ -110,7 +110,7 @@ export class Pack3Fx {
       this.casts.push({ ...c, t: 0, max: c.kind === 'worldbreak-charge' ? c.duration ?? 2 : 1.2 });
       if (this.casts.length > 12) this.casts.shift();
       const name = { blizzard: 'BLIZZARD', forbidden: 'THE UNWRITTEN CHAPTER', 'worldbreak-charge': 'WORLDBREAK' }[c.kind];
-      if (name) this.r.castFx.popups.push({ x: c.unit.x, y: c.unit.y - 46, text: name, t: 0, big: true, color: c.kind === 'blizzard' ? '#dff3ff' : c.kind === 'forbidden' ? '#e2b8ff' : '#ffb04a' });
+      if (name) this.r.castFx.callout(c.unit.x, c.unit.y - 46, name, c.kind === 'blizzard' ? '#dff3ff' : c.kind === 'forbidden' ? '#e2b8ff' : '#ffb04a');
     });
     on('worldbreak', (w) => {
       this.quakes.push({ x: w.unit.x, y: w.unit.y, t: 0, max: 0.9 });

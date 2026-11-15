@@ -18,6 +18,8 @@ import './render/castArt.js';
 import './render/medievalArt.js';
 import './render/pack2Art.js';
 import './render/pack3Art.js';
+import './render/ghostArt.js';
+import { installChaseAnimations } from './render/chaseStandard.js';
 import { initResponsive } from './ui/responsive.js';
 import { SettingsView } from './ui/settingsView.js';
 import { CollectionView, Showcase } from './ui/collectionView.js';
@@ -25,6 +27,8 @@ import { qualityOf, AUDIO_CHANNELS } from './meta/settings.js';
 import * as sfx from './audio/sfx.js';
 
 registerRoster();
+// every chase unit gets its own animation personality (the Chase Unit Standard)
+installChaseAnimations();
 
 // Debug URL parameters (?seed, ?realm, ?tokens) work only on a local dev server –
 // players can never choose a battlefield.
@@ -220,7 +224,7 @@ const settingsView = new SettingsView({
 document.getElementById('btn-settings-menu').addEventListener('click', () => actions.openSettings());
 const plans = new BattlePlansView({ profile, onBattle: startBattle, onGoto: (p) => showPage(p) });
 const showcase = new Showcase({ profile });
-const summoning = new SummoningView({ profile, onChange: () => updateWallet(), showcase });
+const summoning = new SummoningView({ profile, onChange: () => updateWallet(), showcase, onCircle: (b, picked) => audio.summonCircle(b, picked) });
 const collection = new CollectionView({ profile, starterUnits: STARTER_UNITS, showcase });
 document.querySelector('.tabs').addEventListener('click', (ev) => {
   const t = ev.target.closest('.tab');

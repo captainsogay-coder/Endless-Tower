@@ -8,6 +8,7 @@ import { TAU } from '../core/math.js';
 import { circle, drawGlow } from './canvas.js';
 import { impactWeight } from './impact.js';
 import { STYLE3, drawProjectile3, decorate3 } from './pack3Fx.js';
+import { STYLE_G } from './ghostFx.js';
 
 /**
  * Projectile looks, data-driven:
@@ -46,7 +47,7 @@ const STYLE = {
 };
 
 // Circle Pack 3 kinds share the same painter (their own impacts live in pack3Fx.js)
-Object.assign(STYLE, STYLE3);
+Object.assign(STYLE, STYLE3, STYLE_G);
 
 const IMPACT = {
   parcel: '#b48a5a', pan: '#d9d4c8', trinket: '#e0a23a', inkshot: '#6a7fa8', coinshot: '#f2c14a',
@@ -389,9 +390,9 @@ export class Pack2Fx {
           break;
         }
         default: {
-          const col = { gearbolt: '201,207,216', dart: '224,116,46', gale: '207,228,255' }[l.kind] ?? '233,226,208';
+          const col = { gearbolt: '201,207,216', dart: '224,116,46', gale: '207,228,255', cavalry: '216,190,140' }[l.kind] ?? '233,226,208';
           ctx.strokeStyle = `rgba(${col},${0.85 * a})`;
-          ctx.lineWidth = l.kind === 'gale' ? 2.6 : 1.6;
+          ctx.lineWidth = l.kind === 'gale' || l.kind === 'cavalry' ? 2.6 : 1.6;
           ctx.beginPath();
           ctx.moveTo(l.x0 + dx * k * 0.5, l.y0 + dy * k * 0.5);
           ctx.lineTo(l.x1, l.y1);
@@ -419,6 +420,17 @@ export class Pack2Fx {
       z.t += dt;
       if (z.t >= z.max) continue;
       const a = 1 - z.t / z.max;
+      if (z.kind === 'ghostcut' || z.kind === 'ghostcleave') {
+        const len = z.kind === 'ghostcut' ? 16 : 10;
+        ctx.strokeStyle = `rgba(244,248,255,${a})`;
+        ctx.lineWidth = z.kind === 'ghostcut' ? 2.2 : 1.4;
+        ctx.beginPath();
+        ctx.moveTo(z.x - len, z.y + len * 0.5);
+        ctx.lineTo(z.x + len, z.y - len * 0.5);
+        ctx.stroke();
+        this.zaps[w++] = z;
+        continue;
+      }
       if (z.kind === 'arcane' || z.kind === 'forbidden') {
         // a rune circle drawn on the target, closing as it strikes
         const col = z.kind === 'arcane' ? '79,208,192' : '190,110,255';

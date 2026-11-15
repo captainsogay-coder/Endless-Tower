@@ -48,8 +48,9 @@ import { NUCLEAR_WAR_UNITS, BATTALION_SOLDIER } from './defs/nuclearWar.js';
 import { VILLAGE_UNITS, GUARD_UNITS, SIEGE_UNITS, MEDIEVAL_ALLIES } from './defs/medieval.js';
 import { PACK2_UNITS } from './defs/pack2.js';
 import { PACK3_UNITS } from './defs/pack3.js';
+import { GHOST_UNITS } from './defs/ghost.js';
 
-export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress, ...WILD_WEST_UNITS, ...GAMBINO_UNITS, ...NUCLEAR_WAR_UNITS, ...VILLAGE_UNITS, ...GUARD_UNITS, ...SIEGE_UNITS, ...PACK2_UNITS, ...PACK3_UNITS];
+export const ROSTER = [dude, cadet, gunnerman, grenadeLauncher, tank, specialForces, drone, commander, colonel, general, fortress, ...WILD_WEST_UNITS, ...GAMBINO_UNITS, ...NUCLEAR_WAR_UNITS, ...VILLAGE_UNITS, ...GUARD_UNITS, ...SIEGE_UNITS, ...PACK2_UNITS, ...PACK3_UNITS, ...GHOST_UNITS];
 
 /** Temporary combatants created by abilities (never summoned, listed or deployed). */
 export const ALLY_DEFS = [BATTALION_SOLDIER, ...MEDIEVAL_ALLIES];

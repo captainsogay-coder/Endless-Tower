@@ -70,6 +70,39 @@ export const WEATHERS = {
     short: ['+30% dmg', '−40% cooldown'],
     color: '#f2c27a',
   },
+  // ---- The Ghost update
+  ghastly: {
+    id: 'ghastly',
+    label: 'Ghastly Wind',
+    weight: 1,
+    rangeMult: 1.15,
+    enemySpeed: 0.9,
+    effects: ['+15% range', 'Enemies move 10% slower'],
+    short: ['+15% range', 'enemies −10% speed'],
+    color: '#b8c2c8',
+  },
+  starfall: {
+    id: 'starfall',
+    label: 'Starfall',
+    weight: 1,
+    damageMult: 1.1,
+    star: { every: 4, maxHpFraction: 0.04, bossFraction: 0.02 },
+    effects: ['+10% damage', 'Every 4 s a falling star hits a random enemy for 4% of its max HP (bosses: 2%)'],
+    short: ['+10% dmg', 'falling stars'],
+    color: '#b9c8ff',
+  },
+  twilight: {
+    id: 'twilight',
+    label: 'Twilight of Gods',
+    weight: 1,
+    damageMult: 1.2,
+    cooldownMult: 1 / 1.15,
+    enemyDamageTaken: 1.1,
+    pulse: { every: 5, radius: 96, maxHpFraction: 0.03, bossFraction: 0.01 },
+    effects: ['+20% damage', '+15% attack speed', 'Enemies take +10% damage', 'Every 5 s a celestial pulse: area damage of 3% max HP (bosses: 1%)'],
+    short: ['+20% dmg', '+15% speed', 'enemies +10% dmg taken'],
+    color: '#f0a050',
+  },
 };
 
 export class WeatherSystem {
@@ -81,6 +114,8 @@ export class WeatherSystem {
     this.remaining = 0;
     this.secondTimer = 0;
     this.lightningTimer = 0;
+    this.periodic = {}; // weather-specific periodic effects (stars, pulses): kind -> seconds to next
+    this.due = []; // periodic effects due this step, read and cleared by Game
     this.onChange = null;
   }
 
@@ -98,6 +133,8 @@ export class WeatherSystem {
     this.current = WEATHERS[id];
     this.remaining = this.settings.duration;
     this.lightningTimer = this.settings.lightningInterval;
+    this.periodic = {};
+    for (const k of ['star', 'pulse']) if (this.current[k]) this.periodic[k] = this.current[k].every;
     this.onChange?.(this.current);
   }
 
@@ -117,6 +154,13 @@ export class WeatherSystem {
         while (this.lightningTimer <= 0) {
           strikes++;
           this.lightningTimer += this.settings.lightningInterval;
+        }
+      }
+      for (const k of Object.keys(this.periodic)) {
+        this.periodic[k] -= dt;
+        while (this.periodic[k] <= 0) {
+          this.due.push(k);
+          this.periodic[k] += this.current[k].every;
         }
       }
       if (this.remaining <= 0) this.stop();

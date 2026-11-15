@@ -34,7 +34,8 @@ export function autoQuality(env = globalThis) {
   return 'high';
 }
 
-export const AUDIO_CHANNELS = ['music', 'sfx', 'ambient'];
+/** Player volume channels: music, combat sounds, ambience (realm + weather), and UI/summoning. */
+export const AUDIO_CHANNELS = ['music', 'sfx', 'ambient', 'ui'];
 
 export function defaultSettings() {
   return {
@@ -43,8 +44,8 @@ export function defaultSettings() {
     weatherFx: true, // weather visuals (gameplay modifiers are a separate toggle)
     intenseFx: true, // big flashes, chase cinematics, heavy particle bursts
     ambientLife: true, // animated environment, wildlife, drifting clouds
-    volume: { music: 0.6, sfx: 0.8, ambient: 0.7 },
-    mute: { music: false, sfx: false, ambient: false },
+    volume: { music: 0.6, sfx: 0.8, ambient: 0.7, ui: 0.8 },
+    mute: { music: false, sfx: false, ambient: false, ui: false },
   };
 }
 

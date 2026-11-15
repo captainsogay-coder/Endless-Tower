@@ -425,3 +425,31 @@ registerBanner({
     { unit: 'worldbreaker', chance: 0.02, chase: true },
   ],
 });
+
+// ---------------------------------------------------------------- THE GHOST
+
+export const THE_GHOST_CIRCLE = 'the-ghost-circle';
+registerBanner({
+  id: THE_GHOST_CIRCLE,
+  name: 'The Ghost',
+  tagline: 'Samurai and invaders, honour and betrayal, and a legend in the mist.',
+  currency: 'tokens',
+  price: 2500,
+  counts: [1, 5, 10, 25],
+  pool: [
+    { unit: 'starving-samurai', chance: 0.22 },
+    { unit: 'mongol-warrior', chance: 0.18 },
+    { unit: 'mongol-archer', chance: 0.15 },
+    { unit: 'mongol-horsemen', chance: 0.12 },
+    { unit: 'mongol-brute', chance: 0.1 },
+    { unit: 'ronin', chance: 0.08 },
+    { unit: 'mongol-commander', chance: 0.06 },
+    { unit: 'decorated-samurai', chance: 0.04 },
+    { unit: 'samurai-lord', chance: 0.025 },
+    { unit: 'desperate-thief', chance: 0.015 },
+    { unit: 'defected-lord', chance: 0.005, chase: true },
+    { unit: 'honourable-lord', chance: 0.003, chase: true },
+    { unit: 'great-khan', chance: 0.001, chase: true, superChase: true },
+    { unit: 'ghost-warrior', chance: 0.001, chase: true, superChase: true },
+  ],
+});

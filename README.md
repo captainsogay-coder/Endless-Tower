@@ -20,8 +20,8 @@ Debug URL options, which work on `localhost` only: `?seed=1234` (reproducible ba
 1. **Battle Plans:** pick up to **12 unit types** from the units you own and name the plan. You can deploy unlimited copies of each type in battle. Pin favourites to the front of the collection, filter by role, or let **Auto Pick** choose your strongest types, optionally by DPS, AOE, Summon, Empower or Economy (see [Battle Plans](#battle-plans)).
 2. **Battle:** the game assigns a **random battlefield**: a realm, a terrain variant and a layout, avoiding what you fought on recently. Players can't choose or reroll it. Deploy plan units with **Coins**, upgrade and sell copies, and clear waves.
 3. **Tokens:** every **fully completed wave pays 250 Tokens, +5% for every 10 waves** reached (wave 10: 263, wave 50: 313, wave 100: 375). The reward is shown before each wave and when it's cleared, and saved immediately.
-4. **Summoning:** spend Tokens at seventeen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency. Tap a unit in a circle's drop list to preview it.
-5. **Collection:** an encyclopedia of all 118 units by circle, with your completion and a live showcase of every unit you own (see [Collection](#collection)).
+4. **Summoning:** spend Tokens at eighteen circles to unlock new unit types permanently. All circles are shown together, cheapest first, and the cheapest opens by default. Tokens are the only summon currency. Tap a unit in a circle's drop list to preview it.
+5. **Collection:** an encyclopedia of all 132 units by circle, with your completion and a live showcase of every unit you own (see [Collection](#collection)).
 
 ### Upgrading and range
 
@@ -72,6 +72,9 @@ While weather is on (the cloud button at the top left), every second has a **1% 
 | Thunderstorm | +25% damage, +15% range; lightning every 3 s strikes a random enemy, and every enemy in the blast loses 7% of its max HP |
 | Aurora | +35% coin gain |
 | Nova | +30% damage, +40% cooldown reduction |
+| Ghastly Wind | +15% range; enemies move 10% slower. Fog rolls in and leaves blow across the field |
+| Starfall | +10% damage; every 4 s a falling star hits a random enemy for 4% of its max HP (2% on bosses) |
+| Twilight of Gods | +20% damage, +15% attack speed, enemies take 10% more damage; every 5 s a divine pulse hits enemies within 3 tiles of a random enemy for 3% of their max HP (1% on bosses) |
 
 "X% cooldown reduction" multiplies the cooldown by (1 − X%). Turning weather off ends the current weather immediately.
 
@@ -284,6 +287,20 @@ Fictional, arcade-style sci-fi: toy-like hardware and stylised energy blasts.
 | Warforged Titan | XVIII | 2,200 | 694.8 | 6.05 | 0.89 | 617.6 | Deals +25% damage to bosses and elite (high-HP) enemies. |
 | Foundry Overseer | XXI | 3,920 | 1533.6 | 6.05 | 1 | 1533.6 | Allies within 5 tiles gain +15% damage. Every 25 s: those allies gain a further +25% damage for 5 s. |
 | The Worldbreaker | XXV | 8,420 | 2490 | 7.15 | 0.67 | 1660 | Every 40 s: charges for 2 s, then slams the whole battlefield. Every enemy takes 3× damage, +5% per enemy alive (up to 2× more, so 6× at most). |
+| Starving Samurai | II | 25 | 16.8 | 2.2 | 1.44 | 24.27 | Cheap, reliable melee attacker. Every 10th attack deals 2× damage. |
+| Mongol Warrior | IV | 70 | 35.4 | 3.3 | 1.22 | 43.27 | Medium damage at moderate range. Every 8th attack is a 2.2× strike. |
+| Mongol Archer | V | 100 | 40.2 | 7.15 | 1.11 | 44.67 | Long range, consistent damage. Every 6th attack is a power shot for 2.5×. |
+| Mongol Horsemen | VII | 185 | 43.2 | 5.5 | 1.78 | 76.8 | Fast shots at medium-long range; +20% damage to enemies near the exit. Every 12 s a charge rides through up to 6 enemies for 2.5×. |
+| Mongol Brute | VI | 140 | 81 | 2.48 | 0.61 | 49.5 | Slow, heavy single-target blows. Every 10 s a ground slam hits everything within 2.25 tiles for 2×. |
+| Ronin | VIII | 240 | 102.6 | 2.75 | 1.33 | 136.8 | High single-target damage, always at the enemy with the most health. Every 8th attack is a rapid three-strike combination. |
+| Mongol Commander | X | 400 | 96 | 6.05 | 1 | 96 | Fire-arrow volleys that burst in an area. Mongol units within 5 tiles +12% damage; every 20 s the drums give them +20% attack speed for 5 s. |
+| Decorated Samurai | XI | 510 | 216 | 3.03 | 1.22 | 264 | Elite single-target attacker, +10% damage to bosses. Every 12 s a precision strike deals 4× to the strongest enemy in reach. |
+| Samurai Lord | XIII | 810 | 228 | 4.4 | 1.11 | 253.3 | Medium range. Samurai units within 5 tiles +15% damage. Every 20 s a sweeping sword technique hits everything within 3.5 tiles for 2.5×. |
+| Desperate Thief | XIV | 1,010 | 232.8 | 6.05 | 1.78 | 413.9 | Agile ranged attacker, always at the enemy closest to the exit. Every 10 s a volley of knives hits up to 3 enemies for 2.5×. Every 20 eliminations: 15 coins. |
+| The Defected Lord | XVII | 1,820 | 544.8 | 3.85 | 1.44 | 786.9 | Strong single-target damage. Ronin units within 5 tiles +20% damage. Every 15 s a five-strike flurry (1.4× each); every 30 s +30% attack speed for 6 s. |
+| The Honourable Lord | XIX | 2,670 | 686.4 | 4.68 | 1.11 | 762.7 | All Samurai units on the map +18% damage and +10% range. +25% damage to bosses. Every 25 s an area-clearing sword technique hits everything within 4 tiles for 5×. |
+| The Great Khan | XXIII | 5,740 | 1196.4 | 7.7 | 0.61 | 731.1 | Huge area volleys; enemies hit take +20% damage from all allies for 6 s. Every 30 s a sky of arrows hits every enemy on the battlefield for 4×. Every 50 eliminations: 25 coins. |
+| The Ghost Warrior | XXV | 8,420 | 1136.4 | 4.13 | 2.22 | 2525.3 | High damage, very fast attacks. Every 12 s a Ghost technique cuts through up to 6 enemies for 3×. Every 30 s Ghost Stance for 8 s: +40% damage, +25% attack speed, each attack also cuts 2 nearby enemies. +1% damage per 100 eliminations (max +25%). |
 
 ### Traveling Caravan: 180 Tokens per summon
 
@@ -411,13 +428,34 @@ Molten steel, giant engines and the ground giving way.
 | Foundry Overseer | XXI | 5% |
 | The Worldbreaker | XXV | 2% |
 
+### The Ghost: 2,500 Tokens per summon
+
+Samurai and invaders, honour and betrayal, and a legend in the mist. The circle's units are original characters inspired by feudal Japan and the Mongol invasions.
+
+| Unit | Tier | Chance | Kit |
+| --- | --- | --- | --- |
+| Starving Samurai | II | 22% | Cheap melee; every 10th attack deals 2× |
+| Mongol Warrior | IV | 18% | Every 8th attack is a 2.2× strike |
+| Mongol Archer | V | 15% | Long range; every 6th arrow is a 2.5× power shot |
+| Mongol Horsemen | VII | 12% | +20% damage near the exit; every 12 s a charge rides through up to 6 enemies for 2.5× |
+| Mongol Brute | VI | 10% | Heavy blows; every 10 s a ground slam within 2.25 tiles for 2× |
+| Ronin | VIII | 8% | Always targets the enemy with the most health; every 8th attack is a three-strike combination |
+| Mongol Commander | X | 6% | Fire-arrow volleys; Mongol units within 5 tiles +12% damage; every 20 s war drums give them +20% attack speed for 5 s |
+| Decorated Samurai | XI | 4% | +10% against bosses; every 12 s a 4× precision strike on the strongest enemy |
+| Samurai Lord | XIII | 2.5% | Samurai units within 5 tiles +15% damage; every 20 s a sword technique within 3.5 tiles for 2.5× |
+| Desperate Thief | XIV | 1.5% | Targets the enemy closest to the exit; every 10 s knives hit 3 enemies for 2.5×; 15 coins per 20 kills |
+| **The Defected Lord** (chase) | XVII | 0.5% | Ronin units within 5 tiles +20% damage; every 15 s a five-strike flurry (1.4× each); every 30 s +30% attack speed for 6 s |
+| **The Honourable Lord** (chase) | XIX | 0.3% | All Samurai on the map +18% damage, +10% range; +25% against bosses; every 25 s a 5× technique within 4 tiles |
+| **The Great Khan** (super chase) | XXIII | 0.1% | Area volleys; enemies hit take +20% damage for 6 s; every 30 s a sky of arrows hits every enemy for 4×; 25 coins per 50 kills |
+| **The Ghost Warrior** (super chase) | XXV | 0.1% | Every 12 s cuts up to 6 enemies for 3×; every 30 s Ghost Stance for 8 s (+40% damage, +25% attack speed, cleaving cuts); +1% damage per 100 kills (max +25%) |
+
 Every pool is checked at start-up to total exactly 100%.
 
 ### Duplicates and rare units
 
 - **Duplicate compensation:** a pull of a unit you already own refunds **30% of one summon**. This includes a unit pulled earlier in the same multi-summon. It is shown on each reveal card and totalled in the results.
-  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War and Clockwork Atelier, 54 at Traveling Caravan, 66 at Royal Academy, 195 at Frostbound Legion, 255 at Jungle Covenant, 285 at Arcane Library, 360 at Skybound Order, 450 at Titan Foundry and 540 at Astral Observatory.
-- **Rare units:** any result with a chance of 1% or less, and every Pack 2 and Pack 3 chase unit (2%), gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, a Siege Workshop gear, a caravan compass, a clockwork dial, a jungle leaf, Skybound wings, an Astral moon, a Royal Academy crest, a Frostbound snowflake, an Arcane tome or a Titan Foundry anvil.
+  - It's always paid in Tokens: 30 at Village Militia, 45 at Military, 75 at Advanced and Town Guard, 90 at Wild West and Gambino, 120 at Siege Workshop, 150 at Nuclear War and Clockwork Atelier, 54 at Traveling Caravan, 66 at Royal Academy, 195 at Frostbound Legion, 255 at Jungle Covenant, 285 at Arcane Library, 360 at Skybound Order, 450 at Titan Foundry, 540 at Astral Observatory and 750 at The Ghost.
+- **Rare units:** any result with a chance of 1% or less, and every Pack 2 and Pack 3 chase unit (2%), gets a longer reveal with a blackout, a stamp, an armoured crate and an alarm. Each circle has its own floor art: concrete, red steel, Wild West floorboards with a sheriff's star, Gambino casino felt with a roulette wheel, a hazard-striped Nuclear War launch pad, village planks with a wheat sheaf, a Town Guard shield, a Siege Workshop gear, a caravan compass, a clockwork dial, a jungle leaf, Skybound wings, an Astral moon, a Royal Academy crest, a Frostbound snowflake, an Arcane tome, a Titan Foundry anvil or The Ghost's crossed blades.
   - **Fastest Hand In The West:** "High Noon". At sundown a revolver cylinder spins in silence, then six shots ring out around the circle.
   - **THE HOUSE:** the circle becomes a slot machine. The reels stop one by one on 7-7-7, then coins pour down.
   - **High Roller:** a chip shower.
@@ -426,6 +464,25 @@ Every pool is checked at start-up to total exactly 100%.
   - **The Village Hero / The King's Champion / The Master Engineer:** HERO, CHAMPION and MASTERWORK stamps.
   - **The Golden Merchant / The Eternal Engine / Heart of the Wild / Eye of the Zenith / Singularity Monarch:** FORTUNE, PERPETUAL, WILD HEART, ZENITH and EVENT HORIZON stamps.
   - **The Grandmaster / The Eternal Winter / The Forbidden Author / The Worldbreaker:** GRANDMASTER, ETERNAL WINTER, FORBIDDEN and WORLDBREAKER stamps. Their abilities also get a short in-battle callout (BLIZZARD, THE UNWRITTEN CHAPTER, WORLDBREAK).
+
+  - **The Defected Lord / The Honourable Lord / The Great Khan / The Ghost Warrior:** TURNCOAT, HONOUR, GREAT KHAN and THE GHOST stamps. The two super chase units (0.1%) get letterbox bars and the longest reveal.
+
+### Cinematic summoning
+
+Every summon is a short cinematic: the rings lock, the lamps climb, the circle plays its own motif, the drop lands, and the reveal opens (`src/units/revealPlan.js`).
+
+| Result | Single summon |
+| --- | --- |
+| Common | about 4.2 s |
+| High tier (X and above) | about 5 s |
+| Chase | about 6.4 s |
+| Super chase (0.1% or rarer) | about 8.4 s |
+
+A ×5, ×10 or ×25 summon is **one** 4–9 s sequence: the build-up plays once for the best result, then every result cascades onto the results board, and chase or super chase results get a spotlight and a badge. **Skip** is always available. The units are granted before the cinematic starts, so it only shows what already happened.
+
+### Chase Unit Standard
+
+Every chase unit (all 22) has its own idle, attack and special animation, special-ability VFX and sound, a kill mark and a dedicated reveal (stamp, motif and colours), registered in `src/render/chaseStandard.js`. `tests/chaseStandard.test.js` fails if a chase unit is added without a complete entry, so the standard applies to every future chase unit.
 
   Odds are never adjusted. Every pull is a plain independent draw, and the outcome is decided before the animation starts. Normal summons keep their short reveal.
 
@@ -673,13 +730,13 @@ The gear button (menu bar and battle HUD) opens Settings. Opening it in battle p
 - **Weather visuals:** the gameplay effect of weather has its own toggle (the cloud button in the HUD).
 - **Intense effects:** flashes, ability cinematics and big particle bursts.
 - **Screen shake:** a short shake on major impacts only.
-- **Audio:** separate volume and mute for **music**, **sound effects** and **ambient** (realm and weather), plus the master switch.
+- **Audio:** separate volume and mute for **music**, **combat sounds**, **ambient** (realm and weather) and **UI & summoning**, plus the master switch.
 
 Measured in headless Chromium with software rendering, in a stress battle of 680 enemies on screen: Low and Ultra differ by about 4 ms per frame on desktop, so the cost is the crowd itself. On a phone-sized screen, Low and Medium hold 60 fps while Ultra (full device resolution) drops to about 30.
 
 ## Collection
 
-The **Collection** tab is an encyclopedia of all 118 units, grouped by summoning circle in price order:
+The **Collection** tab is an encyclopedia of all 132 units, grouped by summoning circle in price order:
 
 - overall progress and a completion card per circle;
 - a portrait for each unit you own and a silhouette for each one you don't. Names, tiers and drop chances are public anyway, because the circles list them. Artwork, description, abilities and statistics stay hidden until you obtain the unit.
@@ -696,7 +753,20 @@ Tapping an owned unit opens the **showcase**: the unit alive on a small stage, a
 
 All sound is synthesized with WebAudio, so nothing is downloaded. Effects, ambience, weather and music run on separate buses into a compressor, and Settings has a volume and mute for each channel.
 
-**Music** (`src/audio/music.js`) is generative and layered. A calm layer (pad and a sparse melody) plays in menus and between waves, a combat layer (arpeggio, bass and light percussion) fades in while waves run, and a boss layer (low ostinato, war drums and brass stabs) takes over while a boss lives. Every realm has its own mode and tempo. Chords follow a small Markov walk and melodies are rewritten every four bars, so nothing loops identically. Bosses add a warning horn and a defeat fanfare, and map events a soft chime. Each realm has its own ambience loop and each weather its own layer. Huge waves stay listenable: each sound kind has a minimum gap, at most 10 voices start per 100 ms, and loudness eases off as that budget fills. The sound button in the HUD mutes everything, and the setting is saved.
+**Music** (`src/audio/music.js`) is an original soundtrack, written out as melodies, bass lines, chord progressions and arrangements, and synthesized live with WebAudio. There are no recordings. One theme plays at a time and every change crossfades over about 2 s:
+
+| Theme | Plays | Character |
+| --- | --- | --- |
+| Main | Menus, between waves | Hopeful dorian horn melody over strings and a gentle arpeggio |
+| Battle | While waves run | Driving: string ostinato, war drums, brass melody |
+| Boss | While a boss lives | Harmonic minor brass ostinato, timpani, choir |
+| The Ghost | The Ghost's summoning screen; battles where Ghost units are at least half the field | Miyako-bushi (in-scale) melody on a breathy shakuhachi-like flute, koto plucks, taiko |
+| The Ghost (battle) | The same, during waves | Faster koto, full taiko pattern |
+| Ghastly Wind | During the weather | Airy whole-tone flute over a drone |
+| Starfall | During the weather | Lydian celesta melody and harp arpeggios |
+| Twilight of Gods | During the weather | Slow, epic brass chorale with choir and timpani |
+
+Each theme is in A-B-A-C form, with small variations on every pass (octave lifts, breaths), and realms transpose it a little. Chase and super chase reveals play their own stinger, and each circle has a short motif when opened. Weapons sound like what they are: katana draws, bowstrings, a heavy club, thrown kunai, galloping horses. Bosses add a warning horn and a defeat fanfare, and map events a soft chime. Each realm has its own ambience loop and each weather its own layer. Huge waves stay listenable: each sound kind has a minimum gap, at most 10 voices start per 100 ms, and loudness eases off as that budget fills. The sound button in the HUD mutes everything, and the setting is saved.
 
 ## Architecture
 

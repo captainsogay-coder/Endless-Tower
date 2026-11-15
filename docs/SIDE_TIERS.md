@@ -161,3 +161,17 @@ They also drive the collection filters and sorting, and Auto Pick priorities.
 | Warforged Titan | XVIII | 14 | 16 | N/A | N/A | N/A | 17 |  |
 | Foundry Overseer | XXI | 19 | N/A | N/A | 6 | N/A | 19 |  |
 | The Worldbreaker | XXV | 20 | 27 | N/A | N/A | N/A | 25 |  |
+| Starving Samurai | II | 2 | N/A | N/A | N/A | N/A | 2 |  |
+| Mongol Warrior | IV | 4 | N/A | N/A | N/A | N/A | 4 |  |
+| Mongol Archer | V | 5 | N/A | N/A | N/A | N/A | 5 |  |
+| Mongol Horsemen | VII | 6 | 3 | N/A | N/A | N/A | 7 |  |
+| Mongol Brute | VI | 4 | 7 | N/A | N/A | N/A | 6 |  |
+| Ronin | VIII | 8 | N/A | N/A | N/A | N/A | 8 |  |
+| Mongol Commander | X | 6 | 9 | N/A | 6 | N/A | 8 |  |
+| Decorated Samurai | XI | 11 | N/A | N/A | N/A | N/A | 11 |  |
+| Samurai Lord | XIII | 10 | 9 | N/A | 6 | N/A | 11 |  |
+| Desperate Thief | XIV | 13 | 6 | N/A | N/A | 1 | 13 | 79 coins/min, net -772 |
+| The Defected Lord | XVII | 16 | 2 | N/A | 7 | N/A | 16 |  |
+| The Honourable Lord | XIX | 16 | 16 | N/A | 6 | N/A | 18 |  |
+| The Great Khan | XXIII | 17 | 24 | N/A | 4 | 1 | 21 | 53 coins/min, net -5581 |
+| The Ghost Warrior | XXV | 22 | 21 | N/A | N/A | N/A | 24 |  |

@@ -72,7 +72,7 @@ export class MapScene {
 
   /** Wind strength from the weather (windy and stormy weather bend the trees harder). */
   setWind(weatherId) {
-    this.windTarget = weatherId === 'windy' ? 1 : weatherId === 'thunderstorm' ? 0.8 : weatherId === 'rainy' ? 0.35 : 0.1;
+    this.windTarget = weatherId === 'ghastly' ? 1.4 : weatherId === 'windy' ? 1 : weatherId === 'thunderstorm' ? 0.8 : weatherId === 'rainy' ? 0.35 : 0.1;
   }
 
   set life(level) {

@@ -1048,6 +1048,12 @@ export function registerPainter(key, painter, anim = null, { box = null } = {}) 
 }
 const BOXES = {};
 
+/** Replaces a unit's animation personality (the Chase Unit Standard gives every chase unit its own). */
+export function registerAnim(key, anim) {
+  ANIMS[key] = anim;
+}
+export const animOf = (key) => ANIMS[key] ?? null;
+
 
 /** Bounds (in world px) of every unit sprite, relative to the feet. */
 const BOX = { left: -21, right: 21, top: -32, bottom: 8 };

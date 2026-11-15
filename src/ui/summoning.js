@@ -13,6 +13,7 @@ import { esc } from './format.js';
 import { portrait } from './battlePlans.js';
 import { sideTierStrip } from './sideTierView.js';
 import { UnitStage } from '../render/unitStage.js';
+import { revealPlan, rarityOf } from '../units/revealPlan.js';
 
 const $ = (id) => document.getElementById(id);
 // keep sub-percent odds exact (0.5%, 7.5%)
@@ -20,8 +21,9 @@ const pct = (c) => `${Math.round(c * 10000) / 100}%`;
 const tokenIcon = '<svg class="ico token"><use href="#i-token" /></svg>';
 
 export class SummoningView {
-  constructor({ profile, onChange, showcase = null }) {
+  constructor({ profile, onChange, showcase = null, onCircle = null }) {
     this.profile = profile;
+    this.onCircle = onCircle; // (banner | null) → the music follows the open circle
     this.onChange = onChange;
     this.showcase = showcase;
     this.banner = listCirclesByPrice()[0];
@@ -60,6 +62,7 @@ export class SummoningView {
       if (!b) return;
       this.banner = getBanner(b.dataset.banner);
       this.stage.banner = this.banner;
+      this.onCircle?.(this.banner, true);
       this.render();
       b.blur();
       this.el.tabs.querySelector('.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -102,6 +105,7 @@ export class SummoningView {
 
   show(on) {
     this.el.page.hidden = !on;
+    this.onCircle?.(on ? this.banner : null, false);
     if (on && !this.detailsInit) {
       // drop rates start collapsed on phones (expand on tap), open on desktop
       this.detailsInit = true;
@@ -213,7 +217,7 @@ export class SummoningView {
     el.done.hidden = true;
     el.skip.hidden = false;
     el.skip.textContent = results.length > 1 ? 'Skip to results' : 'Skip';
-    el.progress.textContent = results.length > 1 ? `1 / ${results.length}` : '';
+    el.progress.textContent = results.length > 1 ? `${results.length} summons` : '';
     this.stage.stop();
     this.seq = new RevealSequence({
       canvas: el.revealCanvas,
@@ -239,7 +243,7 @@ export class SummoningView {
     el.card.innerHTML = `
       <span class="rc-tier" style="--c:${tier.color}">${esc(tier.label)}</span>
       <div class="rc-name">${esc(def.name)}${r.isNew ? '<span class="rc-new">New</span>' : `<span class="rc-dupe">Duplicate</span><span class="rc-comp">+${r.compensation} Tokens</span>`}</div>
-      ${r.rare ? `<div class="rc-rare">Rare asset, ${pct(r.chance)}</div>` : ''}
+      ${r.rare ? `<div class="rc-rare ${rarityOf(r)}">${rarityOf(r) === 'super' ? 'Super chase' : 'Chase unit'}, ${pct(r.chance)}</div>` : ''}
       <div class="rc-meta">${esc(def.role ?? '')}, ${pct(r.chance)} chance${r.isNew ? ', Unlocked in Battle Plans' : `, Owned ×${this.profile.ownedCount(r.unit)}, duplicate refunded`}</div>
       ${sideTierStrip(def)}
       ${r.rare ? '<canvas class="rc-stage" aria-hidden="true"></canvas>' : ''}`;
@@ -277,6 +281,9 @@ export class SummoningView {
       if (r.isNew) fresh++;
     }
     const sorted = [...this.results].sort((a, b) => b.tier - a.tier);
+    // the cascade spreads the cards over the plan's time; chase results get a spotlight after
+    const plan = revealPlan(this.results);
+    const step = (plan.cascade * 1000) / Math.max(1, sorted.length);
     const comp = this.results.reduce((sum, r) => sum + r.compensation, 0);
     const dupes = this.results.filter((r) => !r.isNew).length;
     el.summary.innerHTML = `
@@ -287,7 +294,10 @@ export class SummoningView {
         .map((r, i) => {
           const def = getUnit(r.unit);
           const tier = getTier(r.tier);
-          return `<div class="rs-item ${r.rare ? 'rare' : ''}" style="--c:${tier.color}; animation-delay:${Math.min(i, 30) * 25}ms">
+          const rarity = rarityOf(r);
+          const spot = rarity === 'super' || rarity === 'chase';
+          return `<div class="rs-item ${r.rare ? 'rare' : ''} ${spot ? `spot ${rarity}` : ''}" style="--c:${tier.color}; animation-delay:${Math.round(spot ? plan.cascade * 1000 : i * step)}ms">
+            ${spot ? `<span class="rs-chase">${rarity === 'super' ? 'Super chase' : 'Chase'}</span>` : ''}
             ${r.isNew ? '<span class="rc-new">New</span>' : ''}
             <img alt="" src="${portrait(def, 160)}" /><div class="rs-name">${esc(def.name)}</div><div class="rs-tier">${esc(tier.label)}</div>
             ${sideTierStrip(def, { label: false })}

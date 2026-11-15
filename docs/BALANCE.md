@@ -41,6 +41,10 @@ Limits applied so the new units can't break the economy or the buff caps:
 - **Self-scaling caps:** Heart of the Wild +30%, Overdrive extension +5 s.
 - **Two units were toned down during calibration** because their ability alone exceeded their tier even at the minimum trim: Eye of the Zenith strikes every 1.5 s (not every 0.5 s), and the Singularity Monarch detonates for 6× (not 8×).
 
+## The Ghost
+
+Fourteen units calibrated with the same tier generator (table below). Two abilities were toned down so their base stats still rise with tier: the Mongol Brute's slam is 2× over 2.25 tiles (not 3× over 2.5) and the Samurai Lord's sword wave is 2.5× (not 4×). Three new weathers: Ghastly Wind (+15% range, enemies 10% slower), Starfall (+10% damage, a 4% max-HP star every 4 s, 2% on bosses) and Twilight of Gods (+20% damage, +15% attack speed, enemies take +10%, a 3% max-HP pulse within 3 tiles every 5 s, 1% on bosses). Like every weather, they last 20 s and never stack. No other unit's numbers changed.
+
 ## Tier rework: make tiers matter
 
 The problem, measured:
@@ -76,6 +80,7 @@ T 2 gunnerman                gunner    value   1.61 target   1.60 ×1.01  trim 0
 T 2 militia-archer           gunner    value   1.60 target   1.60 ×1.00  trim 0.95 → 0.95
 T 2 practice-archer          gunner    value   1.60 target   1.60 ×1.00  trim 1.00 → 1.00
 T 2 slingman                 gunner    value   1.61 target   1.60 ×1.00  trim 0.97 → 0.97
+T 2 starving-samurai         gunner    value   1.61 target   1.60 ×1.01  trim 0.96 → 0.95
 T 2 trainee-guard            gunner    value   1.62 target   1.60 ×1.01  trim 1.02 → 1.01
 T 3 apprentice-engineer      gunner    value   2.39 target   2.40 ×1.00  trim 0.96 → 0.96
 T 3 bandit                   gunner    value   2.41 target   2.40 ×1.00  trim 0.77 → 0.77
@@ -93,6 +98,7 @@ T 4 cartographer             support   value   2.90 target   2.89 ×1.00  trim 0
 T 4 duelist                  gunner    value   3.45 target   3.40 ×1.01  trim 1.08 → 1.06
 T 4 halberdier               gunner    value   3.39 target   3.40 ×1.00  trim 0.89 → 0.89
 T 4 missile-launcher         gunner    value   3.35 target   3.40 ×0.98  trim 0.69 → 0.70
+T 4 mongol-warrior           gunner    value   3.41 target   3.40 ×1.00  trim 0.81 → 0.81
 T 4 page-apprentice          gunner    value   3.36 target   3.40 ×0.99  trim 0.83 → 0.84
 T 4 springling               gunner    value   3.39 target   3.40 ×1.00  trim 0.78 → 0.78
 T 4 village-hero             gunner    value   3.43 target   3.40 ×1.01  trim 0.76 → 0.75
@@ -107,6 +113,7 @@ T 5 dartkeeper               gunner    value   4.67 target   4.70 ×0.99  trim 0
 T 5 drone                    gunner    value   4.72 target   4.70 ×1.00  trim 0.71 → 0.71
 T 5 gearshot                 gunner    value   4.75 target   4.70 ×1.01  trim 0.57 → 0.56
 T 5 ice-archer               gunner    value   4.72 target   4.70 ×1.00  trim 1.00 → 1.00
+T 5 mongol-archer            gunner    value   4.74 target   4.70 ×1.01  trim 0.81 → 0.80
 T 5 outlaw                   gunner    value   4.68 target   4.70 ×0.99  trim 0.64 → 0.64
 T 5 royal-patrol             gunner    value   4.71 target   4.70 ×1.00  trim 0.94 → 0.94
 T 5 special-force-battalion  summoner  value   3.80 target   3.76 ×1.01  trim 0.85 → 0.84
@@ -116,6 +123,7 @@ T 6 colonel                  economy   value   4.75 target   4.72 ×1.01  trim 0
 T 6 dealer                   support   value   5.38 target   5.35 ×1.00  trim 0.92 → 0.92
 T 6 grand-captain            support   value   5.36 target   5.35 ×1.00  trim 1.04 → 1.04
 T 6 iron-hauler              gunner    value   6.34 target   6.30 ×1.01  trim 0.95 → 0.94
+T 6 mongol-brute             gunner    value   6.28 target   6.30 ×1.00  trim 0.49 → 0.49
 T 6 night-dancer             gunner    value   6.26 target   6.30 ×0.99  trim 0.88 → 0.89
 T 6 rune-caster              gunner    value   6.24 target   6.30 ×0.99  trim 0.87 → 0.88
 T 6 siege-commander          support   value   5.35 target   5.35 ×1.00  trim 0.93 → 0.93
@@ -125,12 +133,14 @@ T 7 gale-lancer              gunner    value   8.29 target   8.30 ×1.00  trim 0
 T 7 general                  support   value   7.04 target   7.06 ×1.00  trim 0.81 → 0.81
 T 7 gunslinger               gunner    value   8.26 target   8.30 ×0.99  trim 0.59 → 0.59
 T 7 icbm                     gunner    value   8.30 target   8.30 ×1.00  trim 0.65 → 0.65
+T 7 mongol-horsemen          gunner    value   8.39 target   8.30 ×1.01  trim 0.68 → 0.67
 T 7 panther                  gunner    value   8.29 target   8.30 ×1.00  trim 1.09 → 1.09
 T 7 royal-graduate           gunner    value   8.23 target   8.30 ×0.99  trim 0.77 → 0.78
 T 7 snow-berserker           gunner    value   8.36 target   8.30 ×1.01  trim 1.03 → 1.02
 T 7 star-reader              gunner    value   8.31 target   8.30 ×1.00  trim 0.81 → 0.81
 T 7 steam-golem              gunner    value   8.27 target   8.30 ×1.00  trim 0.82 → 0.82
 T 8 kings-champion           gunner    value  10.80 target  10.80 ×1.00  trim 0.72 → 0.72
+T 8 ronin                    gunner    value  10.86 target  10.80 ×1.01  trim 0.79 → 0.79
 T 8 spellblade               gunner    value  10.82 target  10.80 ×1.00  trim 0.72 → 0.72
 T 8 spore-shaman             support   value   9.15 target   9.18 ×1.00  trim 0.76 → 0.76
 T 8 trebuchet                gunner    value  10.84 target  10.80 ×1.00  trim 0.89 → 0.89
@@ -150,6 +160,8 @@ T10 fortress                 summoner  value  14.06 target  14.00 ×1.00  trim 0
 T10 grandmaster              support   value  15.01 target  14.88 ×1.01  trim 0.82 → 0.81
 T10 high-roller              gunner    value  17.49 target  17.50 ×1.00  trim 0.55 → 0.55
 T10 master-engineer          gunner    value  17.63 target  17.50 ×1.01  trim 0.78 → 0.77
+T10 mongol-commander         support   value  14.83 target  14.88 ×1.00  trim 0.79 → 0.79
+T11 decorated-samurai        gunner    value  22.05 target  22.00 ×1.00  trim 0.75 → 0.75
 T11 glacier-knight           gunner    value  22.28 target  22.00 ×1.01  trim 0.51 → 0.50
 T11 stormcaller              gunner    value  21.95 target  22.00 ×1.00  trim 0.58 → 0.58
 T12 fastest-hand             gunner    value  27.72 target  27.50 ×1.01  trim 0.78 → 0.77
@@ -157,8 +169,10 @@ T12 grand-automaton          gunner    value  27.55 target  27.50 ×1.00  trim 0
 T12 marshal                  support   value  23.37 target  23.38 ×1.00  trim 0.58 → 0.58
 T12 molten-giant             gunner    value  27.33 target  27.50 ×0.99  trim 0.48 → 0.48
 T12 moon-prism               gunner    value  27.43 target  27.50 ×1.00  trim 0.51 → 0.51
+T13 samurai-lord             support   value  29.00 target  28.90 ×1.00  trim 0.56 → 0.56
 T13 void-reader              support   value  28.92 target  28.90 ×1.00  trim 0.76 → 0.76
 T14 canopy-warden            support   value  35.71 target  35.70 ×1.00  trim 0.87 → 0.87
+T14 desperate-thief          gunner    value  41.78 target  42.00 ×0.99  trim 0.70 → 0.70
 T14 eclipse-adept            support   value  35.58 target  35.70 ×1.00  trim 0.80 → 0.80
 T14 sky-admiral              support   value  35.59 target  35.70 ×1.00  trim 0.86 → 0.86
 T15 glorious-leader          support   value  43.60 target  43.35 ×1.01  trim 0.86 → 0.86
@@ -168,6 +182,7 @@ T15 winter-general           support   value  43.28 target  43.35 ×1.00  trim 0
 T16 eternal-engine           gunner    value  61.46 target  61.20 ×1.00  trim 0.70 → 0.70
 T16 nebula-architect         support   value  51.89 target  52.02 ×1.00  trim 0.85 → 0.85
 T17 archmage                 support   value  62.47 target  62.42 ×1.00  trim 0.85 → 0.85
+T17 defected-lord            gunner    value  73.74 target  73.44 ×1.00  trim 0.67 → 0.67
 T17 nuclear-warhead          gunner    value  73.77 target  73.44 ×1.00  trim 0.62 → 0.62
 T17 tempest-sovereign        gunner    value  73.44 target  73.44 ×1.00  trim 0.57 → 0.57
 T18 heart-of-the-wild        gunner    value  88.17 target  88.13 ×1.00  trim 0.53 → 0.53
@@ -175,10 +190,13 @@ T18 warforged-titan          gunner    value  87.67 target  88.13 ×0.99  trim 0
 T19 antimatter-warhead       gunner    value 105.88 target 105.75 ×1.00  trim 0.92 → 0.92
 T19 celestial-oracle         support   value  89.67 target  89.89 ×1.00  trim 0.81 → 0.81
 T19 eternal-winter           gunner    value 105.20 target 105.75 ×0.99  trim 0.57 → 0.57
+T19 honourable-lord          support   value  90.67 target  89.89 ×1.01  trim 0.53 → 0.53
 T21 eye-of-the-zenith        gunner    value 152.40 target 152.29 ×1.00  trim 0.48 → 0.48
 T21 forbidden-author         gunner    value 152.39 target 152.29 ×1.00  trim 0.51 → 0.51
 T21 foundry-overseer         support   value 129.30 target 129.44 ×1.00  trim 0.79 → 0.79
+T23 great-khan               gunner    value 217.49 target 219.29 ×0.99  trim 0.48 → 0.48
 T23 singularity-monarch      gunner    value 213.64 target 219.29 ×0.97  trim 0.45 → 0.46
+T25 ghost-warrior            gunner    value 315.74 target 315.78 ×1.00  trim 0.50 → 0.50
 T25 worldbreaker             gunner    value 317.56 target 315.78 ×1.01  trim 0.69 → 0.69
 ```
 

@@ -1387,7 +1387,7 @@ html.phone .menu-settings { min-width: var(--tap-sm); height: var(--tap-sm); }
 .set-audio input[type="range"] { width: 100%; accent-color: var(--accent); }
 .set-mute { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); font-size: 13px; }
 .set-mute input { accent-color: var(--accent); }
-html.phone .set-audio { grid-template-columns: 1fr auto; }
+html.phone .set-audio { grid-template-columns: 1fr auto; grid-auto-flow: row dense; }
 html.phone .set-audio input[type="range"] { grid-column: 1 / -1; order: 0; }
 html.phone .set-toggle input, html.phone .set-mute input { width: 22px; height: 22px; }
 
@@ -1466,3 +1466,13 @@ html.phone .sc-grid { grid-template-columns: 1fr; gap: 10px; }
 html.phone .sc-info h2 { font-size: 28px; }
 .pool-item { cursor: pointer; }
 .reveal-card canvas.rc-stage { width: 100%; max-width: 280px; aspect-ratio: 4 / 3; display: block; margin: 8px auto 0; background: radial-gradient(ellipse at 40% 70%, rgba(47,90,79,0.9) 0%, rgba(24,51,48,0.6) 70%, transparent 100%); border-radius: var(--r); }
+
+/* ---------------------------------------------------------------- cinematic summons */
+.rc-rare.chase { color: #f0cf7a; }
+.rc-rare.super { color: #fff3c8; text-shadow: 0 0 8px rgba(240,207,122,0.6); letter-spacing: 0.12em; }
+.rs-item.spot { animation: rs-spot 0.9s cubic-bezier(.2,.9,.2,1.2) both; z-index: 1; }
+.rs-item.spot.super { animation-duration: 1.4s; box-shadow: 0 0 0 2px #f0cf7a, 0 0 22px rgba(240,207,122,0.55); }
+.rs-item.spot.chase { box-shadow: 0 0 0 2px var(--c), 0 0 14px rgba(240,207,122,0.35); }
+.rs-chase { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); padding: 1px 8px; background: #f0cf7a; color: #1d1505; font-family: var(--display); font-weight: 800; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; border-radius: 2px; white-space: nowrap; }
+@keyframes rs-spot { 0% { opacity: 0; transform: scale(1.8) translateY(-20px); } 60% { opacity: 1; transform: scale(0.95); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .rs-item.spot { animation: none; } }

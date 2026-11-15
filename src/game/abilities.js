@@ -1230,7 +1230,352 @@ const worldbreaker = {
   },
 };
 
+// ------------------------------------------------------------------ THE GHOST
+
+/** Every Nth attack hits harder, with its own projectile look (Starving Samurai, Mongol Warrior/Archer). */
+const heavyKind = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const heavy = count(u) % a.heavyEvery === 0;
+    if (heavy) u.lastSpecial = game.time;
+    shoot(game, u, target, heavy ? a.heavyMult : 1, { crit: heavy, kind: heavy ? a.heavyKind : undefined });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.heavyEvery}th attack: ${a.heavyMult}× damage · next in ${a.heavyEvery - ((u.shots ?? 0) % a.heavyEvery)}`];
+  },
+};
+
+/** A periodic ground slam on the leading enemy in reach (Mongol Brute). */
+const slamEvery = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'slam', a.slamEvery, dt)) return;
+    const e = game.findTarget(u, u.stats.range + a.slamRadius * 0.5);
+    if (!e) {
+      u.timers.slam = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.explode(e.x, e.y, a.slamRadius, u.stats.damage * a.slamMult, u, { kind: a.slamKind ?? 'slam' });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.slamEvery} s: ground slam (${(a.slamRadius / 32).toFixed(1)} tiles) for ${a.slamMult}× damage · next in ${timeLeft(u, 'slam', a.slamEvery).toFixed(0)} s`];
+  },
+};
+
+/** Fast shots, a bonus near the exit, and a periodic charge through a line of enemies. */
+const mongolHorsemen = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const near = target.route && target.d >= target.route.length * a.exitShare;
+    shoot(game, u, target, near ? 1 + a.exitBonus : 1);
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'charge', a.chargeEvery, dt)) return;
+    const e = game.findTarget(u, u.stats.range);
+    if (!e) {
+      u.timers.charge = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.pierce(u, e, { count: a.chargeCount, mult: a.chargeMult, kind: 'cavalry', width: 22 });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`+${pct(a.exitBonus)} damage near the exit (last ${pct(1 - a.exitShare)} of the road)`, `Every ${a.chargeEvery} s: a charge through up to ${a.chargeCount} enemies for ${a.chargeMult}× · next in ${timeLeft(u, 'charge', a.chargeEvery).toFixed(0)} s`];
+  },
+};
+
+/** Every Nth attack is a rapid multi-hit combination (Ronin). */
+const comboEvery = {
+  fire(u, target, game) {
+    const a = u.def.ability;
+    if (count(u) % a.every !== 0) return shoot(game, u, target);
+    u.lastSpecial = game.time;
+    for (let i = 0; i < a.hits; i++) {
+      game.after(i * a.gap, () => {
+        if (target.alive && u.placed) shoot(game, u, target, a.mult, { kind: a.kind, crit: true });
+      });
+    }
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.every}th attack: a ${a.hits}-strike combination · next in ${a.every - ((u.shots ?? 0) % a.every)}`];
+  },
+};
+
+/** Mongol Commander: war drums – a timed attack-speed boost for nearby Mongol units. */
+const mongolCommander = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'drums', a.drumEvery, dt)) return;
+    if (!game.enemies.length) {
+      u.timers.drums = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.timedBuff(u, { id: 'war-drums', label: 'War Drums', tag: 'mongol', cooldownMult: 1 / (1 + a.drumRate * abilityPower(u)), color: '#c2563a' }, a.drumDuration, a.drumRadius);
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.drumEvery} s: Mongol units within ${(a.drumRadius / 32).toFixed(0)} tiles +${pct(a.drumRate * abilityPower(u))} attack speed for ${a.drumDuration} s · next in ${timeLeft(u, 'drums', a.drumEvery).toFixed(0)} s`];
+  },
+};
+
+/** Decorated Samurai: a timed precision strike at the strongest, and a boss bonus on every hit. */
+const decoratedSamurai = {
+  fire(u, target, game) {
+    const boss = !!target.isBoss;
+    shoot(game, u, target, boss ? 1 + u.def.ability.bossBonus : 1);
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'precision', a.strikeEvery, dt)) return;
+    const e = game.hash.best(u.x, u.y, u.stats.range, (o) => o.hp + o.shield);
+    if (!e) {
+      u.timers.precision = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    shoot(game, u, e, a.strikeMult * (e.isBoss ? 1 + a.bossBonus : 1), { kind: 'precision', speed: 1800, crit: true });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`+${pct(a.bossBonus)} damage to bosses`, `Every ${a.strikeEvery} s: a ${a.strikeMult}× precision strike at the strongest enemy · next in ${timeLeft(u, 'precision', a.strikeEvery).toFixed(0)} s`];
+  },
+};
+
+/** A periodic technique around the unit itself (Samurai Lord). */
+const selfWave = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'wave', a.waveEvery, dt)) return;
+    if (!game.hash.best(u.x, u.y, a.waveRadius, () => 1)) {
+      u.timers.wave = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.explode(u.x, u.y, a.waveRadius, u.stats.damage * a.waveMult, u, { kind: a.kind });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.waveEvery} s: a sword technique (${(a.waveRadius / 32).toFixed(1)} tiles around it) for ${a.waveMult}× · next in ${timeLeft(u, 'wave', a.waveEvery).toFixed(0)} s`];
+  },
+};
+
+/** Desperate Thief: knife volleys at the leaders, and coins from the chaos. */
+const desperateThief = {
+  init(u, game) {
+    u.killMark = game.stats.kills;
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    const kills = game.stats.kills - (u.killMark ?? game.stats.kills);
+    if (kills >= a.killsPerPayout) {
+      u.killMark += a.killsPerPayout;
+      game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 24, null, u);
+    }
+    if (!every(u, 'volley', a.volleyEvery, dt)) return;
+    const near = [];
+    game.hash.each(u.x, u.y, u.stats.range, (e) => e.alive && near.push(e));
+    if (!near.length) {
+      u.timers.volley = 0.5;
+      return;
+    }
+    near.sort((x, y) => y.d - x.d);
+    u.lastSpecial = game.time;
+    for (const e of near.slice(0, a.volleyCount)) shoot(game, u, e, a.volleyMult, { kind: 'kunaivolley', speed: 1200, crit: true });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.volleyEvery} s: knives at up to ${a.volleyCount} leading enemies for ${a.volleyMult}× · next in ${timeLeft(u, 'volley', a.volleyEvery).toFixed(0)} s`, `Every ${a.killsPerPayout} eliminations: ${Math.round(a.coins * abilityPower(u))} coins`];
+  },
+};
+
+/** The Defected Lord: a five-strike flurry and a periodic frenzy. */
+const defectedLord = {
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (u.frenzyUntil && game.time >= u.frenzyUntil) {
+      u.frenzyUntil = 0;
+      setBonus(u, game, 'rate', 0);
+    }
+    if (every(u, 'frenzy', a.frenzyEvery, dt)) {
+      if (game.enemies.length) {
+        u.frenzyUntil = game.time + a.frenzyDuration;
+        setBonus(u, game, 'rate', a.frenzyRate);
+        game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: 40, kind: 'frenzy' });
+      } else u.timers.frenzy = 0.5;
+    }
+    if (!every(u, 'flurry', a.comboEvery, dt)) return;
+    const e = game.findTarget(u, u.stats.range);
+    if (!e) {
+      u.timers.flurry = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.emit('chaseCast', { unit: u, x: e.x, y: e.y, radius: 30, kind: 'flurry' });
+    for (let i = 0; i < a.comboHits; i++) {
+      game.after(i * 0.08, () => {
+        const t = e.alive ? e : game.findTarget(u, u.stats.range);
+        if (t && u.placed) shoot(game, u, t, a.comboMult, { kind: 'turncoat', speed: 2000, crit: true });
+      });
+    }
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const on = u.frenzyUntil && game && u.frenzyUntil > game.time;
+    return [`Every ${a.comboEvery} s: a ${a.comboHits}-strike flurry (${a.comboMult}× each) · next in ${timeLeft(u, 'flurry', a.comboEvery).toFixed(0)} s`, `Every ${a.frenzyEvery} s: +${pct(a.frenzyRate)} attack speed for ${a.frenzyDuration} s${on ? ' · active' : ''}`];
+  },
+};
+
+/** The Honourable Lord: an area-clearing technique, and +25% against bosses. */
+const honourableLord = {
+  fire(u, target, game) {
+    shoot(game, u, target, target.isBoss ? 1 + u.def.ability.bossBonus : 1);
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    if (!every(u, 'technique', a.techniqueEvery, dt)) return;
+    const e = game.findTarget(u, u.stats.range + a.techniqueRadius * 0.5);
+    if (!e) {
+      u.timers.technique = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    game.emit('chaseCast', { unit: u, x: e.x, y: e.y, radius: a.techniqueRadius, kind: 'lordtechnique' });
+    game.after(0.35, () => {
+      if (u.placed) game.explode(e.x, e.y, a.techniqueRadius, u.stats.damage * a.techniqueMult, u, { kind: 'lordtechnique', focusMult: 1 + a.bossBonus });
+    });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`+${pct(a.bossBonus)} damage to bosses`, `Every ${a.techniqueEvery} s: an area-clearing technique (${(a.techniqueRadius / 32).toFixed(0)} tiles) for ${a.techniqueMult}× · next in ${timeLeft(u, 'technique', a.techniqueEvery).toFixed(0)} s`];
+  },
+};
+
+/** The Great Khan: a sky of arrows over the whole battlefield, and coins from the conquest. */
+const greatKhan = {
+  init(u, game) {
+    u.killMark = game.stats.kills;
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    const kills = game.stats.kills - (u.killMark ?? game.stats.kills);
+    if (kills >= a.killsPerPayout) {
+      u.killMark += a.killsPerPayout;
+      game.grantCoins(Math.round(a.coins * abilityPower(u)), u.x, u.y - 34, 'Tribute', u);
+    }
+    if (u.volleying) return;
+    if (!every(u, 'sky', a.every, dt)) return;
+    if (!game.enemies.some((e) => e.alive && e.intro >= 1)) {
+      u.timers.sky = 0.5;
+      return;
+    }
+    u.lastSpecial = game.time;
+    u.volleying = true;
+    game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: Infinity, kind: 'skyofarrows', duration: 1.4 });
+    game.after(1.4, () => {
+      u.volleying = false;
+      if (!u.placed) return;
+      const all = game.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+      for (const e of all) {
+        game.damageEnemy(e, u.stats.damage * a.mult, u);
+        if (e.alive) game.applyStatusTo(e, 'exposed', { amount: a.exposed, duration: a.exposedDuration });
+      }
+      game.emit('skyofarrows', { unit: u, hits: all.length, targets: all.slice(0, 40).map((e) => ({ x: e.x, y: e.y })) });
+    });
+  },
+  describe(u) {
+    const a = u.def.ability;
+    return [`Every ${a.every} s: a sky of arrows – every enemy on the map takes ${a.mult}× and +${pct(a.exposed)} damage taken for ${a.exposedDuration} s · next in ${timeLeft(u, 'sky', a.every).toFixed(0)} s`, `Every ${a.killsPerPayout} eliminations: ${Math.round(a.coins * abilityPower(u))} coins`];
+  },
+};
+
+/** The Ghost Warrior: Ghost techniques, Ghost Stance with cleaving strikes, and a legend that grows. */
+const ghostWarrior = {
+  init(u, game) {
+    u.killMark = game.stats.kills;
+  },
+  fire(u, target, game) {
+    const a = u.def.ability;
+    const stance = u.stanceUntil > game.time;
+    shoot(game, u, target, 1, stance ? { kind: 'ghoststance' } : null);
+    if (!stance) return;
+    // in Ghost Stance every cut carries on into nearby enemies
+    let n = 0;
+    game.hash.each(target.x, target.y, a.cleaveRadius, (e) => {
+      if (n >= a.cleave || e === target || !e.alive || e.invulnerable) return;
+      n++;
+      game.damageEnemy(e, u.stats.damage * a.cleaveMult, u);
+      game.emit('zap', { x: e.x, y: e.y, kind: 'ghostcleave', source: u });
+    });
+  },
+  update(u, dt, game) {
+    const a = u.def.ability;
+    const stacks = Math.floor((game.stats.kills - (u.killMark ?? game.stats.kills)) / a.killsPerStack);
+    u.legend = Math.min(a.stackCap, stacks * a.perStack);
+    if (u.stanceUntil && game.time >= u.stanceUntil) {
+      u.stanceUntil = 0;
+      setBonus(u, game, 'rate', 0);
+    }
+    const stance = u.stanceUntil > game.time;
+    const dmg = u.legend + (stance ? a.stanceDamage : 0);
+    if ((u.bonus?.damage ?? 0) !== dmg) setBonus(u, game, 'damage', dmg);
+    if (every(u, 'stance', a.stanceEvery, dt)) {
+      if (game.enemies.length) {
+        u.stanceUntil = game.time + a.stanceDuration;
+        setBonus(u, game, 'rate', a.stanceRate);
+        setBonus(u, game, 'damage', u.legend + a.stanceDamage);
+        game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: 60, kind: 'ghoststance', duration: a.stanceDuration });
+      } else u.timers.stance = 0.5;
+    }
+    if (!every(u, 'technique', a.techniqueEvery, dt)) return;
+    const near = [];
+    game.hash.each(u.x, u.y, u.stats.range * 1.4, (e) => e.alive && !e.invulnerable && near.push(e));
+    if (!near.length) {
+      u.timers.technique = 0.5;
+      return;
+    }
+    near.sort((x, y) => y.d - x.d);
+    u.lastSpecial = game.time;
+    const hit = near.slice(0, a.techniqueCount);
+    game.emit('chaseCast', { unit: u, x: u.x, y: u.y, radius: u.stats.range * 1.4, kind: 'ghosttechnique', targets: hit.map((e) => ({ x: e.x, y: e.y })) });
+    hit.forEach((e, i) => {
+      game.after(0.06 * i + 0.2, () => {
+        if (!e.alive || !u.placed) return;
+        game.damageEnemy(e, u.stats.damage * a.techniqueMult, u);
+        game.emit('zap', { x: e.x, y: e.y, kind: 'ghostcut', source: u });
+      });
+    });
+  },
+  describe(u, game) {
+    const a = u.def.ability;
+    const on = u.stanceUntil && game && u.stanceUntil > game.time;
+    return [
+      `Every ${a.techniqueEvery} s: a Ghost technique cuts up to ${a.techniqueCount} enemies for ${a.techniqueMult}× · next in ${timeLeft(u, 'technique', a.techniqueEvery).toFixed(0)} s`,
+      `Every ${a.stanceEvery} s: Ghost Stance for ${a.stanceDuration} s (+${pct(a.stanceDamage)} damage, +${pct(a.stanceRate)} attack speed, cleaves ${a.cleave} nearby)${on ? ' · active' : ''}`,
+      `Legend: +${pct(u.legend ?? 0)} damage (1% per ${a.killsPerStack} eliminations, max +${pct(a.stackCap)})`,
+    ];
+  },
+};
+
 export const ABILITIES = {
+  'heavy-kind': heavyKind,
+  'slam-every': slamEvery,
+  'mongol-horsemen': mongolHorsemen,
+  'combo-every': comboEvery,
+  'mongol-commander': mongolCommander,
+  'decorated-samurai': decoratedSamurai,
+  'self-wave': selfWave,
+  'desperate-thief': desperateThief,
+  'defected-lord': defectedLord,
+  'honourable-lord': honourableLord,
+  'great-khan': greatKhan,
+  'ghost-warrior': ghostWarrior,
   'trainee-guard': traineeGuard,
   grandmaster,
   'ice-archer': iceArcher,

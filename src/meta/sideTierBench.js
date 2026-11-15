@@ -196,6 +196,14 @@ function buffsOwnCopies(def) {
 /** Which squad a unit's buffs are judged on, and how much of an army they can reach. */
 export function squadFor(def) {
   if (buffsOwnCopies(def)) return { id: def.id, coverage: BENCH.coverage.self };
+  // tag buffs (The Ghost's Samurai / Mongol / Ronin) are judged on the cheapest unit with that tag
+  const tag = [...(def.buffs ?? []), ...(def.ability?.buffTag ? [{ tag: def.ability.buffTag }] : [])].find((b) => b.tag)?.tag;
+  if (tag) {
+    const base = listUnits()
+      .filter((u) => u.tags?.includes(tag) && u.id !== def.id)
+      .sort((a, b) => a.tier - b.tier)[0];
+    if (base) return { id: base.id, coverage: BENCH.coverage.faction };
+  }
   if (def.faction) {
     const base = listUnits()
       .filter((u) => u.faction === def.faction)

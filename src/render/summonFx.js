@@ -12,6 +12,9 @@ import { getUnit } from '../units/unitRegistry.js';
 import { unitPortrait } from './unitArt.js';
 import { makeCanvas, circle } from './canvas.js';
 import * as sfx from '../audio/sfx.js';
+import { revealPlan, rarityOf } from '../units/revealPlan.js';
+import { chaseOf } from './chaseStandard.js';
+import { drawMotif } from './revealMotifs.js';
 
 const TAU = Math.PI * 2;
 const PAINT = '#c8b07c'; // faded stencil paint
@@ -46,6 +49,8 @@ const CIRCLE_STYLES = {
   // library floor: dark wood and an open tome ringed in runes
   'arcane-library-circle': { paint: '#4fd0c0', accent: '#c9a24a', text: 'ARCANE LIBRARY · RUNE · VERSE · THE CHAINED SHELF · ', doubleRing: true, chevrons: 5, emblem: 'tome', floorTint: 'rgba(40,20,60,0.36)', planks: true, stampText: 'FORBIDDEN', beacon: '120,240,220' },
   // foundry floor: riveted iron and an anvil, embers in the cracks
+  // wet stone and mist, two crossed blades and falling leaves
+  'the-ghost-circle': { paint: '#e8e6e0', accent: '#a82a2a', text: 'THE GHOST · HONOUR · STEEL · THE WIND · ', doubleRing: true, chevrons: 4, emblem: 'blades', floorTint: 'rgba(30,34,44,0.42)', stampText: 'THE GHOST', beacon: '230,236,250' },
   'titan-foundry-circle': { paint: '#e07a2e', accent: '#c9a24a', text: 'TITAN FOUNDRY · IRON · FIRE · THE GROUND GIVES WAY · ', doubleRing: true, chevrons: 3, emblem: 'anvil', floorTint: 'rgba(90,40,20,0.36)', hazard: true, stampText: 'WORLDBREAKER', beacon: '255,150,70' },
 };
 export const circleStyle = (bannerId) => CIRCLE_STYLES[bannerId] ?? CIRCLE_STYLES['military-circle'];
@@ -368,6 +373,29 @@ export function paintCircle(ctx, w, h, cx, cy, R, s) {
     for (const [x, y, r] of [[0.13, 0.1, 0.03], [0.05, 0.16, 0.018], [0.17, -0.12, 0.02]]) {
       circle(ctx, x * R, y * R, r * R);
       ctx.fill();
+    }
+  } else if (st.emblem === 'blades') {
+    // two crossed katana before a small red sun
+    ctx.fillStyle = st.accent;
+    ctx.beginPath();
+    ctx.arc(0, -R * 0.05, R * 0.085, 0, TAU);
+    ctx.fill();
+    for (const a of [-0.7, 0.7]) {
+      ctx.save();
+      ctx.rotate(a);
+      ctx.fillStyle = st.paint;
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.08, -R * 0.016);
+      ctx.quadraticCurveTo(R * 0.08, -R * 0.04, R * 0.24, -R * 0.032);
+      ctx.lineTo(R * 0.22, R * 0.004);
+      ctx.quadraticCurveTo(R * 0.08, -R * 0.006, -R * 0.08, R * 0.016);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#c9a24a';
+      ctx.fillRect(-R * 0.09, -R * 0.034, R * 0.016, R * 0.068);
+      ctx.fillStyle = '#1d1a1a';
+      ctx.fillRect(-R * 0.2, -R * 0.014, R * 0.11, R * 0.028);
+      ctx.restore();
     }
   } else if (st.emblem === 'crest') {
     // a heater shield with a crown over it
@@ -978,15 +1006,16 @@ export class RevealSequence {
     this.onCard = onCard;
     this.onDone = onDone;
     this.multi = results.length > 1;
-    this.i = 0;
+    // one cinematic per summon (src/units/revealPlan.js): a batch builds up once, to its best result
+    this.plan = revealPlan(results);
+    this.headline = this.plan.headline;
+    this.i = this.multi ? results.indexOf(this.headline) : 0;
     this.t = 0;
     this.done = false;
     this.cardShown = false;
     this.cues = new Set();
     for (const r of results) portraitImage(getUnit(r.unit));
-    this.timing = this.multi ? { lock: 0.4, charge: 0.45, drop: 0.3, open: 0.3, dwell: 0.9 } : { lock: 0.9, charge: 1.0, drop: 0.45, open: 0.5, dwell: Infinity };
-    // rare results always get the long, distinct sequence – even inside a multi-summon
-    this.rareTiming = { lock: 1.2, charge: 1.9, drop: 0.6, open: 0.7, dwell: this.multi ? 2.2 : Infinity };
+    this.timing = { ...this.plan.phases, dwell: this.multi ? 0 : Infinity };
   }
 
   get current() {
@@ -1012,13 +1041,9 @@ export class RevealSequence {
     requestAnimationFrame(loop);
   }
 
-  /** Advance to the next unit (click), or finish. */
+  /** A click: a batch goes straight to its results board; a single reveal finishes. */
   next() {
-    if (this.i >= this.results.length - 1) return this.finish();
-    this.i++;
-    this.t = 0;
-    this.cardShown = false;
-    this.cues.clear();
+    this.finish();
   }
 
   skip() {
@@ -1034,11 +1059,11 @@ export class RevealSequence {
   cue(name, fn) {
     if (this.cues.has(name)) return;
     this.cues.add(name);
-    fn();
+    sfx.asUi(fn); // summoning sounds belong to the UI/summoning channel
   }
 
-  timingFor(r) {
-    return r.rare ? this.rareTiming : this.timing;
+  timingFor() {
+    return this.timing;
   }
 
   step(dt) {
@@ -1064,11 +1089,17 @@ export class RevealSequence {
     if (this.t >= tDrop) this.cue('thud', () => sfx.thud(Math.min(2, tier / 2.5)));
     if (this.t >= tOpen) {
       this.cue('sting', () => sfx.sting(tier, r.rare));
+      const rarity = rarityOf(r);
+      if (rarity === 'chase' || rarity === 'super') this.cue('stinger', () => sfx.summonStinger?.(rarity));
+      if (this.multi) {
+        // the batch hands over to the results board, which cascades the rest in
+        this.finish();
+        return;
+      }
       if (!this.cardShown) {
         this.cardShown = true;
         this.onCard?.(r, this.i);
       }
-      if (this.t >= tOpen + T.dwell) this.next();
     }
   }
 
@@ -1134,7 +1165,7 @@ export class RevealSequence {
       beacon: blackout ? t * 5 : null,
       stamp: rare && t >= tLock + T.charge * 0.7 ? (t - (tLock + T.charge * 0.7)) / 0.25 : 0,
       style: this.style,
-      stampText: show?.stamp,
+      stampText: show?.stamp ?? (rare ? chaseOf(r.unit)?.reveal.stamp : undefined),
       stampColor: show?.stampColor,
       beaconColor: show?.beaconColor,
       sweepColor: ladder[stage],
@@ -1144,6 +1175,16 @@ export class RevealSequence {
     });
 
     show?.draw(ctx, { cx, cy, R, w, h, t, ph: phases(T) });
+    // Chase Unit Standard: every chase unit without a bespoke show gets its own reveal motif
+    const chase = rare && !show ? chaseOf(r.unit) : null;
+    if (chase) drawMotif(ctx, chase.reveal.motif, chase.reveal.colors, { cx, cy, R, w, h, t, tLock, tCharge, tDrop, tOpen });
+    if (rarityOf(r) === 'super') {
+      // super chase: cinematic letterbox bars close in during the build-up
+      const k = Math.min(1, t / tLock) * (t < tOpen + 0.6 ? 1 : Math.max(0, 1 - (t - tOpen - 0.6) / 0.6));
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h * 0.09 * k);
+      ctx.fillRect(0, h - h * 0.09 * k, w, h * 0.09 * k);
+    }
 
     // the crate falls from above the lamp and lands on the star
     if (t >= tCharge) {

@@ -12,6 +12,7 @@ import { drawUnit } from './unitArt.js';
 import { impactWeight } from './impact.js';
 import { Pack2Fx } from './pack2Fx.js';
 import { Pack3Fx } from './pack3Fx.js';
+import { GhostFx } from './ghostFx.js';
 
 const BLAST_STYLE = {
   dynamite: { palette: 'hot', max: 0.3 },
@@ -24,6 +25,9 @@ const BLAST_STYLE = {
   singularity: { palette: 'antimatter', max: 0.8 },
   frostwave: { palette: 'frost', max: 0.45 },
   slam: { palette: 'dust', max: 0.5 },
+  bruteslam: { palette: 'dust', max: 0.45 },
+  swordwave: { palette: 'steel', max: 0.4 },
+  lordtechnique: { palette: 'gold', max: 0.55 },
   icbm: { palette: 'hot', max: 0.5 },
   missile: { palette: null, max: 0.28 },
   sequin: { palette: 'pink', max: 0.22 },
@@ -38,6 +42,7 @@ export const BLAST_PALETTES = {
   antimatter: ['#7a4fe0', '#f3e9ff'],
   pink: ['#c45cc9', '#ffd9fb'],
   frost: ['#8fc4e8', '#f2faff'],
+  steel: ['#b9c4d4', '#f4f8ff'],
 };
 
 export class CastFx {
@@ -45,6 +50,7 @@ export class CastFx {
     this.r = renderer;
     this.p2 = new Pack2Fx(renderer);
     this.p3 = new Pack3Fx(renderer);
+    this.ghost = new GhostFx(renderer);
     this.planes = [];
     this.pulses = [];
     this.popups = [];
@@ -53,6 +59,7 @@ export class CastFx {
   reset() {
     this.p2.reset();
     this.p3.reset();
+    this.ghost.reset();
     this.planes = [];
     this.pulses = [];
     this.popups = [];
@@ -62,6 +69,7 @@ export class CastFx {
     this.game = game;
     this.p2.attach(game, on);
     this.p3.attach(game, on);
+    this.ghost.attach(game, on);
     on('blast', (b) => this.blast(b.x, b.y, b.radius, b.kind, b.focus, b.damage));
     on('flyover', (f) => this.planes.push({ ...f, t: 0 }));
     on('pulse', (p) => this.pulses.push({ ...p, t: 0, max: p.radius === Infinity ? 0.9 : 0.6 }));
@@ -81,6 +89,12 @@ export class CastFx {
     });
   }
 
+  /** A big named call-out above a unit; call-outs that land together stack instead of overprinting. */
+  callout(x, y, text, color) {
+    const near = this.popups.filter((p) => p.big && p.t < 1 && Math.abs(p.x - x) < 90 && Math.abs(p.y - y) < 40).length;
+    this.popups.push({ x, y: y - near * 14, text, t: 0, big: true, color });
+  }
+
   /**
    * Area blast. The radius is always the real one; the spectacle inside it
    * (fireball size, duration, secondary shockwave, screen shake) follows the
@@ -98,7 +112,7 @@ export class CastFx {
     r.decals.push({ x, y, r: radius * 0.5 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: 5, seed: Math.random() * 6 });
     if (r.decals.length > r.q.decals) r.decals.shift();
     const col = { energy: '#9ff5dd', antimatter: '#cdb6ff', gold: '#f2d38a', frost: '#e4f4ff' }[st.palette] ?? '#d8cbb0';
-    if (kind === 'slam' && w > 0.4) r.shake(Math.min(2.5, 2 * w));
+    if ((kind === 'slam' || kind === 'bruteslam' || kind === 'lordtechnique') && w > 0.4) r.shake(Math.min(2.5, 2 * w));
     r.fx.ring(x, y, radius * 0.25, radius * 1.0, 0.3 + 0.1 * w, col, 1 + w);
     if (heavy && w > 0.5) {
       r.fx.ring(x, y, radius * 0.5, radius * 1.25, 0.7, col, 1 + 2 * w);
@@ -177,7 +191,7 @@ export class CastFx {
         this.blast(p.x, p.y, p.splash, 'dynamite', null, p.damage, p.target);
         return true;
       default:
-        return this.p3.onImpact(p) || this.p2.onImpact(p);
+        return this.ghost.onImpact(p) || this.p3.onImpact(p) || this.p2.onImpact(p);
     }
   }
 
@@ -518,6 +532,7 @@ export class CastFx {
   drawOver(ctx, dt) {
     this.p2.draw(ctx, dt);
     this.p3.draw(ctx, dt);
+    this.ghost.draw(ctx, dt);
     let w = 0;
     for (let i = 0; i < this.planes.length; i++) {
       const pl = this.planes[i];

@@ -52,9 +52,9 @@ test('four new circles: exact prices, names, tiers and odds (100%), Tokens only,
   assert.equal(ids.size, 28);
   assert.equal(PACK3_UNITS.length, 28);
   const circles = listCirclesByPrice();
-  assert.equal(circles.length, 17);
-  assert.deepEqual(circles.map((b) => b.price), [100, 150, 180, 220, 250, 250, 300, 300, 400, 500, 500, 650, 850, 950, 1200, 1500, 1800]);
-  assert.equal(ROSTER.length, 90 + 28);
+  assert.equal(circles.length, 18);
+  assert.deepEqual(circles.map((b) => b.price), [100, 150, 180, 220, 250, 250, 300, 300, 400, 500, 500, 650, 850, 950, 1200, 1500, 1800, 2500]);
+  assert.equal(ROSTER.length, 90 + 28 + 14);
 });
 
 test('every one of the 28 can be summoned with x1/x5/x10/x25 (Tokens only), is saved, duplicates refund Tokens, chase rate is 2%', () => {
@@ -147,7 +147,7 @@ test('tiers matter: price, base damage and combat rating rise with tier inside e
   }
   assert.ok(getUnit('squire').price <= 15 && getUnit('practice-archer').price <= 35 && getUnit('trainee-guard').price <= 40);
   const wb = combat('worldbreaker');
-  for (const d of ROSTER) if (d.id !== 'worldbreaker') assert.ok(combat(d.id) < wb, `${d.id} below the Worldbreaker`);
+  for (const d of ROSTER) if (d.id !== 'worldbreaker' && d.id !== 'ghost-warrior') assert.ok(combat(d.id) < wb, `${d.id} below the Worldbreaker`);
 });
 
 test('Royal Academy: Squire 2× every 10th, Trainee +10% beside a classmate, Duelist +20% below half, Instructor +12% (Academy only), Graduate 5× strike, Grandmaster exam + count bonus', () => {

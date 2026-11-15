@@ -33,8 +33,8 @@ test('settings are sanitised on load and persist in the profile', () => {
   assert.equal(junk.graphics, 'auto');
   assert.equal(junk.shake, true, 'only an explicit false turns shake off');
   assert.equal(junk.weatherFx, false);
-  assert.deepEqual(junk.volume, { music: 1, sfx: 0, ambient: 0.7 });
-  assert.deepEqual(junk.mute, { music: false, sfx: true, ambient: false });
+  assert.deepEqual(junk.volume, { music: 1, sfx: 0, ambient: 0.7, ui: 0.8 }, 'old saves without a ui volume get the default');
+  assert.deepEqual(junk.mute, { music: false, sfx: true, ambient: false, ui: false });
   const storage = memoryStorage();
   const p = new Profile({ storage, starterUnits: ['dude'] });
   p.data.settings.graphics = 'low';

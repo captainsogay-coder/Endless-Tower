@@ -65,7 +65,7 @@ await page.click('#btn-retreat-confirm');
 await page.click('.tab[data-page="summon"]');
 await page.waitForTimeout(200);
 const order = await page.$$eval('.circle-card', (els) => els.map((e) => ({ id: e.dataset.banner, price: Number(e.querySelector('.cc-price').textContent.replace(/[^0-9]/g, '')), active: e.classList.contains('active') })));
-check('all 17 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 17 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,180,220,250,250,300,300,400,500,500,650,850,950,1200,1500,1800', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
+check('all 18 circles in one collection, sorted by Token price (cheapest first, opened by default)', order.length === 18 && order.every((c, i) => i === 0 || c.price >= order[i - 1].price) && order[0].active && order.map((c) => c.price).join() === '100,150,180,220,250,250,300,300,400,500,500,650,850,950,1200,1500,1800,2500', order.map((c) => `${c.id.replace('-circle', '')} ${c.price}`).join(' · '));
 const poolStrips = await page.$$eval('.pool-item', (els) => els.every((e) => e.querySelectorAll('.st-cell').length === 5));
 check('drop-rate list shows each unit\'s five side tiers', poolStrips);
 await page.click('[data-banner="military-circle"]');
@@ -429,6 +429,66 @@ const p3deploy = await ev((pulled) => {
 }, titan.res[0].unit);
 check('a summoned Titan unit and every Pack 3 chase unit deploy, upgrade, fight and cast their chase abilities', p3deploy.placed.length === 7 && p3deploy.levels.every((l) => l >= 1) && p3deploy.kills > 0 && ['blizzard', 'forbidden', 'worldbreak-charge'].every((k) => p3deploy.casts.includes(k)), `${p3deploy.placed.join(', ')} · kills ${p3deploy.kills} · ${p3deploy.casts.join('/')}`);
 
+// 12d. The Ghost: 2,500 Tokens, 14 units, two super chase units, cinematic batch reveal, three new weathers
+await page.click('[data-banner="the-ghost-circle"]');
+const gh = await ev(() => { const b = window.endlessTower.summoning.banner; return { rows: b.pool.map((e) => ({ id: e.unit, chance: Math.round(e.chance * 1e5) / 1e3, chase: !!e.chase, sup: !!e.superChase })), price: b.price } });
+const ghCard = (await page.textContent('[data-banner="the-ghost-circle"] .cc-price')).trim();
+check('The Ghost: 14 units, odds total 100%, 2,500 Tokens, 4 chase units (Great Khan + Ghost Warrior are 0.1% super chase)', gh.rows.length === 14 && Math.round(gh.rows.reduce((a, r) => a + r.chance, 0) * 1000) / 1000 === 100 && ghCard === '2,500 Tokens' && gh.rows.filter((r) => r.chase).map((r) => r.id).join() === 'defected-lord,honourable-lord,great-khan,ghost-warrior' && gh.rows.filter((r) => r.sup).map((r) => `${r.id}:${r.chance}`).join() === 'great-khan:0.1,ghost-warrior:0.1', gh.rows.map((r) => `${r.id} ${r.chance}%`).join(' · '));
+await ev(() => { const p = window.endlessTower.profile; p.data.wallet.tokens = 2500 * 10; p.save(); window.endlessTower.summoning.render(); });
+await page.click('[data-count="10"]');
+await page.click('#btn-confirm-ok');
+await page.waitForTimeout(300);
+const ghSeq = await ev(() => { const s = window.endlessTower.summoning; return { total: s.seq?.plan?.total, mode: s.seq?.plan?.mode, granted: s.results?.length, t: window.endlessTower.profile.balance('tokens') }; });
+await page.click('#btn-reveal-skip');
+await page.waitForTimeout(200);
+const ghRes = await ev(() => ({ res: window.endlessTower.summoning.results.map((r) => ({ unit: r.unit, comp: r.compensation })), summary: !document.getElementById('reveal-summary').hidden }));
+await page.click('#btn-reveal-done');
+check('Ghost ×10 is one 4–9 s cinematic, units granted before it plays, Skip jumps to the results board', ghSeq.mode === 'batch' && ghSeq.total >= 4 && ghSeq.total <= 9 && ghSeq.granted === 10 && ghRes.res.length === 10 && ghRes.res.every((r) => gh.rows.some((x) => x.id === r.unit)) && ghRes.summary, `${ghSeq.total?.toFixed(2)} s, ${ghRes.res.length} results`);
+const ghDeploy = await ev(() => {
+  const g = window.endlessTower.game; const ids = ['defected-lord', 'honourable-lord', 'great-khan', 'ghost-warrior', 'mongol-commander', 'samurai-lord', 'mongol-horsemen', 'desperate-thief'];
+  g.newRun({ loadout: ids }); g.coins = 1e7; const placed = [];
+  const p0 = g.map.routes[0].points[0];
+  const spots = [];
+  for (let y = 0; y < 22; y++) for (let x = 0; x < 40; x++) if (g.map.pathDist[y * 40 + x] <= 2 && g.canPlace(x, y)) spots.push([x, y, Math.hypot(x * 32 + 16 - p0.x, y * 32 + 16 - p0.y)]);
+  spots.sort((a, b) => a[2] - b[2]);
+  for (const id of ids) { const sp = spots.shift(); const u = sp && g.deploy(id, sp[0], sp[1]); if (u) placed.push(u); }
+  for (const u of placed) g.upgrade(u);
+  const casts = []; const specials = new Set(); const wx = { star: 0, pulse: 0 };
+  g.on('chaseCast', (c) => casts.push(c.kind));
+  g.on('unitSpecial', (u) => specials.add(u.def.id));
+  g.on('starfall', () => wx.star++);
+  g.on('celestialPulse', () => wx.pulse++);
+  g.towerHp = g.towerMaxHp = 1e12; g.autoSkip = true; g.callWaves(30);
+  for (let i = 0; i < 20 * 60; i++) g.update(1 / 20);
+  const kills = g.stats.kills ?? null;
+  // stars and pulses need living enemies: a fresh run with no defenders
+  g.newRun({ loadout: ids });
+  g.towerHp = g.towerMaxHp = 1e12; g.callWaves(5);
+  for (let i = 0; i < 20 * 8; i++) g.update(1 / 20);
+  for (const id of ['starfall', 'twilight']) {
+    g.weather.start(id);
+    for (let i = 0; i < 20 * 13; i++) g.update(1 / 20);
+  }
+  g.autoSkip = false;
+  return { placed: placed.map((u) => u.def.id), kills, casts: [...new Set(casts)], specials: [...specials], wx };
+});
+check('every Ghost chase unit deploys, upgrades, fights and casts its chase ability', ghDeploy.placed.length === 8 && ghDeploy.kills > 0 && ['flurry', 'lordtechnique', 'skyofarrows', 'ghosttechnique'].every((k) => ghDeploy.casts.includes(k)), `${ghDeploy.placed.length} placed · kills ${ghDeploy.kills} · ${ghDeploy.casts.join('/')}`);
+check('Starfall drops stars and Twilight of Gods pulses (periodic weather effects fire in a real battle)', ghDeploy.wx.star >= 3 && ghDeploy.wx.pulse >= 2, JSON.stringify(ghDeploy.wx));
+ghDeploy.cards = {};
+await page.click('.tab[data-page="plans"]');
+await page.click('#btn-battle');
+await page.waitForTimeout(200);
+for (const id of ['ghastly', 'starfall', 'twilight']) {
+  await ev((id) => window.endlessTower.game.weather.start(id), id);
+  await page.waitForTimeout(250);
+  ghDeploy.cards[id] = await ev(() => document.getElementById('weather-card').textContent.replace(/\s+/g, ' ').trim().slice(0, 70));
+}
+await ev(() => window.endlessTower.game.weather.stop());
+await page.click('#btn-retreat');
+await page.click('#btn-retreat-confirm');
+await page.waitForTimeout(150);
+check('the three new weathers show their HUD card', /Ghastly Wind/.test(ghDeploy.cards.ghastly) && /Starfall/.test(ghDeploy.cards.starfall) && /Twilight of Gods/.test(ghDeploy.cards.twilight), Object.values(ghDeploy.cards).join(' | '));
+
 // 13. Battle Plans: favorites, sorting, Auto Build + Undo, manual editing
 await page.click('.tab[data-page="plans"]');
 await page.waitForTimeout(200);
@@ -498,7 +558,7 @@ check("circle + ownership filters combine (Wild West · not owned · Economy)", 
 await page.click('#roster-reset');
 await page.waitForTimeout(100);
 const reset = await ev(() => ({ f: window.endlessTower.profile.data.rosterFilter, n: document.querySelectorAll('.roster-grid .unit-card').length, sort: window.endlessTower.profile.data.rosterSort }));
-check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 118 && reset.sort === 'tier', JSON.stringify(reset));
+check('Clear filters restores the full collection', reset.f.ownership === 'all' && reset.f.circle === 'all' && reset.f.side === null && reset.n === 132 && reset.sort === 'tier', JSON.stringify(reset));
 // combat sheet + comparison in the unit details panel
 await ev(() => { window.endlessTower.plans.focusId = 'glorious-leader'; window.endlessTower.plans.compare = null; window.endlessTower.plans.render(); });
 const sheet = await ev(() => ({ rows: [...document.querySelectorAll('#dossier .cmp-sheet tbody th')].map((e) => e.textContent.trim()), against: document.getElementById('compare-with').value, verdict: document.querySelector('#dossier .cmp-verdict')?.textContent ?? '' }));
@@ -531,12 +591,16 @@ await page.click('#btn-settings-menu');
 await page.click('#set-quality [data-q="low"]');
 const lowQ = await ev(() => ({ q: window.endlessTower.renderer.q.id, max: window.endlessTower.renderer.fx.max, saved: window.endlessTower.profile.data.settings.graphics }));
 await page.click('#set-shake');
+await page.fill('#set-vol-ui', '35');
+await page.dispatchEvent('#set-vol-ui', 'input');
+const vols = await ev(() => ({ n: document.querySelectorAll('.set-audio input[type=range]').length, ui: window.endlessTower.profile.data.settings.volume.ui }));
+check('Settings: separate saved volumes for music, combat, ambience and UI / summoning', vols.n === 4 && vols.ui === 0.35, JSON.stringify(vols));
 await page.click('#btn-settings-done');
 check('Settings: Low preset applies at once (render budget) and is saved; screen shake can be turned off', lowQ.q === 'low' && lowQ.max === 300 && lowQ.saved === 'low' && (await ev(() => window.endlessTower.profile.data.settings.shake)) === false, JSON.stringify(lowQ));
 await page.click('.tab[data-page="collection"]');
 await page.waitForTimeout(300);
 const colPage = await ev(() => ({ cards: document.querySelectorAll('.col-card').length, owned: document.querySelectorAll('.col-card.owned').length, locked: document.querySelectorAll('.col-card.locked').length, circles: document.querySelectorAll('.col-circle').length, total: document.getElementById('col-total').textContent }));
-check('Collection: every unit (118) grouped by circle with completion, owned vs undiscovered', colPage.cards === 118 && colPage.owned > 0 && colPage.locked > 0 && colPage.circles === 18 && /of 118 units obtained/.test(colPage.total), JSON.stringify(colPage));
+check('Collection: every unit (132) grouped by circle with completion, owned vs undiscovered', colPage.cards === 132 && colPage.owned > 0 && colPage.locked > 0 && colPage.circles === 19 && /of 132 units obtained/.test(colPage.total), JSON.stringify(colPage));
 const ownedId = await ev(() => document.querySelector('.col-card.owned').dataset.unit);
 await page.click(`.col-card[data-unit="${ownedId}"]`);
 await page.waitForTimeout(300);

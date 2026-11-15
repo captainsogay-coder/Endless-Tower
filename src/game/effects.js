@@ -12,6 +12,8 @@
 //   - different ids are compatible and multiply together;
 //   - a unit never buffs itself;
 //   - a buff with `faction` only reaches units of that faction (e.g. Village Rally);
+//   - a buff with `tag` only reaches units carrying that tag in `def.tags`
+//     (The Ghost: 'samurai', 'mongol', 'ronin' cut across one circle);
 //   - when several copies of a source reach a unit, the highest-level copy counts
 //     (buffs with `levelScale` grow with the source's upgrade level).
 
@@ -107,6 +109,7 @@ export function computeAuras(units) {
     for (const { u: s, b } of sources) {
       if (s === u) continue;
       if (b.faction && u.def.faction !== b.faction) continue; // faction buffs only reach their own faction
+      if (b.tag && !u.def.tags?.includes(b.tag)) continue; // tag buffs only reach units with that tag
       const r = buffRadius(b, s);
       if (r === Infinity || (s.x - u.x) ** 2 + (s.y - u.y) ** 2 <= r * r) {
         if (!best.has(b.id) || s.level > best.get(b.id)) best.set(b.id, s.level);

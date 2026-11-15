@@ -1,7 +1,7 @@
 // Synthesized sound kit (WebAudio, no asset files).
 //
-// Mixing: every sound goes to one of four buses – sfx, ambience, weather,
-// music – which feed a master gain and a compressor/limiter, so even hundreds of
+// Mixing: every sound goes to one of five buses – sfx, ambience, weather,
+// music, ui – which feed a master gain and a compressor/limiter, so even hundreds of
 // simultaneous shots can't clip. Combat call sites are additionally rate-
 // limited by the AudioDirector so massive waves never become noise.
 // Everything is a no-op until the context is unlocked by a user gesture, and
@@ -13,9 +13,12 @@ let buses = null;
 let muted = false;
 const noiseCache = new Map();
 
-export const MIX = { master: 0.55, sfx: 0.8, ambience: 0.35, weather: 0.5, music: 0.32 };
-/** Player-facing channels: volume 0..1 and mute, applied on top of the base mix. Ambient covers realm + weather. */
-const CHANNEL = { sfx: { v: 1, mute: false }, ambient: { v: 1, mute: false }, music: { v: 1, mute: false } };
+export const MIX = { master: 0.55, sfx: 0.8, ambience: 0.35, weather: 0.5, music: 0.32, ui: 0.8 };
+/**
+ * Player-facing channels: volume 0..1 and mute, applied on top of the base mix.
+ * sfx = combat, ambient = realm + weather, ui = menus and summoning, music.
+ */
+const CHANNEL = { sfx: { v: 1, mute: false }, ambient: { v: 1, mute: false }, music: { v: 1, mute: false }, ui: { v: 1, mute: false } };
 const channelOf = (busName) => (busName === 'ambience' || busName === 'weather' ? 'ambient' : busName);
 const busGain = (name) => {
   const ch = CHANNEL[channelOf(name)];
@@ -38,7 +41,7 @@ function ac() {
       master.gain.value = muted ? 0 : MIX.master;
       master.connect(comp).connect(ctx.destination);
       buses = {};
-      for (const name of ['sfx', 'ambience', 'weather', 'music']) {
+      for (const name of ['sfx', 'ambience', 'weather', 'music', 'ui']) {
         const g = ctx.createGain();
         g.gain.value = busGain(name);
         g.connect(master);
@@ -65,7 +68,7 @@ export function setMuted(m) {
 }
 export const isMuted = () => muted;
 
-/** Sets a player channel ('music' | 'sfx' | 'ambient'): volume 0..1 and mute. */
+/** Sets a player channel ('music' | 'sfx' | 'ambient' | 'ui'): volume 0..1 and mute. */
 export function setChannel(name, volume, mute = false) {
   if (!CHANNEL[name]) return;
   CHANNEL[name].v = Math.min(1, Math.max(0, Number(volume) || 0));
@@ -78,8 +81,20 @@ export const channelAudible = (name) => !muted && !CHANNEL[name].mute && CHANNEL
 export const audioContext = () => ctx;
 export const musicBus = () => buses?.music ?? null;
 
+let forced = null;
 function bus(name = 'sfx') {
-  return buses?.[name] ?? master;
+  // music stays on its own bus; everything else may be redirected (summoning → ui)
+  return buses?.[forced && name !== 'music' ? forced : name] ?? master;
+}
+/** Runs `fn` with every sound it makes routed to the UI/summoning bus (summon cinematics reuse combat sounds). */
+export function asUi(fn) {
+  const prev = forced;
+  forced = 'ui';
+  try {
+    return fn();
+  } finally {
+    forced = prev;
+  }
 }
 
 function noise(seconds) {
@@ -138,8 +153,8 @@ function burst(dur, peak, filterType, f0, f1 = f0, q = 1, out = 'sfx', delay = 0
 
 /** Mechanical ring lock: a short metallic click. */
 export function click(pitch = 1) {
-  tone('square', 1400 * pitch, 500 * pitch, 0.05, 0.22);
-  burst(0.03, 0.18, 'highpass', 3000);
+  tone('square', 1400 * pitch, 500 * pitch, 0.05, 0.22, 'ui');
+  burst(0.03, 0.18, 'highpass', 3000, 3000, 1, 'ui');
 }
 
 /** Rising electrical hum used during the anticipation phase. */
@@ -159,25 +174,25 @@ export function hum(duration = 1, intensity = 1) {
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(0.12, t + duration * 0.8);
   g.gain.exponentialRampToValueAtTime(0.0001, t + duration + 0.1);
-  o.connect(f).connect(g).connect(bus());
+  o.connect(f).connect(g).connect(bus('ui'));
   o.start(t);
   o.stop(t + duration + 0.15);
 }
 
 /** Two-tone alert; `long` adds a third rise for the rarest results. */
 export function alarm(long = false) {
-  for (let i = 0; i < (long ? 4 : 2); i++) tone('triangle', 620, 880, 0.22, 0.16, 'sfx', i * 0.28);
+  for (let i = 0; i < (long ? 4 : 2); i++) tone('triangle', 620, 880, 0.22, 0.16, 'ui', i * 0.28);
 }
 
 /** Air rushing as the crate falls. */
 export function whoosh(duration = 0.4) {
-  burst(duration, 0.2, 'bandpass', 400, 2400, 1.5);
+  burst(duration, 0.2, 'bandpass', 400, 2400, 1.5, 'ui');
 }
 
 /** Heavy landing. Weight scales with rarity. */
 export function thud(weight = 1) {
-  tone('sine', 120, 38, 0.3 + 0.1 * weight, 0.5 + 0.2 * weight);
-  burst(0.25, 0.35, 'lowpass', 500);
+  tone('sine', 120, 38, 0.3 + 0.1 * weight, 0.5 + 0.2 * weight, 'ui');
+  burst(0.25, 0.35, 'lowpass', 500, 500, 1, 'ui');
 }
 
 /** Reveal sting: more notes and a higher top note for rarer tiers. */
@@ -185,8 +200,24 @@ export function sting(tier = 1, rare = false) {
   const scale = [0, 4, 7, 12, 16, 19, 24];
   const notes = scale.slice(0, Math.min(scale.length, 2 + Math.min(5, tier - 1) + (rare ? 1 : 0)));
   const base = 196 * Math.pow(2, Math.min(7, tier - 1) / 12);
-  notes.forEach((semi, i) => tone(i === notes.length - 1 ? 'triangle' : 'sine', base * Math.pow(2, semi / 12), base * Math.pow(2, semi / 12), 0.5 + tier * 0.08 + (rare ? 0.8 : 0), 0.13, 'sfx', i * (rare ? 0.11 : 0.06)));
-  if (rare) tone('sine', base / 2, base / 2, 2.2, 0.16, 'sfx', 0); // a low drone under the fanfare
+  notes.forEach((semi, i) => tone(i === notes.length - 1 ? 'triangle' : 'sine', base * Math.pow(2, semi / 12), base * Math.pow(2, semi / 12), 0.5 + tier * 0.08 + (rare ? 0.8 : 0), 0.13, 'ui', i * (rare ? 0.11 : 0.06)));
+  if (rare) tone('sine', base / 2, base / 2, 2.2, 0.16, 'ui', 0); // a low drone under the fanfare
+}
+
+/**
+ * The rare-summon stinger: the moment a chase (or super chase) unit is revealed.
+ * A short musical phrase on the music engine (registered by music.js) plus a
+ * bright shimmer on the UI bus; falls back to the shimmer alone.
+ */
+let stingerHook = null;
+export function setStingerHook(fn) {
+  stingerHook = fn;
+}
+export function summonStinger(rarity = 'chase') {
+  if (rarity !== 'chase' && rarity !== 'super') return;
+  stingerHook?.(rarity);
+  const n = rarity === 'super' ? 8 : 5;
+  for (let i = 0; i < n; i++) tone('sine', 1568 * Math.pow(2, (i * 2) / 12), 1568 * Math.pow(2, (i * 2) / 12), 0.6, 0.03, 'ui', 0.1 + i * 0.07);
 }
 
 /** Crisp UI tick for buttons. */
@@ -345,6 +376,22 @@ const PACK2_SHOTS = {
   steelfist: (v) => (tone('sine', 70, 40, 0.25, 0.12 * v), burst(0.12, 0.08 * v, 'lowpass', 700, 200)),
   titanshell: (v) => (tone('sine', 80, 45, 0.3, 0.1 * v), burst(0.15, 0.09 * v, 'lowpass', 1100, 250)),
   rivetburst: (v) => (burst(0.03, 0.08 * v, 'highpass', 2600), tone('square', 500, 380, 0.03, 0.025 * v)),
+  // ---- The Ghost: steel draws and cuts, bowstrings, a heavy club, thrown kunai
+  katana: (v) => (burst(0.06, 0.07 * v, 'bandpass', 3200, 1800, 2), tone('sine', 2900, 3300, 0.05, 0.015 * v)),
+  katanaheavy: (v) => (burst(0.12, 0.1 * v, 'bandpass', 2600, 900, 1.5), tone('sine', 2400, 2800, 0.2, 0.025 * v)),
+  combo: (v) => (burst(0.04, 0.06 * v, 'bandpass', 3600, 2200, 2), tone('sine', 3100, 3500, 0.04, 0.012 * v)),
+  heavysaber: (v) => (burst(0.12, 0.1 * v, 'bandpass', 2000, 800, 1.5), tone('sine', 1900, 2300, 0.15, 0.025 * v)),
+  horsebow: (v) => (tone('triangle', 240, 130, 0.08, 0.06 * v), burst(0.06, 0.04 * v, 'bandpass', 2200, 1500, 3)),
+  powershot: (v) => (tone('triangle', 200, 100, 0.14, 0.09 * v), burst(0.12, 0.06 * v, 'bandpass', 2600, 1400, 2)),
+  firearrow: (v) => (tone('triangle', 230, 120, 0.08, 0.05 * v), burst(0.25, 0.04 * v, 'bandpass', 900, 500, 0.8)),
+  precision: (v) => (tone('triangle', 280, 140, 0.1, 0.07 * v), tone('sine', 2200, 2200, 0.15, 0.02 * v)),
+  club: (v) => (tone('sine', 120, 60, 0.15, 0.1 * v), burst(0.08, 0.07 * v, 'lowpass', 700, 250)),
+  kunai: (v) => burst(0.03, 0.06 * v, 'highpass', 3800, 4500),
+  kunaivolley: (v) => [0, 0.04, 0.08].forEach((d) => burst(0.03, 0.06 * v, 'highpass', 3800, 4500, 1, 'sfx', d)),
+  turncoat: (v) => (burst(0.05, 0.08 * v, 'bandpass', 3400, 2000, 2), tone('sine', 2600, 2200, 0.06, 0.02 * v)),
+  khanvolley: (v) => [0, 0.05, 0.1].forEach((d) => (tone('triangle', 210, 120, 0.07, 0.04 * v, 'sfx', d), burst(0.05, 0.03 * v, 'bandpass', 2000, 1400, 3, 'sfx', d))),
+  ghostblade: (v) => (burst(0.05, 0.08 * v, 'highpass', 3600, 5000), tone('sine', 1760, 2350, 0.08, 0.02 * v)),
+  ghoststance: (v) => (burst(0.07, 0.1 * v, 'highpass', 3000, 5200), tone('sine', 1568, 2093, 0.12, 0.03 * v), burst(0.15, 0.03 * v, 'bandpass', 500, 900, 2)),
 };
 
 /** Circle Pack 3 chase abilities: short, distinct stingers (never longer than the effect). */
@@ -358,6 +405,29 @@ export function chaseCast(kind, v = 1) {
       tone('sine', 110, 55, 1.4, 0.08 * v);
       tone('sine', 165, 82, 1.4, 0.05 * v);
       burst(0.9, 0.05 * v, 'bandpass', 3000, 1200, 2);
+      break;
+    // ---- The Ghost
+    case 'frenzy': // war drums
+      [0, 0.18, 0.36, 0.5, 0.62].forEach((d, i) => tone('sine', 90, 45, 0.22, (0.1 + i * 0.01) * v, 'sfx', d));
+      break;
+    case 'flurry':
+      [0, 0.07, 0.14, 0.21, 0.28].forEach((d) => burst(0.04, 0.07 * v, 'bandpass', 3400, 2000, 2, 'sfx', d));
+      break;
+    case 'lordtechnique':
+      tone('sine', 98, 98, 0.6, 0.06 * v);
+      burst(0.35, 0.1 * v, 'bandpass', 2600, 5000, 1.5, 'sfx', 0.25);
+      break;
+    case 'skyofarrows': // a horn, then the hiss of hundreds of arrows
+      tone('sawtooth', 110, 104, 0.8, 0.06 * v);
+      burst(1.2, 0.07 * v, 'bandpass', 3000, 1200, 1.5, 'sfx', 0.8);
+      break;
+    case 'ghoststance':
+      burst(0.8, 0.05 * v, 'bandpass', 400, 1400, 2);
+      tone('sine', 1047, 1047, 0.6, 0.03 * v, 'sfx', 0.2);
+      break;
+    case 'ghosttechnique':
+      tone('sine', 1568, 1568, 0.4, 0.025 * v);
+      [0.25, 0.32, 0.39, 0.46, 0.53, 0.6].forEach((d) => burst(0.04, 0.07 * v, 'highpass', 3600, 5000, 1, 'sfx', d));
       break;
     case 'worldbreak-charge':
       tone('sawtooth', 40, 90, 2, 0.05 * v);
@@ -379,7 +449,11 @@ export function freeze(v = 1) {
 /** Piercing lines, sky strikes and blessings (Circle Pack 2 abilities). */
 export function pierce(kind, v = 1) {
   if (kind === 'moonbeam') tone('sine', 900, 1600, 0.45, 0.06 * v);
-  else if (kind === 'gear') (tone('sawtooth', 300, 800, 0.35, 0.04 * v), burst(0.3, 0.04 * v, 'bandpass', 1500, 2500, 3));
+  else if (kind === 'cavalry') {
+    // a galloping charge: hoofbeats under a war cry
+    for (let i = 0; i < 8; i++) tone('sine', 110, 60, 0.08, 0.07 * v, 'sfx', i * 0.09 + (i % 2) * 0.03);
+    tone('sawtooth', 220, 180, 0.5, 0.025 * v);
+  } else if (kind === 'gear') (tone('sawtooth', 300, 800, 0.35, 0.04 * v), burst(0.3, 0.04 * v, 'bandpass', 1500, 2500, 3));
   else burst(0.1, 0.07 * v, 'bandpass', 1800, 2800, 2);
 }
 export function zap(gold = false, v = 1) {
@@ -434,6 +508,38 @@ export function lightning() {
   tone('sine', 60, 30, 1.4, 0.25, 'weather', 0.1);
 }
 
+/**
+ * Chase Unit Standard: every chase unit's own special-ability sound
+ * (keys referenced by src/render/chaseStandard.js; tests check each exists).
+ */
+export const CHASE_SFX = {
+  heroStrike: (v) => (tone('triangle', 392, 784, 0.25, 0.06 * v), burst(0.08, 0.06 * v, 'bandpass', 1400, 2200, 2)),
+  championFanfare: (v) => [523, 659, 784].forEach((f, i) => tone('sawtooth', f, f, 0.18, 0.035 * v, 'sfx', i * 0.09)),
+  engineerBuild: (v) => [0, 0.12, 0.24].forEach((d) => (tone('square', 900, 700, 0.04, 0.03 * v, 'sfx', d), burst(0.04, 0.05 * v, 'bandpass', 2400, 2400, 4, 'sfx', d))),
+  fortressSiren: (v) => tone('sawtooth', 330, 660, 0.6, 0.04 * v),
+  highNoon: (v) => (tone('sine', 1760, 1760, 0.6, 0.02 * v), [0, 0.1, 0.2].forEach((d) => burst(0.05, 0.1 * v, 'highpass', 2000, 2000, 1, 'sfx', 0.35 + d))),
+  diceRoll: (v) => [0, 0.06, 0.13, 0.21].forEach((d) => burst(0.03, 0.05 * v, 'bandpass', 3000, 3000, 5, 'sfx', d)),
+  houseWheel: (v) => (Array.from({ length: 10 }, (_, i) => tone('square', 1200, 1200, 0.02, 0.02 * v, 'sfx', i * (0.05 + i * 0.008))), tone('sine', 784, 1047, 0.4, 0.05 * v, 'sfx', 0.9)),
+  launchKlaxon: (v) => [0, 0.4].forEach((d) => tone('square', 440, 330, 0.3, 0.035 * v, 'sfx', d)),
+  antimatterFold: (v) => (tone('sine', 900, 60, 1.2, 0.07 * v), tone('sine', 1200, 80, 1.2, 0.04 * v)),
+  merchantVault: (v) => [1319, 1568, 2093, 2637].forEach((f, i) => tone('sine', f, f, 0.12, 0.035 * v, 'sfx', i * 0.06)),
+  overdrive: (v) => (tone('sawtooth', 80, 320, 0.6, 0.05 * v), burst(0.6, 0.04 * v, 'bandpass', 600, 2400, 2)),
+  wildHeart: (v) => (tone('sine', 110, 110, 0.9, 0.08 * v), burst(0.7, 0.04 * v, 'bandpass', 800, 1400, 1)),
+  zenithEye: (v) => (tone('sine', 220, 880, 0.5, 0.05 * v), burst(0.2, 0.08 * v, 'highpass', 3000, 3000, 1, 'sfx', 0.45)),
+  eventHorizon: (v) => (tone('sine', 55, 30, 1.4, 0.12 * v), tone('triangle', 2400, 600, 1.2, 0.02 * v)),
+  examBell: (v) => (tone('sine', 880, 880, 1.2, 0.05 * v), tone('sine', 1320, 1320, 1, 0.025 * v)),
+  winterHowl: (v) => (burst(1.2, 0.07 * v, 'bandpass', 400, 1600, 3), tone('sine', 1568, 1046, 0.9, 0.025 * v)),
+  chainsBreak: (v) => [0, 0.08, 0.15].forEach((d) => (tone('square', 2400, 1600, 0.05, 0.03 * v, 'sfx', d), burst(0.05, 0.06 * v, 'highpass', 3500, 3500, 1, 'sfx', d))),
+  worldbreakRumble: (v) => (tone('sine', 40, 30, 1.6, 0.14 * v), burst(1.4, 0.06 * v, 'lowpass', 200, 120, 0.7)),
+  turncoat: (v) => [0, 0.07, 0.14, 0.21, 0.28].forEach((d, i) => (burst(0.04, 0.07 * v, 'highpass', 3200 + i * 200, 3200, 1, 'sfx', d), tone('sine', 2600 - i * 200, 2400, 0.05, 0.02 * v, 'sfx', d))),
+  lordsCut: (v) => (tone('sine', 98, 98, 0.8, 0.07 * v), burst(0.3, 0.08 * v, 'bandpass', 3000, 5000, 2, 'sfx', 0.35), tone('triangle', 1175, 1175, 0.8, 0.03 * v, 'sfx', 0.35)),
+  khanHorn: (v) => (tone('sawtooth', 110, 104, 1, 0.07 * v), tone('sawtooth', 165, 156, 1, 0.04 * v), [0, 0.3, 0.6, 0.9].forEach((d) => tone('sine', 70, 40, 0.18, 0.12 * v, 'sfx', d))),
+  ghostWind: (v) => (burst(1, 0.05 * v, 'bandpass', 500, 2000, 3), tone('sine', 1047, 1047, 0.5, 0.03 * v, 'sfx', 0.3), tone('sine', 1568, 1568, 0.6, 0.02 * v, 'sfx', 0.45), burst(0.05, 0.09 * v, 'highpass', 4000, 4000, 1, 'sfx', 0.7)),
+};
+export function chaseSignature(key, v = 1) {
+  CHASE_SFX[key]?.(v);
+}
+
 /** A boss is about to use its ability: a short low horn (the visual telegraph runs at the same time). */
 export function bossWarn(v = 1) {
   tone('sawtooth', 110, 104, 0.5, 0.05 * v);
@@ -458,6 +564,19 @@ export function meteor(v = 1) {
   burst(0.7, 0.04 * v, 'bandpass', 3000, 600, 1.2, 'ambience');
 }
 
+/** Starfall: a falling whistle and a bright strike. */
+export function starStrike(v = 1) {
+  tone('sine', 2600, 700, 0.35, 0.03 * v);
+  burst(0.2, 0.08 * v, 'highpass', 2400, 1200, 1, 'sfx', 0.3);
+  tone('sine', 1760, 1760, 0.4, 0.02 * v, 'sfx', 0.3);
+}
+/** Twilight of Gods: a deep, divine pulse. */
+export function celestialPulse(v = 1) {
+  tone('sine', 82, 55, 0.9, 0.09 * v);
+  tone('sine', 330, 330, 0.8, 0.02 * v);
+  tone('sine', 495, 495, 0.8, 0.015 * v);
+}
+
 export function bossRoar() {
   tone('sawtooth', 70, 45, 1.2, 0.18);
   burst(1.0, 0.15, 'lowpass', 300, 120);
@@ -467,13 +586,13 @@ export function bossRoar() {
 
 /**
  * Starts a looping layer and returns a handle with stop(). Layers:
- *   rain, wind, storm, aurora, nova       – weather bus
+ *   rain, wind, storm, aurora, nova, ghastly, starfall, twilight – weather bus
  *   forest, volcanic, frozen, ruins, sky, mechanical – ambience bus
  */
 export function loop(name) {
   const c = ac();
   if (!c) return { stop() {} };
-  const out = ['rain', 'wind', 'storm', 'aurora', 'nova'].includes(name) ? 'weather' : 'ambience';
+  const out = ['rain', 'wind', 'storm', 'aurora', 'nova', 'ghastly', 'starfall', 'twilight'].includes(name) ? 'weather' : 'ambience';
   const g = c.createGain();
   g.gain.value = 0.0001;
   g.connect(bus(out));
@@ -552,6 +671,24 @@ export function loop(name) {
       padLayer([261.6, 392, 523.2], 'triangle', 0.04, 0.3);
       noiseLayer('highpass', 6000, 0.5, 0.06);
       level = 0.6;
+      break;
+    case 'ghastly': // a hollow, howling wind with rustling leaves
+      noiseLayer('bandpass', 380, 3, 0.5, 0.09, 180);
+      noiseLayer('bandpass', 1400, 1.5, 0.12, 0.2, 500);
+      every(4, 9, () => burst(0.5, 0.025, 'bandpass', 3000, 2000, 2, 'weather'));
+      level = 0.55;
+      break;
+    case 'starfall': // a still night: a soft shimmer and distant twinkles
+      noiseLayer('highpass', 7000, 0.5, 0.04);
+      padLayer([392, 587.3], 'sine', 0.025, 0.1);
+      every(1.5, 4, () => tone('sine', 2093 + Math.random() * 1500, 2093, 0.3, 0.012, 'weather'));
+      level = 0.5;
+      break;
+    case 'twilight': // a low, sacred drone
+      padLayer([55, 82.4, 110], 'sine', 0.06, 0.05);
+      padLayer([220, 329.6], 'triangle', 0.015, 0.1);
+      noiseLayer('lowpass', 300, 0.7, 0.08, 0.04, 80);
+      level = 0.55;
       break;
     case 'forest':
       noiseLayer('bandpass', 700, 0.6, 0.12, 0.08, 200);

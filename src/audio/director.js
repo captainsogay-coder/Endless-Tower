@@ -7,6 +7,7 @@
 import { impactWeight } from '../render/impact.js';
 import * as sfx from './sfx.js';
 import { Music } from './music.js';
+import { chaseOf } from '../render/chaseStandard.js';
 
 const MIN_GAP = {
   pierce: 0.08,
@@ -71,7 +72,26 @@ const MIN_GAP = {
 };
 const BUDGET_WINDOW = 0.1;
 const BUDGET = 10;
-const WEATHER_LOOP = { rainy: 'rain', windy: 'wind', thunderstorm: 'storm', aurora: 'aurora', nova: 'nova' };
+const WEATHER_LOOP = { rainy: 'rain', windy: 'wind', thunderstorm: 'storm', aurora: 'aurora', nova: 'nova', ghastly: 'ghastly', starfall: 'starfall', twilight: 'twilight' };
+/** Weathers with their own music theme (it replaces the battle theme while the weather lasts; bosses still win). */
+const WEATHER_THEME = { ghastly: 'ghastly', starfall: 'starfall', twilight: 'twilight' };
+const GHOST_FACTION = 'the-ghost';
+
+/**
+ * Which theme plays in battle (one at a time; Music crossfades on change):
+ * boss → a weather theme → The Ghost (when Ghost units make up at least half
+ * the field, 2+) → battle in a wave, main between waves.
+ */
+export function battleTheme(game) {
+  if (game.boss?.alive) return 'boss';
+  const w = WEATHER_THEME[game.weather?.current?.id];
+  if (w) return w;
+  const units = game.units ?? [];
+  const ghosts = units.filter((u) => u.def?.faction === GHOST_FACTION).length;
+  const wave = game.phase === 'wave';
+  if (ghosts >= 2 && ghosts * 2 >= units.length) return wave ? 'ghostBattle' : 'ghost';
+  return wave ? 'battle' : 'main';
+}
 
 export class AudioDirector {
   constructor({ muted = false } = {}) {
@@ -100,7 +120,7 @@ export class AudioDirector {
   allow(kind) {
     if (!this.active || !sfx.ready()) return 0;
     const t = this.now();
-    if (t - (this.last.get(kind) ?? -1) < (MIN_GAP[kind] ?? 0.05)) return 0;
+    if (t - (this.last.get(kind) ?? -1) < (MIN_GAP[kind] ?? (kind.startsWith('chase:') ? 0.6 : 0.05))) return 0;
     while (this.window.length && t - this.window[0] > BUDGET_WINDOW) this.window.shift();
     if (this.window.length >= BUDGET) return 0;
     this.last.set(kind, t);
@@ -154,6 +174,14 @@ export class AudioDirector {
       if (v) sfx.chaseCast(c.kind, v);
     });
     game.on('worldbreak', () => this.active && sfx.worldbreak());
+    game.on('starfall', () => {
+      const v = this.allow('starfall');
+      if (v) sfx.starStrike(v);
+    });
+    game.on('celestialPulse', () => {
+      const v = this.allow('celestialPulse');
+      if (v) sfx.celestialPulse(v);
+    });
     game.on('freeze', () => {
       const v = this.allow('freeze');
       if (v) sfx.freeze(v);
@@ -164,6 +192,13 @@ export class AudioDirector {
       if (v) sfx.bossWarn(v);
     });
     game.on('warCry', () => this.active && sfx.bossRoar());
+    // every chase unit's special has its own sound (Chase Unit Standard)
+    game.on('unitSpecial', (u) => {
+      const c = chaseOf(u.def.id);
+      if (!c) return;
+      const v = this.allow(`chase:${u.def.id}`);
+      if (v) sfx.chaseSignature(c.sfx, v);
+    });
     game.on('bossDefeated', () => this.active && sfx.bossFanfare());
     game.on('mapEvent', (e) => {
       if (!this.active) return;
@@ -185,13 +220,22 @@ export class AudioDirector {
     this.startAmbience(game.biome.id);
     this.setWeather(game.weather.current);
     this.music.start(game.biome.id);
-    this.music.setIntensity('calm');
+    this.music.play(battleTheme(game));
   }
 
-  /** Once per frame in battle: the music follows the fight (calm → combat → boss). */
+  /** Once per frame in battle: the music follows the fight (see battleTheme). */
   update(game) {
     if (!this.active) return;
-    this.music.setIntensity(game.boss?.alive ? 'boss' : game.phase === 'wave' ? 'combat' : 'calm');
+    this.music.play(battleTheme(game));
+  }
+
+  /** The summoning screen: The Ghost circle has its own theme; picking a circle plays its motif. */
+  summonCircle(banner, picked) {
+    if (this.active) return;
+    sfx.unlock();
+    this.music.start('menu');
+    this.music.play(banner?.id === 'the-ghost-circle' ? 'ghost' : 'main');
+    if (picked && banner) this.music.circleMotif(banner.id);
   }
 
   /** Menus: calm music once audio is allowed (after the first click or tap). */
@@ -199,14 +243,14 @@ export class AudioDirector {
     sfx.unlock();
     if (!this.active) {
       this.music.start('menu');
-      this.music.setIntensity('calm');
+      this.music.play('main');
     }
   }
 
   stopBattle() {
     this.active = false;
     this.music.start('menu');
-    this.music.setIntensity('calm');
+    this.music.play('main');
     this.ambience?.stop();
     this.ambience = null;
     this.weatherLoop?.stop();

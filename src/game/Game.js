@@ -298,6 +298,10 @@ export class Game {
     this.hash.clear();
     for (const e of this.enemies) if (e.alive && e.intro >= 1) this.hash.insert(e);
     for (let i = 0; i < strikes; i++) this.lightningStrike();
+    if (this.weather.due.length) {
+      for (const k of this.weather.due) k === 'star' ? this.starStrike() : this.celestialPulse();
+      this.weather.due.length = 0;
+    }
     this.updateTimers();
     this.updateFields(dt);
     this.updateUnits(dt);
@@ -326,7 +330,8 @@ export class Game {
 
   /** Enemy speed factor from an active map event (Whiteout); 1 otherwise. */
   get eventEnemySpeed() {
-    return this.events?.enemySpeed ?? 1;
+    // map events (Whiteout) and weather (Ghastly Wind) slow the march; both apply
+    return (this.events?.enemySpeed ?? 1) * (this.weather?.current?.enemySpeed ?? 1);
   }
 
   updateEnemies(dt) {
@@ -408,12 +413,47 @@ export class Game {
     return target;
   }
 
+  /** Starfall: a falling star hits one random enemy for a share of its max HP (bosses capped lower). */
+  starStrike() {
+    const w = this.weather.current?.star;
+    if (!w) return null;
+    const candidates = this.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+    if (!candidates.length) return null;
+    const e = candidates[Math.floor(this.combatRng.next() * candidates.length)];
+    this.damageEnemy(e, e.maxHp * (e.isBoss ? w.bossFraction : w.maxHpFraction), null);
+    this.emit('starfall', { x: e.x, y: e.y, target: e });
+    return e;
+  }
+
+  /** Twilight of Gods: a celestial pulse around a random enemy, area damage by max HP. */
+  celestialPulse() {
+    const w = this.weather.current?.pulse;
+    if (!w) return null;
+    const candidates = this.enemies.filter((e) => e.alive && !e.invulnerable && e.intro >= 1);
+    if (!candidates.length) return null;
+    const c = candidates[Math.floor(this.combatRng.next() * candidates.length)];
+    const { x, y } = c;
+    let n = 0;
+    this.hash.each(x, y, w.radius, (e) => {
+      if (!e.alive || e.invulnerable) return;
+      this.damageEnemy(e, e.maxHp * (e.isBoss ? w.bossFraction : w.maxHpFraction), null);
+      n++;
+    });
+    this.emit('celestialPulse', { x, y, radius: w.radius, hits: n });
+    return n;
+  }
+
   updateUnits(dt) {
     for (const u of this.units) {
       u.def.onUpdate?.(u, dt, this);
       if (u.def.summon) this.updateSummon(u, dt);
       u.ability?.update?.(u, dt, this);
       this.attack(u, dt);
+      // a special ability just fired (abilities stamp lastSpecial): one event for visuals and sound
+      if (u.lastSpecial !== undefined && u.lastSpecial !== u.specialSeen) {
+        u.specialSeen = u.lastSpecial;
+        this.emit('unitSpecial', u);
+      }
     }
   }
 
@@ -784,6 +824,7 @@ export class Game {
     for (const u of this.units) {
       if (radius !== Infinity && (u.x - source.x) ** 2 + (u.y - source.y) ** 2 > radius * radius) continue;
       if (buff.faction && u.def.faction !== buff.faction) continue;
+      if (buff.tag && !u.def.tags?.includes(buff.tag)) continue;
       u.timed ??= {};
       u.timed[buff.id] = { buff, until };
       this.refreshUnit(u);
@@ -836,6 +877,9 @@ export class Game {
     if (!e.alive || e.invulnerable) return 0;
     let dmg = amount * (1 - e.armor);
     if (e.bracedUntil > this.time) dmg *= bossDamageTaken(e, this.time);
+    // Twilight of Gods: every enemy takes a little more from everything
+    const wx = this.weather?.current?.enemyDamageTaken;
+    if (wx) dmg *= wx;
     if (e.statuses) {
       dmg *= statusDamageTakenMultiplier(e, this.time);
       if (source?.stats?.vsSlowed && statusSpeedMultiplier(e, this.time) < 1) dmg *= 1 + source.stats.vsSlowed;
@@ -889,6 +933,7 @@ export class Game {
     source?.ability?.onKill?.(source, e, this);
     this.houseEdgeKill();
     e.variant?.onDeath?.(e, this);
+    e.killedBy = source ?? null;
     this.emit('death', e);
     if (e.isBoss) {
       this.stats.bossesDefeated++;
@@ -1155,6 +1200,7 @@ export class Game {
       for (const b of s.def.buffs ?? []) {
         const r = b.radius === 'range' ? s.stats.range : b.radius;
         if (b.faction && def.faction !== b.faction) continue;
+        if (b.tag && !def.tags?.includes(b.tag)) continue;
         if (r === Infinity || (s.x - x) ** 2 + (s.y - y) ** 2 <= r * r) if (!best.has(b.id) || s.level > best.get(b.id)) best.set(b.id, s.level);
       }
     }

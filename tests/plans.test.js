@@ -173,13 +173,13 @@ test('collection filters: side tier, circle, ownership; sorting by any side tier
 
 test('circles are listed by Token price, cheapest first, stable for equal prices, all Tokens', () => {
   const list = listCirclesByPrice();
-  assert.equal(list.length, 17);
+  assert.equal(list.length, 18);
   for (let i = 1; i < list.length; i++) assert.ok(list[i].price >= list[i - 1].price);
-  assert.deepEqual(list.map((b) => b.price), [100, 150, 180, 220, 250, 250, 300, 300, 400, 500, 500, 650, 850, 950, 1200, 1500, 1800]);
+  assert.deepEqual(list.map((b) => b.price), [100, 150, 180, 220, 250, 250, 300, 300, 400, 500, 500, 650, 850, 950, 1200, 1500, 1800, 2500]);
   // equal prices keep registration order: Advanced (registered first) before Town Guard; Wild West before Gambino
   assert.deepEqual(list.map((b) => b.id).slice(4, 8), ['advanced-military-circle', 'town-guard-circle', 'wild-west-circle', 'gambino-circle']);
   assert.deepEqual(list.map((b) => b.id).slice(9, 11), ['nuclear-war-circle', 'clockwork-atelier-circle'], 'the 500-Token tie keeps registration order');
-  assert.deepEqual(list.map((b) => b.id).slice(-5), ['jungle-covenant-circle', 'arcane-library-circle', 'skybound-order-circle', 'titan-foundry-circle', 'astral-observatory-circle']);
+  assert.deepEqual(list.map((b) => b.id).slice(-6), ['jungle-covenant-circle', 'arcane-library-circle', 'skybound-order-circle', 'titan-foundry-circle', 'astral-observatory-circle', 'the-ghost-circle']);
   assert.ok(list.every((b) => b.currency === 'tokens'));
 });
 

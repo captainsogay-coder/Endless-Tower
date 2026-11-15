@@ -30,6 +30,7 @@ export const CIRCLE_TRIM = {
   'frostbound-legion-circle': '#9fd0ec',
   'arcane-library-circle': '#4fb8a8',
   'titan-foundry-circle': '#d0662a',
+  'the-ghost-circle': '#c8ccd4',
 };
 const STARTER_TRIM = '#8f8a80';
 
@@ -54,7 +55,7 @@ export function trimOf(defId) {
 }
 
 /** Arts whose own drawing is a vehicle/emplacement footprint: they grow less. */
-const LARGE = new Set(['tank', 'fortress', 'theHouse', 'icbm', 'nuclearWarhead', 'antimatter', 'bomber', 'b2', 'missileLauncher', 'catapult', 'trebuchet', 'ballista', 'miniBallista', 'drone', 'battalion', 'steamGolem', 'grandAutomaton', 'eternalEngine', 'elderTreant', 'heartOfTheWild', 'rocRider', 'eyeOfTheZenith', 'gearshot', 'panther', 'eternalWinter', 'forbiddenAuthor', 'ironHauler', 'forgeBrute', 'moltenGiant', 'steelColossus', 'warforgedTitan', 'worldbreaker']);
+const LARGE = new Set(['tank', 'fortress', 'theHouse', 'icbm', 'nuclearWarhead', 'antimatter', 'bomber', 'b2', 'missileLauncher', 'catapult', 'trebuchet', 'ballista', 'miniBallista', 'drone', 'battalion', 'steamGolem', 'grandAutomaton', 'eternalEngine', 'elderTreant', 'heartOfTheWild', 'rocRider', 'eyeOfTheZenith', 'gearshot', 'panther', 'eternalWinter', 'forbiddenAuthor', 'ironHauler', 'forgeBrute', 'moltenGiant', 'steelColossus', 'warforgedTitan', 'worldbreaker', 'mongolHorsemen', 'mongolBrute', 'greatKhan']);
 
 /** Figure scale: a touch larger than the old art for legibility, + up to ~25% by tier. */
 export function unitScale(def) {
