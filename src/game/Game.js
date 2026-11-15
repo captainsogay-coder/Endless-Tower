@@ -17,6 +17,8 @@ import { applyStatus, statusSpeedMultiplier, statusDamageTakenMultiplier, comput
 import { abilityOf } from './abilities.js';
 import { BALANCE, tokensForWave, waveDamageBonus } from '../balance.js';
 import { WeatherSystem, WEATHER_SETTINGS } from './weather.js';
+import { MapEvents } from './mapEvents.js';
+import { pickBoss, applyBoss, updateBoss, bossDamageTaken } from '../enemies/bosses.js';
 import { createUnit, levelStats, applyPassive, upgradeCost, maxLevel } from '../units/unitStats.js';
 
 let allySeq = 0;
@@ -35,6 +37,8 @@ export class Game {
     this.hash = new SpatialHash(WORLD_W, WORLD_H, GAME_CONFIG.spatialCellSize);
     this.autoSkip = false;
     this.weatherEnabled = options.weatherEnabled ?? true;
+    // map events (meteor showers, merchants, surges…); measurement tools switch them off
+    this.mapEventsEnabled = options.mapEvents ?? true;
     this.newRun(options);
   }
 
@@ -100,12 +104,15 @@ export class Game {
     this.nextPlan = this.director.next();
     this.cinematic = null;
     this.boss = null;
+    this.lastBossKind = null;
     this.coinMult = 1;
     this.weather = new WeatherSystem(rng.fork(), { enabled: this.weatherEnabled });
     this.weather.onChange = (w) => {
       this.refreshAll();
       this.emit('weather', w);
     };
+    // map events draw from their own stream, so they never shift spawns or combat rolls
+    this.events = new MapEvents(this, rng.fork(), { enabled: this.mapEventsEnabled });
     this.stats = { kills: 0, leaks: 0, bossesDefeated: 0, damage: 0, unitsDeployed: 0, upgrades: 0, coinsSpent: 0, peakUnits: 0, wavesCleared: 0, lightning: 0, dronesLaunched: 0, bonusCoins: 0, alliesSummoned: 0 };
     this.emit('runStart', this);
   }
@@ -163,6 +170,7 @@ export class Game {
     this.phase = 'wave';
     this.queueTimer = GAME_CONFIG.waveStagger;
     this.emit('waveStart', plan);
+    this.events?.onWaveStart(plan);
     return wave;
   }
 
@@ -233,6 +241,12 @@ export class Game {
     };
     for (const id of e.traits) getTrait(id)?.apply(e);
     e.hp = e.maxHp;
+    if (e.isBoss) {
+      // a boss archetype from the seed and wave number (not the director's stream)
+      const def = pickBoss(this.seed, wave.number ?? wave.plan?.wave ?? this.wave, this.lastBossKind);
+      applyBoss(e, def);
+      this.lastBossKind = def.id;
+    }
     if (ev.cinematic) {
       // Bosses materialise just inside the entrance so the arrival is visible.
       e.d = Math.min(route.length * 0.25, TILE * 3.8);
@@ -276,6 +290,7 @@ export class Game {
     this.time += dt;
 
     this.updateWaves(dt);
+    this.events?.update();
 
     const strikes = this.weather.update(dt);
 
@@ -309,6 +324,11 @@ export class Game {
     if (!this.activeWaves.length && !this.queue.length && this.phase === 'wave') this.phase = 'build';
   }
 
+  /** Enemy speed factor from an active map event (Whiteout); 1 otherwise. */
+  get eventEnemySpeed() {
+    return this.events?.enemySpeed ?? 1;
+  }
+
   updateEnemies(dt) {
     const tmp = this._tmp ?? (this._tmp = { x: 0, y: 0, dx: 0, dy: 0 });
     for (const e of this.enemies) {
@@ -328,6 +348,7 @@ export class Game {
       }
       if (e.regen > 0 && e.hp < e.maxHp && this.time - e.lastHit > 1.5) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * e.regen * dt);
       e.variant?.onUpdate?.(e, dt, this);
+      if (e.bossDef) updateBoss(e, dt, this);
       if (e.gravity && e.gravity.until > this.time) {
         // held by a gravity field: no progress along the road, drawn toward its centre
         e.seg = sampleRoute(e.route, e.d, tmp, e.seg);
@@ -338,7 +359,7 @@ export class Game {
         e.y = tmp.y + e.oy;
         continue;
       }
-      e.d += e.speed * (e.statuses ? statusSpeedMultiplier(e, this.time) : 1) * dt;
+      e.d += e.speed * (e.statuses ? statusSpeedMultiplier(e, this.time) : 1) * this.eventEnemySpeed * dt;
       if (e.d >= e.route.length) {
         this.leak(e);
         continue;
@@ -399,6 +420,8 @@ export class Game {
   /** Shared attack loop for deployed units and temporary allies. */
   attack(u, dt) {
     if (u.recoil > 0) u.recoil = Math.max(0, u.recoil - dt * 6);
+    // stunned by a boss's war cry: the cooldown waits too
+    if (u.stunnedUntil > this.time) return;
     u.cooldown -= dt;
     if (u.cooldown > 0) return;
     const target = u.ability?.target ? u.ability.target(u, this) : this.findTarget(u, u.stats.range);
@@ -812,6 +835,7 @@ export class Game {
   damageEnemy(e, amount, source = null) {
     if (!e.alive || e.invulnerable) return 0;
     let dmg = amount * (1 - e.armor);
+    if (e.bracedUntil > this.time) dmg *= bossDamageTaken(e, this.time);
     if (e.statuses) {
       dmg *= statusDamageTakenMultiplier(e, this.time);
       if (source?.stats?.vsSlowed && statusSpeedMultiplier(e, this.time) < 1) dmg *= 1 + source.stats.vsSlowed;
@@ -1098,6 +1122,8 @@ export class Game {
     for (const id of u.auras ?? []) add(scaledBuff(defs.get(id), u.auraLevels?.[id] ?? 0));
     // temporary ability buffs (one per id, only while active) share the same caps
     for (const t of Object.values(u.timed ?? {})) if (t.until > this.time) add(t.buff);
+    // an environmental surge (map event) counts as one more buff inside the same caps
+    add(this.events?.unitMod);
     const C = BALANCE.caps;
     agg.damageMult = Math.min(C.buffDamage, agg.damageMult);
     agg.cooldownMult = Math.max(1 / C.buffRate, agg.cooldownMult);

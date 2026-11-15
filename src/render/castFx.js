@@ -96,7 +96,7 @@ export class CastFx {
       if (r.blasts.length > 130) r.blasts.shift();
     }
     r.decals.push({ x, y, r: radius * 0.5 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: 5, seed: Math.random() * 6 });
-    if (r.decals.length > 140) r.decals.shift();
+    if (r.decals.length > r.q.decals) r.decals.shift();
     const col = { energy: '#9ff5dd', antimatter: '#cdb6ff', gold: '#f2d38a', frost: '#e4f4ff' }[st.palette] ?? '#d8cbb0';
     if (kind === 'slam' && w > 0.4) r.shake(Math.min(2.5, 2 * w));
     r.fx.ring(x, y, radius * 0.25, radius * 1.0, 0.3 + 0.1 * w, col, 1 + w);

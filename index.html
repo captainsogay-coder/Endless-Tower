@@ -34,6 +34,7 @@
     <symbol id="i-st-empower" viewBox="0 0 16 16"><path d="M3 8.5 8 4l5 4.5M3 13 8 8.5l5 4.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round"/></symbol>
     <symbol id="i-st-economy" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2"/><path d="M9.8 5.6C9.3 5 8.7 4.8 8 4.8c-1.2 0-2 .6-2 1.5 0 2 4 1.2 4 3.3 0 .9-.9 1.6-2 1.6-.8 0-1.5-.3-2-.9M8 3.5v9" stroke="#1d1606" stroke-width="1.2" fill="none"/></symbol>
     <symbol id="i-pin" viewBox="0 0 16 16"><path d="M8 1.5l1.9 4.2 4.6.4-3.5 3 1.1 4.5L8 11.2l-4.1 2.4L5 9.1l-3.5-3 4.6-.4z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 16 16"><path d="M6.9 1.5h2.2l.4 1.9 1.3.6 1.6-1.1 1.6 1.6-1.1 1.6.6 1.3 1.9.4v2.2l-1.9.4-.6 1.3 1.1 1.6-1.6 1.6-1.6-1.1-1.3.6-.4 1.9H6.9l-.4-1.9-1.3-.6-1.6 1.1-1.6-1.6 1.1-1.6-.6-1.3-1.9-.4V6.9l1.9-.4.6-1.3-1.1-1.6 1.6-1.6 1.6 1.1 1.3-.6z"/><circle cx="8" cy="8" r="2.3" fill="#1d1606"/></symbol>
     <symbol id="i-tower" viewBox="0 0 16 16"><path d="M3 14V6h1.5V4H6v2h1.2V4h1.6v2H10V4h1.5v2H13v8z"/></symbol>
   </svg>
 
@@ -67,6 +68,7 @@
         <svg class="ico token"><use href="#i-token" /></svg>
         <span id="wallet-tokens" class="num">0</span><span class="label">Tokens</span>
       </div>
+      <button id="btn-settings-menu" class="icon-btn menu-settings" type="button" title="Settings: graphics, effects and audio" aria-label="Settings"><svg><use href="#i-gear" /></svg></button>
       </div>
     </nav>
 
@@ -247,7 +249,7 @@
               <button data-speed="3" title="Fastest">3×</button>
             </div>
           </div>
-          <button class="icon-btn" id="btn-fx" title="Ambient effects"><svg><use href="#i-fx" /></svg></button>
+          <button class="icon-btn" id="btn-settings" title="Settings: graphics, effects and audio" aria-label="Settings"><svg><use href="#i-gear" /></svg></button>
           <button class="icon-btn" id="btn-sound" title="Sound on/off"><svg><use href="#i-sound" /></svg></button>
           <button class="icon-btn" id="btn-retreat" title="Retreat to Battle Plans"><svg><use href="#i-flag" /></svg></button>
         </div>
@@ -257,6 +259,7 @@
     <main id="stage">
       <canvas id="game"></canvas>
       <div id="weather-card" class="weather-card" hidden aria-live="polite"></div>
+      <div id="event-card" class="event-card" hidden aria-live="polite"></div>
       <div id="boss-bar" hidden>
         <div class="boss-title"><span id="boss-name">Boss</span><span id="boss-hp-text" class="num"></span></div>
         <div class="boss-track"><div id="boss-shield"></div><div id="boss-fill"></div></div>
@@ -308,6 +311,38 @@
         <button id="btn-retreat-cancel" class="btn-secondary">Keep fighting</button>
         <button id="btn-retreat-confirm" class="btn-primary">Retreat</button>
       </div>
+    </div>
+  </div>
+
+
+  <div id="screen-settings" class="overlay" hidden>
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="set-head"><h2 id="settings-title">Settings</h2><button id="btn-settings-close" class="icon-btn" type="button" aria-label="Close settings">✕</button></div>
+      <section class="set-group">
+        <h3>Graphics</h3>
+        <div id="set-quality" class="seg" role="radiogroup" aria-label="Graphics quality">
+          <button type="button" role="radio" data-q="auto">Auto</button>
+          <button type="button" role="radio" data-q="low">Low</button>
+          <button type="button" role="radio" data-q="medium">Medium</button>
+          <button type="button" role="radio" data-q="high">High</button>
+          <button type="button" role="radio" data-q="ultra">Ultra</button>
+        </div>
+        <p id="set-quality-note" class="muted small"></p>
+        <label class="set-toggle"><input type="checkbox" id="set-ambient" /> <span><b>Living environment</b><span class="muted small">Moving foliage, water, wildlife, clouds and changing light</span></span></label>
+        <label class="set-toggle"><input type="checkbox" id="set-weatherfx" /> <span><b>Weather visuals</b><span class="muted small">Rain, snow, storms and auroras on screen. Weather still affects the battle when this is off.</span></span></label>
+        <label class="set-toggle"><input type="checkbox" id="set-intense" /> <span><b>Intense effects</b><span class="muted small">Flashes, ability cinematics and big particle bursts</span></span></label>
+        <label class="set-toggle"><input type="checkbox" id="set-shake" /> <span><b>Screen shake</b><span class="muted small">A short shake on major impacts only</span></span></label>
+      </section>
+      <section class="set-group">
+        <h3>Audio</h3>
+        <div class="set-audio">
+          <label for="set-vol-music">Music</label><input type="range" id="set-vol-music" min="0" max="100" step="5" /><label class="set-mute"><input type="checkbox" id="set-mute-music" /> Mute</label>
+          <label for="set-vol-sfx">Sound effects</label><input type="range" id="set-vol-sfx" min="0" max="100" step="5" /><label class="set-mute"><input type="checkbox" id="set-mute-sfx" /> Mute</label>
+          <label for="set-vol-ambient">Ambient</label><input type="range" id="set-vol-ambient" min="0" max="100" step="5" /><label class="set-mute"><input type="checkbox" id="set-mute-ambient" /> Mute</label>
+        </div>
+        <label class="set-toggle"><input type="checkbox" id="set-master" /> <span><b>All sound</b><span class="muted small">The master switch (also the speaker button)</span></span></label>
+      </section>
+      <div class="modal-actions"><button id="btn-settings-done" class="btn-primary" type="button">Done</button></div>
     </div>
   </div>
 

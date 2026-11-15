@@ -19,6 +19,9 @@ import './render/medievalArt.js';
 import './render/pack2Art.js';
 import './render/pack3Art.js';
 import { initResponsive } from './ui/responsive.js';
+import { SettingsView } from './ui/settingsView.js';
+import { qualityOf, AUDIO_CHANNELS } from './meta/settings.js';
+import * as sfx from './audio/sfx.js';
 
 registerRoster();
 
@@ -137,10 +140,23 @@ const actions = {
     settings.speed = s;
     hud.setSpeed(s);
   },
-  toggleEffects() {
-    settings.effects = settings.effects ? 0 : 1;
-    renderer.setEffects(settings.effects);
-    hud.setEffects(!!settings.effects);
+  acceptOffer() {
+    if (!game.events.acceptOffer()) hud.toast('Not enough coins for this trade', '#d9534a');
+  },
+  declineOffer() {
+    // the merchant packs up and leaves; nothing is spent
+    if (game.events.active?.def.kind === 'offer') game.events.end();
+  },
+  openSettings() {
+    // the battle pauses while the panel is open (and resumes as it was)
+    if (settings.inBattle && !settings.paused) {
+      setPaused(true);
+      settingsView.onClose = () => {
+        settingsView.onClose = null;
+        setPaused(false);
+      };
+    }
+    settingsView.open();
   },
   selectDeploy(defId) {
     ui.selected = null;
@@ -183,6 +199,23 @@ const actions = {
 };
 
 const hud = new Hud(actions);
+
+/** Applies saved graphics/accessibility/audio settings to the renderer and the mixer. */
+function applySettings(st) {
+  const q = qualityOf(st);
+  renderer.applySettings(q, { shake: st.shake, weatherFx: st.weatherFx, intenseFx: st.intenseFx, ambientLife: st.ambientLife && settings.effects > 0 });
+  for (const c of AUDIO_CHANNELS) sfx.setChannel(c, st.volume[c], st.mute[c]);
+  audio.applySettings?.(st);
+}
+const settingsView = new SettingsView({
+  profile,
+  onApply: applySettings,
+  onMaster: (on) => {
+    if (on === !profile.data.muted) return;
+    actions.toggleSound();
+  },
+});
+document.getElementById('btn-settings-menu').addEventListener('click', () => actions.openSettings());
 const plans = new BattlePlansView({ profile, onBattle: startBattle, onGoto: (p) => showPage(p) });
 const summoning = new SummoningView({ profile, onChange: () => updateWallet() });
 document.querySelector('.tabs').addEventListener('click', (ev) => {
@@ -190,10 +223,16 @@ document.querySelector('.tabs').addEventListener('click', (ev) => {
   if (t) showPage(t.dataset.page);
 });
 renderer.attach(game);
-hud.setEffects(!!settings.effects);
+applySettings(profile.data.settings);
 hud.onRunStart(game);
 
 game.on('runStart', () => hud.onRunStart(game));
+game.on('mapEvent', (e) => hud.onMapEvent(e, game));
+// Tokens from a merchant trade are saved at once, like wave rewards
+game.on('bonusTokens', (t) => {
+  profile.earn('tokens', t.amount);
+  updateWallet();
+});
 game.on('waveStart', (plan) => hud.onWaveStart(plan, game));
 game.on('waveClear', (d) => {
   // Tokens are persisted the moment a wave is completed.
@@ -203,6 +242,7 @@ game.on('waveClear', (d) => {
   hud.onWaveClear(d, game);
 });
 game.on('bossArrived', (e) => hud.onBossArrived(e, game));
+game.on('bossIntro', ({ enemy }) => hud.onBossIntro(enemy));
 game.on('sell', ({ refund }) => hud.toast(`Sold for ${refund} coins`, '#8d939e'));
 game.on('upgrade', () => { const el = document.getElementById('unit-panel'); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); });
 game.on('gameOver', (d) => {
@@ -363,7 +403,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // Exposed for debugging and automated screenshots.
-window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit, sideTiers };
+window.endlessTower = { game, renderer, settings, actions, profile, plans, summoning, getUnit, sideTiers, settingsView, applySettings };
 
 // Boot complete: hide the loader.
 window.__etBooted = true;

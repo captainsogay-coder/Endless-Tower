@@ -5,6 +5,7 @@ import { rgba } from '../core/color.js';
 export class Effects {
   constructor(max = 1000) {
     this.max = max;
+    this.scale = 1; // graphics-preset multiplier on requested counts
     this.particles = [];
     this.pool = [];
     this.rings = [];
@@ -22,7 +23,7 @@ export class Effects {
 
   /** Fraction of requested particles to actually emit, shrinking as the field gets crowded. */
   get density() {
-    return Math.max(0.15, 1 - this.particles.length / this.max);
+    return Math.max(0.15, 1 - this.particles.length / this.max) * this.scale;
   }
 
   burst(x, y, count, color, { speed = 80, life = 0.6, size = 2.5, gravity = 0, glow = true } = {}) {

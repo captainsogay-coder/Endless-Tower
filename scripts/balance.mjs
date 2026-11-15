@@ -42,7 +42,7 @@ function investment(def, level) {
 
 /** Damage per second of one copy against wave-`wave` Regulars. */
 function measure(def, wave, scenario, opts = {}) {
-  const g = new Game({ seed: 11, loadout: [def?.id ?? 'cadet', 'cadet'], weatherEnabled: false });
+  const g = new Game({ seed: 11, loadout: [def?.id ?? 'cadet', 'cadet'], weatherEnabled: false, mapEvents: false });
   g.coins = 1e12;
   g.towerHp = g.towerMaxHp = 1e15;
   g.stats.wavesCleared = wave - 1;
@@ -196,7 +196,7 @@ if (mode === 'tiers') {
   const marks = [10, 25, 50, 100, 250];
   console.log(before ? 'BEFORE' : 'AFTER', 'bot: ≤40 units near the road, waves called one at a time');
   for (const lo of loadouts) {
-    const g = new Game({ seed: 5, loadout: lo, weatherEnabled: false });
+    const g = new Game({ seed: 5, loadout: lo, weatherEnabled: false, mapEvents: false });
     const spots = [];
     // best coverage first: how much road (weighted by shared routes) lies within ~3 tiles
     const road = new Map();

@@ -5,12 +5,15 @@ import { createRng } from '../core/rng.js';
 import { makeCanvas, drawGlow } from '../render/canvas.js';
 import { paintTerrain, featurePath } from './paint.js';
 import { VIGNETTES, VIGNETTE_SCALE } from './vignettes.js';
+import { LifeLayer } from '../render/lifeLayer.js';
 
 export class MapScene {
-  constructor(map, biome, { effects = 1, shake } = {}) {
+  constructor(map, biome, { effects = 1, shake, life = 2 } = {}) {
     this.map = map;
     this.biome = biome;
     this.effects = effects;
+    // light moods, wildlife and glints (src/render/lifeLayer.js); level from the graphics preset
+    this.lifeLayer = new LifeLayer(map, biome, life, map.seed);
     this.shake = shake;
     this.time = 0;
     this.terrain = null;
@@ -72,8 +75,17 @@ export class MapScene {
     this.windTarget = weatherId === 'windy' ? 1 : weatherId === 'thunderstorm' ? 0.8 : weatherId === 'rainy' ? 0.35 : 0.1;
   }
 
+  set life(level) {
+    this.lifeLayer.level = level;
+  }
+
+  get life() {
+    return this.lifeLayer.level;
+  }
+
   update(dt) {
     this.time += dt;
+    this.lifeLayer.update(dt);
     this.wind += (this.windTarget - this.wind) * Math.min(1, dt * 0.8);
     this.ambient.update?.(dt, this.time);
     for (const c of this.cloudShadows) {
@@ -131,9 +143,11 @@ export class MapScene {
     ctx.save();
     this.ambient.drawUnder?.(ctx, this.time);
     ctx.restore();
+    this.lifeLayer.drawGround(ctx, this.featurePath);
   }
 
   drawOver(ctx) {
+    this.lifeLayer.drawAir(ctx);
     if (this.effects <= 0) return;
     ctx.save();
     this.ambient.drawOver?.(ctx, this.time);

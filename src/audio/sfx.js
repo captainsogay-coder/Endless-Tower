@@ -1,7 +1,7 @@
 // Synthesized sound kit (WebAudio, no asset files).
 //
-// Mixing: every sound goes to one of three buses – sfx, ambience, weather –
-// which feed a master gain and a compressor/limiter, so even hundreds of
+// Mixing: every sound goes to one of four buses – sfx, ambience, weather,
+// music – which feed a master gain and a compressor/limiter, so even hundreds of
 // simultaneous shots can't clip. Combat call sites are additionally rate-
 // limited by the AudioDirector so massive waves never become noise.
 // Everything is a no-op until the context is unlocked by a user gesture, and
@@ -13,7 +13,14 @@ let buses = null;
 let muted = false;
 const noiseCache = new Map();
 
-export const MIX = { master: 0.55, sfx: 0.8, ambience: 0.35, weather: 0.5 };
+export const MIX = { master: 0.55, sfx: 0.8, ambience: 0.35, weather: 0.5, music: 0.32 };
+/** Player-facing channels: volume 0..1 and mute, applied on top of the base mix. Ambient covers realm + weather. */
+const CHANNEL = { sfx: { v: 1, mute: false }, ambient: { v: 1, mute: false }, music: { v: 1, mute: false } };
+const channelOf = (busName) => (busName === 'ambience' || busName === 'weather' ? 'ambient' : busName);
+const busGain = (name) => {
+  const ch = CHANNEL[channelOf(name)];
+  return ch.mute ? 0 : MIX[name] * ch.v;
+};
 
 function ac() {
   if (!ctx) {
@@ -31,9 +38,9 @@ function ac() {
       master.gain.value = muted ? 0 : MIX.master;
       master.connect(comp).connect(ctx.destination);
       buses = {};
-      for (const name of ['sfx', 'ambience', 'weather']) {
+      for (const name of ['sfx', 'ambience', 'weather', 'music']) {
         const g = ctx.createGain();
-        g.gain.value = MIX[name];
+        g.gain.value = busGain(name);
         g.connect(master);
         buses[name] = g;
       }
@@ -57,6 +64,19 @@ export function setMuted(m) {
   if (master) master.gain.setTargetAtTime(muted ? 0 : MIX.master, ctx.currentTime, 0.05);
 }
 export const isMuted = () => muted;
+
+/** Sets a player channel ('music' | 'sfx' | 'ambient'): volume 0..1 and mute. */
+export function setChannel(name, volume, mute = false) {
+  if (!CHANNEL[name]) return;
+  CHANNEL[name].v = Math.min(1, Math.max(0, Number(volume) || 0));
+  CHANNEL[name].mute = !!mute;
+  if (!buses) return;
+  for (const b of Object.keys(buses)) if (channelOf(b) === name) buses[b].gain.setTargetAtTime(busGain(b), ctx.currentTime, 0.08);
+}
+export const channelAudible = (name) => !muted && !CHANNEL[name].mute && CHANNEL[name].v > 0;
+/** The audio context, for the music engine (null until unlocked). */
+export const audioContext = () => ctx;
+export const musicBus = () => buses?.music ?? null;
 
 function bus(name = 'sfx') {
   return buses?.[name] ?? master;

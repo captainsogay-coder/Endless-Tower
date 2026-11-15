@@ -19,6 +19,10 @@ import { circle, drawGlow } from './canvas.js';
 import { rgba, shade } from '../core/color.js';
 import { getTrait } from '../waves/traits.js';
 import { TAU, easeOutBack, clamp } from '../core/math.js';
+import { QUALITY } from '../meta/settings.js';
+import { EventsFx } from './eventsFx.js';
+import { BossFx } from './bossFx.js';
+import { BOSSES } from '../enemies/bosses.js';
 
 const DEATH_PARTICLES = { minion: 4, regular: 6, elite: 12, boss: 40 };
 const PLAYER_COLOR = '#e3a33b';
@@ -29,7 +33,10 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.effectsLevel = effects;
-    this.fx = new Effects();
+    // graphics budget and accessibility flags (see applySettings / src/meta/settings.js)
+    this.q = QUALITY.high;
+    this.flags = { shake: true, weatherFx: true, intenseFx: true, ambientLife: effects > 0 };
+    this.fx = this.makeFx();
     this.scale = 1;
     this.dpr = 1;
     this.shakeAmt = 0;
@@ -44,6 +51,8 @@ export class Renderer {
     this.decals = []; // scorch marks on the ground
     this.weatherFx = new WeatherFx();
     this.castFx = new CastFx(this);
+    this.eventsFx = new EventsFx(this);
+    this.bossFx = new BossFx(this);
     this.unsub = [];
   }
 
@@ -53,13 +62,18 @@ export class Renderer {
     this.unsub = [];
     const on = (t, fn) => this.unsub.push(game.on(t, fn));
     const rebuild = () => {
-      this.scene = new MapScene(game.map, game.biome, { effects: this.effectsLevel, shake: (a) => this.shake(a) });
+      this.scene = new MapScene(game.map, game.biome, { effects: this.effectsLevel, shake: (a) => this.shake(a), life: this.flags.ambientLife ? this.q.life : 0 });
       this.sprites = buildEnemySprites(game.biome.enemyPalette);
+      // every boss archetype keeps its own colours in every realm, so it is recognised at once
+      this.bossSprites ??= Object.fromEntries(Object.values(BOSSES).map((b) => [b.id, buildEnemySprites(b.palette).boss]));
       this.breachPulse = game.map.entrances.map(() => 0);
-      this.fx = new Effects();
+      this.fx = this.makeFx();
       this.blasts = [];
       this.decals = [];
       this.castFx.reset();
+      this.eventsFx.reset();
+      this.bossFx.reset();
+      this.weatherFx.biome = game.biome.id;
       this.ui.selected = null;
       this.ui.placingDef = null;
       this.resize();
@@ -67,6 +81,8 @@ export class Renderer {
     rebuild();
     on('runStart', rebuild);
     this.castFx.attach(game, on);
+    this.eventsFx.attach(game, on);
+    this.bossFx.attach(game, on);
     on('spawn', (e) => {
       this.breachPulse[e.routeIndex] = Math.min(1, (this.breachPulse[e.routeIndex] ?? 0) + (e.isBoss ? 1 : 0.3));
     });
@@ -95,7 +111,7 @@ export class Renderer {
     });
     on('bossArrived', (e) => {
       this.shake(5);
-      this.bossFlash = 0.35;
+      this.flash(0.35);
       this.fx.ring(e.x, e.y, 20, 160, 0.8, '#ffffff', 3);
     });
     on('lightning', (l) => {
@@ -106,7 +122,7 @@ export class Renderer {
     });
     on('bossDefeated', (e) => {
       this.shake(7);
-      this.bossFlash = 0.4;
+      this.flash(0.4);
       this.fx.ring(e.x, e.y, 20, 200, 1.0, '#ffffff', 4);
     });
   }
@@ -116,8 +132,41 @@ export class Renderer {
     if (this.scene) this.scene.effects = level;
   }
 
+  /** Particle pool sized by the graphics preset; 'intense effects' off thins every burst. */
+  makeFx() {
+    const fx = new Effects(this.q.particles);
+    fx.scale = this.q.density * (this.flags.intenseFx ? 1 : 0.6);
+    return fx;
+  }
+
+  /**
+   * Applies a graphics preset (QUALITY entry) and the accessibility flags.
+   * Scenery counts are fixed when a map is built, so a lower preset takes
+   * full effect from the next battle; budgets and toggles apply at once.
+   */
+  applySettings(q, flags) {
+    this.q = q;
+    this.flags = { ...flags };
+    this.fx.max = q.particles;
+    this.fx.scale = q.density * (flags.intenseFx ? 1 : 0.6);
+    this.setEffects(flags.ambientLife ? q.ambient : 0);
+    if (this.scene) this.scene.life = flags.ambientLife ? q.life : 0;
+    this.weatherFx.enabled = flags.weatherFx;
+    this.weatherFx.detail = q.weather;
+    this.weatherFx.flashScale = flags.intenseFx ? 1 : 0;
+    if (!flags.shake) this.shakeAmt = 0;
+    this.resize();
+  }
+
   shake(amount) {
-    this.shakeAmt = Math.min(8, Math.max(this.shakeAmt, amount * (0.5 + 0.5 * this.effectsLevel)));
+    if (!this.flags.shake) return;
+    const k = this.flags.intenseFx ? 1 : 0.6;
+    this.shakeAmt = Math.min(8, Math.max(this.shakeAmt, amount * k * (0.5 + 0.5 * Math.min(1, this.effectsLevel || 0.6))));
+  }
+
+  /** A short full-screen flash (bosses): skipped when intense effects are off. */
+  flash(v) {
+    if (this.flags.intenseFx) this.bossFlash = v;
   }
 
   /** Impact feedback scales with the weapon: dust for pebbles, sparks for bullets, blasts for explosives. */
@@ -148,7 +197,7 @@ export class Renderer {
           if (this.blasts.length > 120) this.blasts.shift();
         }
         this.decals.push({ x: p.x, y: p.y, r: r * 0.55 * (0.5 + 0.5 * Math.min(1, w)), t: 0, max: big ? 6 : 4, seed: Math.random() * 6 });
-        if (this.decals.length > 140) this.decals.shift();
+        if (this.decals.length > this.q.decals) this.decals.shift();
         this.fx.ring(p.x, p.y, r * 0.3, r * 1.0, 0.25 + 0.15 * w, '#d8cbb0', 1 + w);
         if (p.kind === 'siege' && w > 0.5) this.fx.ring(p.x, p.y, r * 0.6, r * 1.3, 0.5, '#efe6d0', 1 + 2 * w);
         if (p.kind === 'explosive-drone') this.fx.ring(p.x, p.y, r * 0.2, r * 0.9, 0.3, '#d9533f', 1.5 + w);
@@ -193,7 +242,7 @@ export class Renderer {
     if (r.width < 10 || r.height < 10) return;
     const scale = Math.max(0.2, Math.min(r.width / WORLD_W, r.height / WORLD_H));
     this.scale = scale;
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(this.q.dpr, window.devicePixelRatio || 1);
     const w = Math.floor(WORLD_W * scale);
     const h = Math.floor(WORLD_H * scale);
     this.canvas.style.width = `${w}px`;
@@ -221,6 +270,7 @@ export class Renderer {
     scene.update(dt);
     this.fx.update(gameDt);
     this.weatherFx.update(dt, this.game.weather?.current, this.effectsLevel);
+    this.eventsFx.update(gameDt);
     this.towerHit = Math.max(0, this.towerHit - dt * 3);
     this.bossFlash = Math.max(0, this.bossFlash - dt);
     for (let i = 0; i < this.breachPulse.length; i++) this.breachPulse[i] = Math.max(0, this.breachPulse[i] - dt * 1.2);
@@ -239,6 +289,8 @@ export class Renderer {
     scene.drawTerrain(ctx);
     scene.drawUnder(ctx);
     this.weatherFx.drawUnder(ctx);
+    this.eventsFx.drawUnder(ctx);
+    this.bossFx.drawUnder(ctx, WORLD_W, WORLD_H);
     this.drawDecals(ctx, gameDt);
     this.drawHazards(ctx, t);
     this.castFx.drawUnder(ctx, gameDt);
@@ -251,9 +303,11 @@ export class Renderer {
     this.drawProjectiles(ctx);
     this.drawBlasts(ctx, gameDt);
     this.castFx.drawOver(ctx, gameDt);
+    this.bossFx.drawOver(ctx, gameDt);
     this.drawPlacementGhost(ctx);
     this.fx.draw(ctx);
     scene.drawOver(ctx);
+    this.eventsFx.drawOver(ctx);
     this.weatherFx.drawOver(ctx);
     this.drawCinematicOver(ctx);
   }
@@ -632,7 +686,7 @@ export class Renderer {
   }
 
   drawEnemy(ctx, e, t) {
-    const spr = this.sprites[e.category];
+    const spr = (e.bossKind && this.bossSprites[e.bossKind]) || this.sprites[e.category];
     const r = e.radius;
     let scale = 1;
     let alpha = 1;
@@ -715,8 +769,10 @@ export class Renderer {
       ctx.stroke();
     }
 
+    if (e.bossDef) this.bossFx.drawBossBack(ctx, e, bob, scale, t);
     ctx.save();
-    ctx.globalAlpha = alpha;
+    // the Phantom is half there
+    ctx.globalAlpha = e.bossKind === 'phantom' ? alpha * (e.invulnerable ? 0.35 : 0.75) : alpha;
     ctx.translate(e.x, e.y + bob);
     ctx.rotate(tilt);
     ctx.scale(scale * e.facing * (2 - squash), scale * squash);
@@ -727,6 +783,7 @@ export class Renderer {
       ctx.drawImage(spr.flash, -h, -h, h * 2, h * 2);
     }
     ctx.restore();
+    if (e.bossDef && e.intro > 0.3) this.bossFx.drawBoss(ctx, e, bob, scale, t);
 
     if (e.armor > 0) {
       ctx.strokeStyle = 'rgba(214,220,230,0.85)';

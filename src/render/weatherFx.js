@@ -18,6 +18,15 @@ export class WeatherFx {
     this.motes = [];
     this.bolts = [];
     this.flash = 0;
+    this.enabled = true; // weather visuals toggle (the gameplay modifiers never depend on it)
+    this.detail = 1; // graphics preset multiplier on particle counts
+    this.biome = null; // realm id: rain turns to sleet in the Frozen Frontier, steams on lava
+    this.puddles = []; // rain collects in shallow puddles that dry when it stops
+    this.wet = 0; // 0..1 how soaked the ground is
+    this.gusts = []; // dust clouds blown across in wind
+    this.far = []; // distant lightning on the horizon
+    this.dark = 0; // storm darkening (pulses)
+    this.flashScale = 1; // 0 when intense effects are off
   }
 
   /** Called every frame with the game's current weather (or null). */
@@ -26,11 +35,29 @@ export class WeatherFx {
     const id = weather?.id ?? null;
     if (id && id !== this.kind) {
       this.kind = id;
-      this.seed(effects);
+      this.seed(Math.max(0.2, this.detail * (effects > 0 ? 1 : 0.5)));
     }
     this.fade = Math.max(0, Math.min(1, this.fade + (id ? dt : -dt) / 1.5));
+    const raining = id === 'rainy' || id === 'thunderstorm';
+    // the ground soaks over ~20 s of rain and dries over ~40 s
+    this.wet = Math.max(0, Math.min(1, this.wet + (raining ? dt / 20 : -dt / 40)));
+    if (raining && this.puddles.length < Math.round(14 * this.detail) && Math.random() < dt * 0.6) {
+      this.puddles.push({ x: rnd(20, WORLD_W - 20), y: rnd(20, WORLD_H - 20), r: rnd(8, 18), grow: 0, seed: Math.random() * 10 });
+    }
+    for (const p of this.puddles) p.grow = Math.max(0, Math.min(1, p.grow + (raining ? dt / 12 : -dt / 30)));
+    if (!raining) this.puddles = this.puddles.filter((p) => p.grow > 0);
     if (!id && this.fade === 0) this.kind = null;
     if (!this.kind) return;
+    if (this.kind === 'windy' && this.gusts.length < 3 * this.detail && Math.random() < dt * 0.4) {
+      this.gusts.push({ x: -200, y: rnd(40, WORLD_H - 40), r: rnd(70, 140), v: rnd(220, 340), seed: Math.random() * 10 });
+    }
+    for (let i = this.gusts.length - 1; i >= 0; i--) if ((this.gusts[i].x += this.gusts[i].v * dt) > WORLD_W + 200) this.gusts.splice(i, 1);
+    if (this.kind === 'thunderstorm') {
+      // the sky darkens and lifts in slow waves; now and then lightning far away
+      this.dark = 0.5 + 0.5 * Math.sin(this.t * 0.35);
+      if (Math.random() < dt * 0.5) this.far.push({ x: rnd(40, WORLD_W - 40), t: 0, seed: Math.random() * 10 });
+    }
+    for (let i = this.far.length - 1; i >= 0; i--) if ((this.far[i].t += dt) > 0.4) this.far.splice(i, 1);
     const heavy = this.kind === 'thunderstorm';
     for (const d of this.drops) {
       d.x += d.vx * dt;
@@ -101,10 +128,13 @@ export class WeatherFx {
 
   /** Ground layer: ripples, cloud darkening, aurora/nova light on the terrain. */
   drawUnder(ctx) {
+    if (!this.enabled) return;
+    if (this.wet > 0 || this.puddles.length) this.drawWet(ctx);
     if (!this.kind) return;
     const a = this.fade;
     if (this.kind === 'rainy' || this.kind === 'thunderstorm') {
-      ctx.fillStyle = `rgba(20,30,45,${(this.kind === 'thunderstorm' ? 0.22 : 0.1) * a})`;
+      const storm = this.kind === 'thunderstorm';
+      ctx.fillStyle = `rgba(20,30,45,${(storm ? 0.16 + 0.1 * this.dark : 0.1) * a})`;
       ctx.fillRect(0, 0, WORLD_W, WORLD_H);
       ctx.strokeStyle = `rgba(200,220,240,${0.35 * a})`;
       ctx.lineWidth = 1;
@@ -119,6 +149,20 @@ export class WeatherFx {
     } else if (this.kind === 'aurora') {
       ctx.fillStyle = `rgba(30,60,70,${0.12 * a})`;
       ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+      // the ribbons' light pooling on the ground, drifting slowly
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const cols = ['120,230,190', '120,190,240', '190,140,230'];
+      for (let i = 0; i < 3; i++) {
+        const x = WORLD_W * (0.2 + 0.3 * i) + Math.sin(this.t * 0.12 + i * 2) * 140;
+        const y = WORLD_H * (0.35 + 0.2 * Math.sin(this.t * 0.09 + i));
+        const g = ctx.createRadialGradient(x, y, 0, x, y, 260);
+        g.addColorStop(0, `rgba(${cols[i]},${0.08 * a})`);
+        g.addColorStop(1, `rgba(${cols[i]},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(x - 260, y - 260, 520, 520);
+      }
+      ctx.restore();
     } else if (this.kind === 'nova') {
       const g = ctx.createRadialGradient(WORLD_W * 0.82, -40, 0, WORLD_W * 0.82, -40, WORLD_W * 0.9);
       g.addColorStop(0, `rgba(255,214,140,${0.22 * a})`);
@@ -128,24 +172,90 @@ export class WeatherFx {
     }
   }
 
+  /** Soaked ground: a cool sheen and puddles that ripple while it rains. */
+  drawWet(ctx) {
+    const sleet = this.biome === 'frozen';
+    if (this.wet > 0) {
+      ctx.fillStyle = `rgba(${sleet ? '200,215,230' : '30,45,60'},${(0.07 * this.wet).toFixed(3)})`;
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
+    const raining = this.kind === 'rainy' || this.kind === 'thunderstorm';
+    for (const p of this.puddles) {
+      if (p.grow <= 0) continue;
+      const r = p.r * p.grow;
+      ctx.fillStyle = sleet ? `rgba(225,238,248,${0.35 * p.grow})` : `rgba(70,90,110,${0.3 * p.grow})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, r, r * 0.55, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = `rgba(220,235,250,${0.18 * p.grow})`;
+      ctx.beginPath();
+      ctx.ellipse(p.x - r * 0.3, p.y - r * 0.15, r * 0.35, r * 0.12, 0, 0, TAU);
+      ctx.fill();
+      if (raining && !sleet) {
+        const k = (this.t * 1.6 + p.seed) % 1;
+        ctx.strokeStyle = `rgba(220,235,250,${0.4 * (1 - k) * p.grow})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.ellipse(p.x + Math.sin(p.seed) * r * 0.3, p.y, r * 0.2 + k * r * 0.5, (r * 0.2 + k * r * 0.5) * 0.5, 0, 0, TAU);
+        ctx.stroke();
+      }
+    }
+  }
+
   /** Sky layer above actors – kept faint. */
   drawOver(ctx) {
+    if (!this.enabled) {
+      this.drawBolts(ctx); // strikes deal damage, so they always show where they land
+      return;
+    }
     if (!this.kind) return;
     const a = this.fade;
     switch (this.kind) {
       case 'rainy':
       case 'thunderstorm': {
-        ctx.strokeStyle = `rgba(190,210,230,${(this.kind === 'thunderstorm' ? 0.38 : 0.3) * a})`;
-        ctx.lineWidth = 1;
+        const sleet = this.biome === 'frozen';
+        ctx.strokeStyle = sleet ? `rgba(240,246,255,${0.45 * a})` : `rgba(190,210,230,${(this.kind === 'thunderstorm' ? 0.38 : 0.3) * a})`;
+        ctx.lineWidth = sleet ? 1.4 : 1;
         ctx.beginPath();
         for (const d of this.drops) {
           ctx.moveTo(d.x, d.y);
           ctx.lineTo(d.x - d.vx * 0.02, d.y - d.len);
         }
         ctx.stroke();
+        if (this.kind === 'thunderstorm') {
+          // lightning far off, glimpsed along the top of the sky
+          for (const f of this.far) {
+            const k = f.t / 0.4;
+            ctx.strokeStyle = `rgba(230,236,255,${0.5 * (1 - k) * a})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            let x = f.x;
+            ctx.moveTo(x, 0);
+            for (let i = 1; i <= 4; i++) {
+              x += Math.sin(f.seed + i * 2.7) * 8;
+              ctx.lineTo(x, i * 10);
+            }
+            ctx.stroke();
+            ctx.fillStyle = `rgba(220,228,255,${0.06 * (1 - k) * a})`;
+            ctx.fillRect(f.x - 120, 0, 240, 60);
+          }
+        }
         break;
       }
       case 'windy': {
+        // dust clouds driven across the field
+        for (const g of this.gusts) {
+          const grad = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.r);
+          grad.addColorStop(0, `rgba(200,184,150,${0.1 * a})`);
+          grad.addColorStop(1, 'rgba(200,184,150,0)');
+          ctx.fillStyle = grad;
+          ctx.save();
+          ctx.translate(g.x, g.y);
+          ctx.scale(1.8, 0.6);
+          ctx.translate(-g.x, -g.y);
+          ctx.fillRect(g.x - g.r, g.y - g.r, g.r * 2, g.r * 2);
+          ctx.restore();
+        }
         ctx.strokeStyle = `rgba(235,235,225,${0.16 * a})`;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -210,11 +320,24 @@ export class WeatherFx {
         }
         ctx.restore();
         for (const m of this.motes) drawGlow(ctx, '#ffe2a0', m.x, m.y, 3, (0.35 + 0.25 * Math.sin(this.t * 3 + m.ph)) * a);
+        // a slow shimmer rolling out from the star: the air itself bending
+        ctx.strokeStyle = `rgba(255,230,180,${0.07 * a})`;
+        ctx.lineWidth = 6;
+        for (let i = 0; i < 2; i++) {
+          const rr = ((this.t * 60 + i * 400) % 800) + 60;
+          ctx.beginPath();
+          ctx.arc(cx, -40, rr, 0, Math.PI);
+          ctx.stroke();
+        }
         break;
       }
       default:
     }
-    // lightning bolts and flashes (also used outside storms if strike() is called)
+    this.drawBolts(ctx);
+  }
+
+  /** Lightning bolts and their flash (also outside storms if strike() is called). */
+  drawBolts(ctx) {
     for (const b of this.bolts) {
       const k = b.t / 0.35;
       ctx.strokeStyle = `rgba(255,255,240,${(1 - k) * 0.95})`;
@@ -227,7 +350,7 @@ export class WeatherFx {
       ctx.stroke();
     }
     if (this.flash > 0) {
-      ctx.fillStyle = `rgba(230,235,255,${this.flash * 0.12})`;
+      ctx.fillStyle = `rgba(230,235,255,${this.flash * 0.12 * this.flashScale})`;
       ctx.fillRect(0, 0, WORLD_W, WORLD_H);
     }
   }

@@ -61,7 +61,7 @@ export function botStep(game, unitId = 'dude') {
 }
 
 export function simulate({ seed, biomeId, maxWave = 60, step = 1 / 30, loadout = ['dude'] } = {}) {
-  const game = new Game({ seed, biomeId, loadout });
+  const game = new Game({ seed, biomeId, loadout, mapEvents: false });
   const archetypes = [];
   let guard = 0;
   while (game.phase !== 'gameover' && game.wave < maxWave && guard++ < 5e6) {

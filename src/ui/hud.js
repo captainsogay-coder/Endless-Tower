@@ -44,10 +44,10 @@ export class Hud {
       deployBar: $('deploy-bar'),
       nextPreview: $('next-preview'), next: $('btn-next'), auto: $('auto'),
       callCount: $('call-count'), callMany: $('btn-call-many'), queueInfo: $('queue-info'),
-      weatherBtn: $('btn-weather'), weatherCard: $('weather-card'), weatherChip: $('weather-chip'), sound: $('btn-sound'),
+      weatherBtn: $('btn-weather'), weatherCard: $('weather-card'), eventCard: $('event-card'), weatherChip: $('weather-chip'), sound: $('btn-sound'),
       banner: $('banner'), toasts: $('toasts'), unitPanel: $('unit-panel'),
       bossBar: $('boss-bar'), bossName: $('boss-name'), bossFill: $('boss-fill'), bossShield: $('boss-shield'), bossHpText: $('boss-hp-text'),
-      pause: $('btn-pause'), pauseVeil: $('pause-veil'), fx: $('btn-fx'),
+      pause: $('btn-pause'), pauseVeil: $('pause-veil'), settings: $('btn-settings'),
       over: $('screen-over'), overWave: $('over-wave'), overStats: $('over-stats'),
       retreat: $('screen-retreat'),
     };
@@ -85,7 +85,7 @@ export class Hud {
     });
     el.sound.addEventListener('click', () => actions.toggleSound());
     el.pause.addEventListener('click', () => actions.togglePause());
-    el.fx.addEventListener('click', () => actions.toggleEffects());
+    el.settings.addEventListener('click', () => actions.openSettings());
     $('btn-retreat').addEventListener('click', () => actions.askRetreat());
     $('btn-retreat-cancel').addEventListener('click', () => actions.cancelRetreat());
     $('btn-retreat-confirm').addEventListener('click', () => actions.retreat());
@@ -186,8 +186,16 @@ export class Hud {
   }
 
   onBossArrived(e, game) {
-    this.el.bossName.textContent = game.biome.bossTitle ?? 'Boss';
+    this.el.bossName.textContent = e.bossDef?.name ?? game.biome.bossTitle ?? 'Boss';
+    this.el.bossBar.style.setProperty('--boss', e.bossDef?.color ?? '#d9534a');
     this.el.bossBar.hidden = false;
+  }
+
+  /** The boss's own introduction: who it is and how it fights. */
+  onBossIntro(e) {
+    const d = e.bossDef;
+    if (!d) return;
+    this.banner(`<div class="b-kicker">Boss</div><div class="b-title">${esc(d.name)}</div><div class="b-sub">${esc(d.intro)}</div>`, d.color, 'boss');
   }
 
   toast(text, color) {
@@ -210,10 +218,6 @@ export class Hud {
     document.querySelectorAll('.speed button').forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === s));
   }
 
-  setEffects(on) {
-    this.el.fx.classList.toggle('off', !on);
-  }
-
   // ------------------------------------------------------------ per frame
 
   update(game, ui, force = false) {
@@ -222,6 +226,7 @@ export class Hud {
     el.next.disabled = game.phase === 'gameover';
     el.next.textContent = `Call wave ${game.nextPlan.wave}`;
     this.renderWeather(game, ui);
+    this.renderEvent(game);
 
     this.renderDeployBar(game, ui);
     this.renderUnitPanel(game, ui);
@@ -327,6 +332,60 @@ export class Hud {
     card.querySelector('.wc-bar div').style.width = `${(rem / game.weather.settings.duration) * 100}%`;
   }
 
+  /**
+   * Map events: a short banner when one begins, then a small card (top right
+   * of the field) with what it does and how long it lasts. The merchant's card
+   * carries the optional trade.
+   */
+  onMapEvent({ phase, event }, game) {
+    const d = event.def;
+    const color = { cosmetic: '#9fb7d9', modifier: '#93b85c', offer: '#f2d38a', reward: '#f2d38a' }[d.kind];
+    if (phase === 'start') {
+      this.banner(`<div class="b-kicker">Event${d.effect ? `, ${esc(d.effect)} for ${d.duration} s` : ''}</div><div class="b-title">${esc(d.name)}</div><div class="b-sub">${esc(d.text)}</div>`, color, 'small');
+      this.eventKey = '';
+    } else if (phase === 'trade') {
+      this.toast(`Traded with the merchant: +${event.offer.tokens} Tokens`, '#f2d38a');
+      this.eventKey = '';
+    }
+    this.renderEvent(game);
+  }
+
+  renderEvent(game) {
+    const card = this.el.eventCard;
+    const a = game.events?.active;
+    if (!a) {
+      if (!card.hidden) card.hidden = true;
+      this.eventKey = '';
+      return;
+    }
+    const d = a.def;
+    const o = a.offer;
+    const key = `${d.id}|${a.start}|${o?.taken ?? ''}`;
+    if (this.eventKey !== key) {
+      this.eventKey = key;
+      const color = { cosmetic: '#9fb7d9', modifier: '#93b85c', offer: '#f2d38a', reward: '#f2d38a' }[d.kind];
+      card.style.setProperty('--c', color);
+      const body = d.kind === 'modifier' ? `<p class="ev-effect">${esc(d.effect)}</p>` : d.kind === 'cosmetic' ? '<p class="ev-note muted">No effect on the battle.</p>' : '';
+      const offer = o
+        ? o.taken
+          ? '<p class="ev-note">Trade complete.</p>'
+          : `<p class="ev-effect">Pay <b class="num">${formatNumber(o.coins)}</b> coins for <b class="num">${formatNumber(o.tokens)}</b> Tokens</p>
+             <div class="ev-actions"><button type="button" class="btn-primary ev-accept">Trade</button><button type="button" class="btn-secondary ev-decline">No thanks</button></div>`
+        : '';
+      card.innerHTML = `<div class="ev-head"><span class="ev-name">${esc(d.name)}</span><span class="ev-time num"></span></div><div class="wc-bar"><div></div></div>${body}${offer}`;
+      card.querySelector('.ev-accept')?.addEventListener('click', () => this.actions.acceptOffer());
+      card.querySelector('.ev-decline')?.addEventListener('click', () => this.actions.declineOffer());
+    }
+    card.hidden = false;
+    const rem = Math.max(0, a.until - game.time);
+    const secs = `${Math.ceil(rem)}s`;
+    const t = card.querySelector('.ev-time');
+    if (t.textContent !== secs) t.textContent = secs;
+    card.querySelector('.wc-bar div').style.width = `${(rem / d.duration) * 100}%`;
+    const acc = card.querySelector('.ev-accept');
+    if (acc) acc.disabled = game.coins < o.coins;
+  }
+
   setWeatherExpanded(on) {
     const open = !!on && !this.placing && !!this.weatherKey;
     this.weatherExpanded = open;
@@ -346,6 +405,9 @@ export class Hud {
     this.el.bossFill.style.width = `${Math.max(0, (b.hp / b.maxHp) * 100)}%`;
     this.el.bossShield.style.width = b.maxShield ? `${(b.shield / b.maxShield) * 100}%` : '0';
     this.el.bossHpText.textContent = `${formatNumber(Math.max(0, b.hp))} / ${formatNumber(b.maxHp)}`;
+    // what it is about to do (the bar pulses while an ability is telegraphed)
+    this.el.bossBar.classList.toggle('warn', !!b.telegraph);
+    this.el.bossBar.classList.toggle('braced', b.bracedUntil > game.time);
   }
 
   renderDeployBar(game, ui) {

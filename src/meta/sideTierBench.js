@@ -67,7 +67,7 @@ export const BENCH = {
 const UNKILLABLE = 1e15;
 
 function arena(ids) {
-  const g = new Game({ seed: BENCH.seed, loadout: [...new Set(ids)], weatherEnabled: false });
+  const g = new Game({ seed: BENCH.seed, loadout: [...new Set(ids)], weatherEnabled: false, mapEvents: false });
   g.coins = 1e12;
   g.towerHp = g.towerMaxHp = 1e15;
   g.stats.wavesCleared = BENCH.wave - 1;
